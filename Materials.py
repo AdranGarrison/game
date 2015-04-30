@@ -1,5 +1,6 @@
 __author__ = 'Alan'
 
+
 from BaseClasses import *
 import random
 
@@ -30,47 +31,55 @@ class Bone_Material(Material):
         self.density=1900
         self.youngs=12
         self.fracture_energy=1.5*self.quality
-        self.tensile_strength=50*self.quality
+        self.tensile_strength=35*self.quality
         self.mode='brittle'
         self.fracture_toughness=(self.youngs*self.fracture_energy)**0.5
         self.shear=3.3
-        self.shear_strength=70*self.quality
+        self.shear_strength=4*self.quality
         self.electric_conduction=True
         self.heat_conduction=True
-        self.dissipationfactor=1.5
+        self.dissipationfactor=4
         self.maxedge=(10**-4)/self.quality
-        self.damagetype=['crack','break','crush','cut','shatter']
+        self.damagetype=['crack','break','crush','cut','shatter','sever']
 
-    def damageresolve(self,damagedobject,defender,force,pressure,attacker):
-        if isinstance(defender,Limb)==True:
-            defenderstats=defender.stats
-        elif isinstance(defender,Creature)==True:
-            defenderstats=defender.stats
+'''    def damageresolve(self,attack,attacker,reactionforce=False):
+        damagedobject=attack.target
+        basetarget=attack.basetarget
+        if isinstance(attack.basetarget,Limb)==True:
+            defenderstats=attack.basetarget.stats
+        elif isinstance(attack.basetarget,Creature)==True:
+            defenderstats=attack.basetarget.stats
+        elif attack.basetarget.stats:
+            defenderstats=attack.basetarget.stats
         else:
             defenderstats={'str':10,'tec':10,'per':10,'wil':10,'luc':10}
         m=min(0.5*attacker.stats['luc']/defenderstats['luc'],1)
-
+        contact=False
 
 #Cutting---------------------------------------------------------------------
-        rootarea=(force/pressure)**0.5
-        if 1.5*force*(1/(3.5*damagedobject.thickness*rootarea)-self.density*rootarea/(3.5*damagedobject.mass))>self.shear_strength*1000000:
+        rootarea=(attack.force/attack.pressure)**0.5
+        shearforce=1.5*attack.force*(1/(3.5*damagedobject.thickness*rootarea)-self.density*rootarea/(3.5*damagedobject.mass))
+        if isinstance(attack.basetarget,Limb):
+            shearforce=shearforce*(damagedobject.mass/basetarget.mass)**0.5
+        if shearforce>self.shear_strength*1000000 and attack.contact==True and attack.type=='cut':
             damagedobject.damage['cut']+=1
+            contact=True
 #----------------------------------------------------------------------------
 
 #Crushing--------------------------------------------------------------------
-        if pressure>self.tensile_strength*(1200000-200000*random.triangular(low=0,high=1,mode=m)) and damagedobject.damage['crush']==0:
+        if attack.force>self.tensile_strength*(1200000-200000*random.triangular(low=0,high=1,mode=m))*damagedobject.length*damagedobject.radius and damagedobject.damage['crush']==0 and attack.contact==True:
             damagedobject.damage['crush']=1
-            pass
+            contact=True
 #----------------------------------------------------------------------------
 
 
 
 #Cracking, Breaking, and Shattering------------------------------------------
         hitloc=random.triangular(low=0,high=1,mode=m)*damagedobject.length
-        if force>10*(1-damagedobject.damage['crack'])*(3.14*self.tensile_strength*1000000*damagedobject.thickness**3)/hitloc:
-            severity=force/((10*3.14*self.tensile_strength*1000000*damagedobject.thickness**3)/hitloc)-1
+        crackforce=attack.force #*(damagedobject.mass/basetarget.mass)**0.5
+        if crackforce>10*(1-damagedobject.damage['crack'])*(self.tensile_strength*1000000*damagedobject.r*damagedobject.thickness**2)/hitloc:
+            severity=crackforce/(10*(1-damagedobject.damage['crack'])*(self.tensile_strength*1000000*damagedobject.r*damagedobject.thickness**2)/hitloc)-1
             cracklength=damagedobject.damage['crack']**0.5+severity**0.5
-
             #Cracked but not broken
             if cracklength<1:
                 damagedobject.damage['crack']+=severity
@@ -88,10 +97,24 @@ class Bone_Material(Material):
                 damagedobject.damage['break']=1
                 damagedobject.damage['shatter']=1
 
+
+        if contact==True:
+            attack.contact=True
+            attack.energy-=7*self.fracture_energy*1000*rootarea*damagedobject.thickness
+            attack.energy_recalc()
+        else:
+            attack.contact=False
+
 #-----------------------------------------------------------------------------
 
+        if contact==True:
+            attack.contact=True
+            attack.energy-=7*self.fracture_energy*1000*rootarea*damagedobject.thickness
+            attack.energy_recalc()
+        else:
+            attack.contact=False
 
-
+'''
 
 
 
@@ -99,38 +122,68 @@ class Bone_Material(Material):
 class Flesh_Material(Material):
     def __init__(self,thickness=1,quality=1,**kwargs):
         self.name='flesh'
-        self.maxquality=1.1
+        self.maxquality=2
         self.quality=min(quality,self.maxquality)
         self.thickness=thickness
         self.density=1000
-        self.youngs=0.00002
+        self.youngs=0.0003
         self.fracture_energy=0.2*self.quality
         self.tensile_strength=1.6*self.quality
         self.mode='soft'
         self.fracture_toughness=(self.youngs*self.fracture_energy)**0.5
-        self.shear=0.00002
-        self.shear_strength=0.4*self.quality
+        self.shear=0.0002
+        self.shear_strength=0.6*self.quality
         self.electric_conduction=True
         self.heat_conduction=False
         self.dissipationfactor=1.5
         self.maxedge=0.01
         self.damagetype=['bruise','cut','crush']
-
-    def damageresolve(self,damagedobject,defender,force,pressure,attacker):
-        if isinstance(defender,Limb)==True:
-            defenderstats=defender.stats
-        elif isinstance(defender,Creature)==True:
-            defenderstats=defender.stats
+'''
+    def damageresolve(self,attack,attacker):
+        damagedobject=attack.target
+        basetarget=attack.basetarget
+        if isinstance(attack.basetarget,Limb)==True:
+            defenderstats=attack.basetarget.stats
+        elif isinstance(attack.basetarget,Creature)==True:
+            defenderstats=attack.basetarget.stats
+        elif attack.basetarget.stats:
+            defenderstats=attack.basetarget.stats
         else:
             defenderstats={'str':15,'tec':15,'per':15,'wil':15,'luc':15}
+        m=min(0.5*attacker.stats['luc']/defenderstats['luc'],1)
+        contact=False
+
+#Cutting---------------------------------------------------------------------
+        rootarea=(attack.force/attack.pressure)**0.5
+        shearforce=1.5*attack.force*(1/(3.5*damagedobject.thickness*rootarea)-self.density*rootarea/(3.5*damagedobject.mass))
+        if isinstance(attack.basetarget,Limb):
+            shearforce=shearforce*(damagedobject.mass/basetarget.mass)**0.5
+        if shearforce>self.shear_strength*1000000 and attack.contact==True and attack.type=='cut':
+            damagedobject.damage['cut']+=1
+            contact=True
+#----------------------------------------------------------------------------
+
+#Crushing--------------------------------------------------------------------
+        if attack.force>self.tensile_strength*(1200000-200000*random.triangular(low=0,high=1,mode=m))*damagedobject.length*damagedobject.radius and damagedobject.damage['crush']==0 and attack.contact==True:
+            damagedobject.damage['crush']=1
+            contact=True
+#----------------------------------------------------------------------------
 
 
-        #Bruising
-        if pressure>self.tensile_strength*200000:
-            severity=(pressure/(self.tensile_strength*200000)-1)*random.gauss(0.5*attacker.stats['luc']/defenderstats['luc'],0.5)
+#Bruising
+        if attack.pressure>self.tensile_strength*200000:
+            severity=(attack.pressure/(self.tensile_strength*200000)-1)*random.gauss(0.5*attacker.stats['luc']/defenderstats['luc'],0.5)
             pythagoreanseverity=(severity**2+damagedobject.damage['bruise']**2)**0.5
             damagedobject.damage['bruise']=pythagoreanseverity
 
+
+        if contact==True:
+            attack.contact=True
+            attack.energy-=7*self.fracture_energy*1000*rootarea*damagedobject.thickness
+            attack.energy_recalc()
+        else:
+            attack.contact=False
+'''
 
 
 class Iron(Material):
@@ -149,28 +202,76 @@ class Iron(Material):
         self.shear_strength=304*self.quality
         self.electric_conduction=True
         self.heat_conduction=True
-        self.dissipationfactor=1
+        self.dissipationfactor=8
         self.maxedge=(10**-7)/self.quality
         self.damagetype=['crack','break','shatter','crush','cut']
-
-    def damageresolve(self,damagedobject,defender,force,pressure,attacker):
-        if isinstance(defender,Limb)==True:
-            defenderstats=defender.stats
-        elif isinstance(defender,Creature)==True:
-            defenderstats=defender.stats
+'''
+    def damageresolve(self,attack,attacker):
+        damagedobject=attack.target
+        basetarget=attack.basetarget
+        if isinstance(attack.basetarget,Limb)==True:
+            defenderstats=attack.basetarget.stats
+        elif isinstance(attack.basetarget,Creature)==True:
+            defenderstats=attack.basetarget.stats
+        elif attack.basetarget.stats:
+            defenderstats=attack.basetarget.stats
         else:
-            defenderstats={'str':15,'tec':15,'per':15,'wil':15,'luc':15}
-
-        #Cracking
+            defenderstats={'str':10,'tec':10,'per':10,'wil':10,'luc':10}
         m=min(0.5*attacker.stats['luc']/defenderstats['luc'],1)
-        hitloc=random.triangular(low=0,high=1,mode=m)*damagedobject.length
-        if force>10*(3.14*self.tensile_strength*1000000*damagedobject.thickness**3)/hitloc:
-            if damagedobject.plural==False:
-                print("the {} is cracked".format(damagedobject.name))
-            else:
-                print("the {} are cracked".format(damagedobject.name))
-            severity=force/((10*3.14*self.tensile_strength*1000000*damagedobject.thickness**3)/hitloc)-1
-            damagedobject.damage['crack']+=severity
+        contact=False
+
+
+#Cutting---------------------------------------------------------------------
+        rootarea=(attack.force/attack.pressure)**0.5
+        shearforce=1.5*attack.force*(1/(3.5*damagedobject.thickness*rootarea)-self.density*rootarea/(3.5*damagedobject.mass))
+        if isinstance(attack.basetarget,Limb):
+            shearforce=shearforce*(damagedobject.mass/basetarget.mass)**0.5
+        if shearforce>self.shear_strength*1000000 and attack.contact==True and attack.type=='cut':
+            damagedobject.damage['cut']+=1
+            contact=True
+#----------------------------------------------------------------------------
+
+#Crushing--------------------------------------------------------------------
+        if attack.force>self.tensile_strength*(1200000-200000*random.triangular(low=0,high=1,mode=m))*damagedobject.length*damagedobject.radius and damagedobject.damage['crush']==0 and attack.contact==True:
+            damagedobject.damage['crush']=1
+            contact=True
+#----------------------------------------------------------------------------
+
+
+
+#Cracking, Breaking, and Shattering------------------------------------------
+        hitloc=random.triangular(low=0.001,high=1,mode=m)*damagedobject.length
+        crackforce=attack.force #*(damagedobject.mass/basetarget.mass)**0.5
+        if crackforce>10*(1.01-damagedobject.damage['crack'])*(self.tensile_strength*1000000*damagedobject.r*damagedobject.thickness**2)/hitloc:
+            severity=crackforce/(10*(1.01-damagedobject.damage['crack'])*(self.tensile_strength*1000000*damagedobject.r*damagedobject.thickness**2)/hitloc)-1
+            cracklength=damagedobject.damage['crack']**0.5+severity**0.5
+            #Cracked but not broken
+            if cracklength<1:
+                damagedobject.damage['crack']+=severity
+
+
+            #Broken but not shattered
+            elif severity<3 and damagedobject.damage['break']==0:
+                damagedobject.damage['crack']=1
+                damagedobject.damage['break']=1
+
+
+            #Shattered
+            elif severity>=3 and damagedobject.damage['shatter']==0:
+                damagedobject.damage['crack']=1
+                damagedobject.damage['break']=1
+                damagedobject.damage['shatter']=1
+
+
+        if contact==True:
+            attack.contact=True
+            attack.energy-=7*self.fracture_energy*1000*rootarea*damagedobject.thickness
+            attack.energy_recalc()
+        else:
+            attack.contact=False
+
+#-----------------------------------------------------------------------------
+'''
 
 
 class Steel(Material):
@@ -275,25 +376,7 @@ class Titanium(Material):
         self.maxedge=(5*10^-8)/self.quality
         self.damagetype=['crack','break','shatter','crush','cut']
 
-    def damageresolve(self,damagedobject,defender,force,pressure,attacker):
-        if isinstance(defender,Limb)==True:
-            defenderstats=defender.stats
-        elif isinstance(defender,Creature)==True:
-            defenderstats=defender.stats
-        else:
-            defenderstats={'str':15,'tec':15,'per':15,'wil':15,'luc':15}
 
-
-        #Cracking
-        m=min(0.5*attacker.stats['luc']/defenderstats['luc'],1)
-        hitloc=random.triangular(low=0,high=1,mode=m)*damagedobject.length
-        if force>10*(3.14*self.tensile_strength*1000000*damagedobject.thickness**3)/hitloc:
-            if damagedobject.plural==False:
-                print("the {} is cracked".format(damagedobject.name))
-            else:
-                print("the {} are cracked".format(damagedobject.name))
-            severity=force/((10*3.14*self.tensile_strength*1000000*damagedobject.thickness**3)/hitloc)-1
-            damagedobject.damage['crack']+=severity
 
 
 class Silver(Material):
@@ -378,25 +461,6 @@ class Zicral(Material):
         self.maxedge=(10**-7)/self.quality
         self.damagetype=['crack','break','shatter','crush','cut']
 
-    def damageresolve(self,damagedobject,defender,force,pressure,attacker):
-        if isinstance(defender,Limb)==True:
-            defenderstats=defender.stats
-        elif isinstance(defender,Creature)==True:
-            defenderstats=defender.stats
-        else:
-            defenderstats={'str':15,'tec':15,'per':15,'wil':15,'luc':15}
-
-
-        #Cracking
-        m=min(0.5*attacker.stats['luc']/defenderstats['luc'],1)
-        hitloc=random.triangular(low=0,high=1,mode=m)*damagedobject.length
-        if force>10*(3.14*self.tensile_strength*1000000*damagedobject.thickness**3)/hitloc:
-            if damagedobject.plural==False:
-                print("the {} is cracked".format(damagedobject.name))
-            else:
-                print("the {} are cracked".format(damagedobject.name))
-            severity=force/((10*3.14*self.tensile_strength*1000000*damagedobject.thickness**3)/hitloc)-1
-            damagedobject.damage['crack']+=severity
 
 
 class Wood(Material):
@@ -418,27 +482,6 @@ class Wood(Material):
         self.dissipationfactor=1
         self.maxedge=(10**-4)/self.quality
         self.damagetype=['dent','crack','break','crush','cut']
-
-    def damageresolve(self,damagedobject,defender,force,pressure,attacker):
-        if isinstance(defender,Limb)==True:
-            defenderstats=defender.stats
-        elif isinstance(defender,Creature)==True:
-            defenderstats=defender.stats
-        else:
-            defenderstats={'str':15,'tec':15,'per':15,'wil':15,'luc':15}
-
-
-        #Cracking
-        m=min(0.5*attacker.stats['luc']/defenderstats['luc'],1)
-        hitloc=random.triangular(low=0,high=1,mode=m)*damagedobject.length
-        if force>10*(3.14*self.tensile_strength*1000000*damagedobject.thickness**3)/hitloc:
-            if damagedobject.plural==False:
-                print("the {} is cracked".format(damagedobject.name))
-            else:
-                print("the {} are cracked".format(damagedobject.name))
-            severity=force/((10*3.14*self.tensile_strength*1000000*damagedobject.thickness**3)/hitloc)-1
-            damagedobject.damage['crack']+=severity
-
 
 class Leather(Material):
     pass
