@@ -6,6 +6,8 @@ from Attacks import *
 from Items import *
 from Materials import *
 from Limbs import *
+import NameGen
+import cProfile
 
 
 os.environ['KIVY_NO_FILELOG']='true'
@@ -21,19 +23,11 @@ class Sword():
         self.passable=True
         self.color=color
         self.targetable=False
-        self.hostile=False
+        self.hostile=[]
 
         pass
 
-class Shield():
-    def __init__(self,color=(1,1,1,1)):
-        self.name='dummyshield'
-        self.image='c:/Project/shield.png'
-        self.location=[None,None]
-        self.passable=True
-        self.color=color
-        self.targetable=False
-        self.hostile=False
+
 
 
 
@@ -63,7 +57,8 @@ class Shell(FloatLayout):
 
         #this is the dummy floor, to be replaced by a set of real floors later
         self.floors=floors
-        floormaker(None,'dummy')
+        #floormaker(None,'dummy')
+        Floor('dummy')
         self.dungeonmanager.current='dummy'
         self.playscreen=playscreen
 
@@ -130,23 +125,32 @@ class Shell(FloatLayout):
         self.shift=False
 
 
-
+        player=Human(color=(0,1,0,0.8),player=True,stats={'s':15,'t':15,'p':15,'w':15,'l':15},name="Sir Bugsmasher")
         #placing a player character
         self.player=player
-        print(self.player.mass)
-        self.player.equip(Mace())
-        self.player.equip(LongSword())
-        self.player.equip(Glove())
-        self.player.equip(Glove())
-        self.player.equip(Chest())
-        self.player.equip(Armlet())
-        self.player.equip(Armlet())
-        self.player.equip(Boot())
-        self.player.equip(Boot())
-        self.player.equip(Helm())
+
+        print(self.player.mass,self.player.movemass)
+
+        self.player.equip(Spear(material=Steel),log=False)
+        self.player.equip(Spear(material=Steel),log=False)
+        self.player.equip(Glove(material=Steel),log=False)
+        self.player.equip(Glove(material=Steel),log=False)
+        self.player.equip(Chest(material=Steel),log=False)
+        self.player.equip(Armlet(material=Steel),log=False)
+        self.player.equip(Armlet(material=Steel),log=False)
+        self.player.equip(Boot(material=Steel),log=False)
+        self.player.equip(Boot(material=Steel),log=False)
+        self.player.equip(Helm(material=Steel),log=False)
+        self.player.equip(Legging(material=Steel),log=False)
+        self.player.equip(Legging(material=Steel),log=False)
         self.dungeonmanager.current_screen.cells[3][3].contents.append(self.player)
 
+        while any(isinstance(x,MapTiles.Wall) for x in self.dungeonmanager.current_screen.cells[self.player.location[0]][self.player.location[1]].contents):
+            self.dungeonmanager.current_screen.cells[self.player.location[0]][self.player.location[1]].contents.remove(self.player)
+            self.dungeonmanager.current_screen.cells[random.randint(0,self.dungeonmanager.current_screen.dimensions[0]-1)][random.randint(0,self.dungeonmanager.current_screen.dimensions[1]-1)].contents.append(self.player)
+        self.player.mass_calc()
 
+        print(self.player.mass,self.player.movemass)
 
 
         self.playerstamina=self.player.stamina
@@ -155,20 +159,41 @@ class Shell(FloatLayout):
         currentscreen=self.dungeonmanager.current_screen
 
         #Some objects to play around with
-        currentscreen.creaturelist=[Human(color=(1,0,0,0.8),stats={'s':15,'t':15,'p':15,'w':15,'l':15})]
+        currentscreen.creaturelist=[Giant(color=(1,0,0,0.8),name=NameGen.namegen('m'))]
+        adversarymaterial=Steel
 
-        dummyarmor=Chest()
-        currentscreen.creaturelist[0].equip(dummyarmor)
-        currentscreen.creaturelist[0].equip(Glove())
-        currentscreen.creaturelist[0].equip(Glove())
-        currentscreen.creaturelist[0].equip(Armlet())
-        currentscreen.creaturelist[0].equip(Armlet())
-        currentscreen.creaturelist[0].equip(Boot())
-        currentscreen.creaturelist[0].equip(Boot())
-        currentscreen.creaturelist[0].equip(Helm())
+        foe=Human(color=(0,1,0,0.8))
+        currentscreen.creaturelist.append(foe)
+        adversary=currentscreen.creaturelist[0]
+
+        dummyarmor=Chest(material=adversarymaterial)
+
+        currentscreen.creaturelist[0].equip(dummyarmor,log=False)
+        currentscreen.creaturelist[0].equip(Glove(material=adversarymaterial),log=False)
+        currentscreen.creaturelist[0].equip(Glove(material=adversarymaterial),log=False)
+        currentscreen.creaturelist[0].equip(Armlet(material=adversarymaterial),log=False)
+        currentscreen.creaturelist[0].equip(Armlet(material=adversarymaterial),log=False)
+        currentscreen.creaturelist[0].equip(Boot(material=adversarymaterial),log=False)
+        currentscreen.creaturelist[0].equip(Boot(material=adversarymaterial),log=False)
+        currentscreen.creaturelist[0].equip(Helm(material=adversarymaterial),log=False)
+        adversary.equip(LongSword(material=adversarymaterial),log=False)
+        adversary.equip(Mace(material=adversarymaterial),log=False)
+        adversary.equip(Shield(material=adversarymaterial),log=False)
+        adversary.equip(Buckler(material=adversarymaterial),log=False)
+
+        '''
+        for i in adversary.limbs:
+            i.change_material(Flesh_Material,Wood)
+            i.change_material(Bone_Material,Wood)
+        '''
 
 
-        self.dungeonmanager.current_screen.cells[6][6].contents.append(currentscreen.creaturelist[0])
+        adversary.mass_calc()
+        print(adversary.mass)
+
+        self.dungeonmanager.current_screen.place_creature(adversary,[6,6])
+        #self.dungeonmanager.current_screen.cells[6][6].contents.append(currentscreen.creaturelist[0])
+        #self.dungeonmanager.current_screen.cells[8][9].contents.append(foe)
         self.dungeonmanager.current_screen.cells[7][7].contents.append(Sword())
         self.dungeonmanager.current_screen.cells[8][7].contents.append(Shield())
 
@@ -211,16 +236,22 @@ class Shell(FloatLayout):
         self.playerfocus=self.player.focus
         for i in self.dungeonmanager.current_screen.creaturelist:
             i.on_turn()
+        self.player.on_turn()
         if len(messages)>0:
             self.log.addtext("[b]Turn {}:[/b]".format(self.turn),newturn=True)
         while len(messages)>0:
             self.log.addtext(messages.pop(0))
-        for i in self.dungeonmanager.current_screen.cells:
-            for j in self.dungeonmanager.current_screen.cells[i]:
-                self.dungeonmanager.current_screen.cells[i][j].on_contents(None,None)
-        self.player.on_turn()
+        for i in self.dungeonmanager.current_screen.nonindexedcells:
+            i.on_turn()
         self.playerstamina=self.player.stamina
         self.playerfocus=self.player.focus
+
+        if random.random()>0.98:
+            newcreaturetype=random.choice([Human,Amorphous_Horror,Giant,Halfling,Fairy,Goblin])
+            creature=newcreaturetype(color=(random.random(),random.random(),random.random(),0.8),name=NameGen.namegen(random.choice(['m','f'])))
+            self.dungeonmanager.current_screen.place_creature(creature)
+            self.dungeonmanager.current_screen.creaturelist.append(creature)
+
 
 
 
@@ -230,8 +261,8 @@ class Shell(FloatLayout):
     def mouselistener(self,instance,pos):
         newpos=self.dungeonmanager.to_widget(pos[0],pos[1])
         floor=self.dungeonmanager.current_screen
-        for i in range(0,50):
-            for j in range(0,50):
+        for i in range(0,floor.dimensions[0]):
+            for j in range(0,floor.dimensions[1]):
                 if floor.cells[i][j].collide_point(newpos[0],newpos[1]):
                     floor.cells[i][j].highlight()
                 else:
@@ -255,7 +286,10 @@ class Shell(FloatLayout):
                 self.playerfocus[0]+=1
             if keycode[1]=='f' and self.shift==True:
                 self.playerfocus[0]-=1
-            #The below bindings are for real
+            if keycode[1]=='g' and self.shift==True:
+                Floor(self.dungeonmanager.current+'new')
+                self.dungeonmanager.current=self.dungeonmanager.current+'new'
+            #The below bindings are for realG
             if keycode[1]=='numpad7':
                 self.move(self.player,[-1,1])
             elif keycode[1]=='numpad8' or keycode[1]=='up':
@@ -291,8 +325,8 @@ class Shell(FloatLayout):
     #This function handles movement of objects from cell to cell and calls for bump attacks
     def move(self,target,distance,teleport=False,mobile=True,*args,**kwargs):
         #Make sure the cell we are trying to move to exists and is passable
-        if target.location[0]+distance[0] in range(0,50) and target.location[1]+distance[1] in range(0,50):
-
+        if target.location[0]+distance[0] in range(0,self.dungeonmanager.current_screen.dimensions[0]) and target.location[1]+distance[1] in range(0,self.dungeonmanager.current_screen.dimensions[1]):
+            self.dungeonmanager.current_screen.cells[target.location[0]+distance[0]][target.location[1]+distance[1]].on_contents(None,None)
             if self.dungeonmanager.current_screen.cells[target.location[0]+distance[0]][target.location[1]+distance[1]].passable==True:
 
                 if target in self.dungeonmanager.current_screen.cells[target.location[0]][target.location[1]].contents:
@@ -304,13 +338,13 @@ class Shell(FloatLayout):
 
 
                     #Ensuring that the viewport tracks the player-controlled character
-                    if target==self.player:
+                    if target.player:
                         self.turn+=1
-                        scrollamount=viewport.convert_distance_to_scroll(30,30)
+                        scrollamount=viewport.convert_distance_to_scroll(cellsize,cellsize)
                         cell=self.dungeonmanager.current_screen.cells[target.location[0]][target.location[1]]
                         if viewport.width-cell.to_window(cell.pos[0],cell.pos[1])[0]<110:
                             viewport.scroll_x+=scrollamount[0]
-                        if viewport.width-cell.to_window(cell.pos[0],cell.pos[1])[1]<60:
+                        if viewport.height-cell.to_window(cell.pos[0],cell.pos[1])[1]<60:
                             viewport.scroll_y+=scrollamount[1]
                         if viewport.pos[0]-cell.to_window(cell.pos[0],cell.pos[1])[0]>-80:
                             viewport.scroll_x-=scrollamount[0]
@@ -329,7 +363,7 @@ class Shell(FloatLayout):
 
                 attacked=False
                 for i in self.dungeonmanager.current_screen.cells[target.location[0]+distance[0]][target.location[1]+distance[1]].contents:
-                    if i.targetable==True and i.hostile==True:
+                    if i.targetable==True and hostilitycheck(target,i)==True:
                         if target.player==True:
                             target.attack(i)
                             self.turn+=1
@@ -337,13 +371,14 @@ class Shell(FloatLayout):
                             target.attack(i)
                         attacked=True
                         break
-                    elif i.targetable==True and i.hostile==False:
+                    elif i.targetable==True and hostilitycheck(target,i)==False and target.player:
+                        #TODO: Need ability to attack non-hostile targets (usually a bad idea, but should be possible)
                         self.log.addtext('Do you want to attack {}?'.format(i.name))
-                if attacked==False:
+                if attacked==False and target.player:
                     self.log.addtext('You cannot pass through here')
                     print('not passable')
 
-        else:
+        elif target.player:
             print("There is no cell where you are trying to move")
             self.log.addtext('Trust me, you don\'t want to go that way')
 

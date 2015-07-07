@@ -30,8 +30,11 @@ from kivy.core.window import Window
 from kivy.clock import Clock
 from kivy.lang import Builder
 from kivy.uix.progressbar import ProgressBar
+from kivy.config import Config
 
 import BaseClasses
+import MapTiles
+import FloorGen
 
 def flatten(l,ltypes=(list,tuple)):
     ltype=type(l)
@@ -48,7 +51,8 @@ def flatten(l,ltypes=(list,tuple)):
         i+=1
     return ltype(l)
 
-
+Config.set('modules','monitor','1')
+Config.write()
 
 Builder.load_string('''
 <Minimap@FloatLayout>:
@@ -143,13 +147,16 @@ Builder.load_string('''
             pos:self.pos
             source:'C:/Project/Untitled.jpg'
 
+
 <Cell@Widget>
     id:cell
     size_hint:None,None
-    size:30,30
+    size:16,16
+    ''')
+'''
     canvas:
         Color:
-            rgba:0.5,0.5,0.5,1
+            rgba:0.5,0.5,0.5,0.3
         Rectangle:
             id:backdrop
             size:self.size
@@ -158,12 +165,12 @@ Builder.load_string('''
             rgba:0.1,0.1,0.1,1
         Rectangle:
             id:graphics
-            size:self.width-2,self.height-2
+            size:self.width-1,self.height-1
             pos:self.x+1,self.y+1
 
 
 
-''')
+'''
 
 #Below are UI elements which are fixed on the screen (bars, combat log, buttons, etc)
 class Buttonbar(BoxLayout):
@@ -207,6 +214,8 @@ class Combatlog(ScrollView):
         self.size_hint=(0.33,0.43)
         self.scroll_y=0
 
+#TODO: Combat log needs to be more readable. Format needs to be implemented for ease of scanning to draw the eyes quickly to important pieces of information
+
 class Log(BoxLayout):
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
@@ -225,7 +234,7 @@ class Log(BoxLayout):
             truncatelength=len(self.words.text)-8000
             self.words.text=self.words.text[truncatelength:]
         if newturn==False:
-            self.words.text+='\n   -'+message
+            self.words.text="".join([self.words.text,'\n   -'+message])
   #          self.words.texture_update()
             self.height=max(self.words.texture_size[1],2000)
             self.words.height=self.height
@@ -306,10 +315,21 @@ class Cell(Widget):
     contents=ListProperty([])
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
-        self.size=(30,30)
+        self.size_hint=(None,None)
+        self.size=(cellsize,cellsize)
         self.passable=True
         self.highlighted=False
         self.location=[None,None]
+        self.immediate_neighbors=[]
+
+        '''
+        with self.canvas:
+            Color(0.5,0.5,0.5,0.3)
+            Rectangle(size=self.size,pos=self.pos)
+            Color(0.1,0.1,0.1,1)
+            Rectangle(size=(cellsize-1,cellsize-1),pos=(self.pos[0]+1,self.pos[1]+1))
+'''
+
 
     def highlight(self):
         if self.highlighted==False:
@@ -329,6 +349,8 @@ class Cell(Widget):
                 print('stamina:',i.stamina)
             if hasattr(i,'pain'):
                 print('pain:',i.pain)
+            if hasattr(i,'stats'):
+                print('stats:',i.stats)
 
     def unhighlight(self):
         if self.highlighted==True:
@@ -345,8 +367,8 @@ class Cell(Widget):
             if isinstance(i,BaseClasses.Creature)==False:
                 i.location=self.location
                 with self.canvas.after:
-                    if not i.color:
-                        pass
+                    if hasattr(i,'color')==False:
+                        Color(1,1,1,1)
                     else:
                         Color(i.color[0],i.color[1],i.color[2],i.color[3])
                     Rectangle(size=self.size,pos=self.pos,source=i.image)
@@ -365,8 +387,11 @@ class Cell(Widget):
             if i.passable==False:
                 self.passable=False
 
+    def on_turn(self):
+        pass
 
 
+cellsize=16
 
 
 #Screen Manager
@@ -386,7 +411,7 @@ manager.current='play'
 viewport=ScrollView(size_hint=(0.65,0.87),pos_hint={'x':0,'y':0.13},scroll_x=0,scroll_y=0)
 viewport.effect_cls=ScrollEffect
 playscreen.add_widget(viewport)
-dungeonmanager=ScreenManager(size_hint=(None,None),size=(1500,1500))
+dungeonmanager=ScreenManager(size_hint=(None,None),size=(2000,2000))
 viewport.add_widget(dungeonmanager)
 turn=0
 
@@ -397,18 +422,62 @@ floors={}
 #messanger list
 messages=[]
 
-#This function constructs floors
-def floormaker(instance,inputname,*args,**kwargs):
+'''This function constructs floors
+def floormaker(instance,inputname,max_x=60,max_y=60,*args,**kwargs):
     print('name is {}'.format(inputname))
     newfloor=Screen(name=str(inputname))
     floors[str(inputname)]=newfloor
     newfloor.cells={}
-    for i in range(0,50):
+    newfloor.dimensions=[max_x,max_y]
+    newfloor.nonindexedcells=[]
+    newfloor.creaturelist=[]
+    for i in range(0,max_x):
         newfloor.cells[i]={}
-        for j in range(0,50):
-            newfloor.cells[i][j]=Cell(size=(30,30),pos=(i*30,j*30))
+        for j in range(0,max_y):
+            newfloor.cells[i][j]=Cell(size=(cellsize,cellsize),pos=(i*cellsize,j*cellsize))
             newfloor.cells[i][j].location=[i,j]
+            newfloor.cells[i][j].open=False
+            newfloor.cells[i][j].probability=0
             newfloor.add_widget(newfloor.cells[i][j])
+            newfloor.nonindexedcells.append(newfloor.cells[i][j])
     dungeonmanager.add_widget(newfloor)
+    dungeonmanager.size=(max_x*cellsize+1,max_y*cellsize+1)
+    for i in range(0,max_x):
+        for j in range(0,max_y):
+            newfloor.cells[i][j].immediate_neighbors=[]
+
+#stuff to the right
+            if i+1 in range (0,max_x):
+                if j+1 in range (0,max_y):
+                    newfloor.cells[i][j].immediate_neighbors.append(newfloor.cells[i+1][j+1])
+                newfloor.cells[i][j].immediate_neighbors.append(newfloor.cells[i+1][j])
+                if j-1 in range(0,max_y):
+                    newfloor.cells[i][j].immediate_neighbors.append(newfloor.cells[i+1][j-1])
+#stuff to the left
+            if i-1 in range(0,max_x):
+                newfloor.cells[i][j].immediate_neighbors.append(newfloor.cells[i-1][j])
+                if j+1 in range (0,max_y):
+                    newfloor.cells[i][j].immediate_neighbors.append(newfloor.cells[i-1][j+1])
+                if j-1 in range(0,max_y):
+                    newfloor.cells[i][j].immediate_neighbors.append(newfloor.cells[i-1][j-1])
+#straight above
+            if j+1 in range(0,max_y):
+                newfloor.cells[i][j].immediate_neighbors.append(newfloor.cells[i][j+1])
+#and straight below
+            if j-1 in range(0,max_y):
+                newfloor.cells[i][j].immediate_neighbors.append(newfloor.cells[i][j-1])
+#And now next-nearest neighbors (with corners. May want to remove)
+    for i in newfloor.nonindexedcells:
+        i.second_order_neighbors=[]
+        for j in i.immediate_neighbors:
+            i.second_order_neighbors.extend(j.immediate_neighbors)
+        i.second_order_neighbors=set(i.second_order_neighbors)-set(i.immediate_neighbors)- {i}
+
+    FloorGen.experimental_automaton(newfloor)
+    for i in newfloor.nonindexedcells:
+        i.on_contents(None,None)
+'''
+
+
 
 

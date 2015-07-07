@@ -28,8 +28,8 @@ import BaseClasses as B
 class Bone(Item):
     #length is bone length in meters
     #radius is bone radius in meters
-    def __init__(self,length=0.5,radius=0.03,in_radius=0,material=Bone_Material,name='bone',plural=False,quality=1):
-        super().__init__()
+    def __init__(self,length=0.5,radius=0.03,in_radius=0,material=Bone_Material,name='bone',plural=False,quality=1,**kwargs):
+        super().__init__(**kwargs)
         self.plural=plural
         self.material=material(quality=quality)
         if isinstance(self.material,Bone_Material):
@@ -40,18 +40,12 @@ class Bone(Item):
         self.radius=radius
         self.in_radius=in_radius
         self.cross_section_range=[3.14*(self.radius**2-in_radius**2),self.length*2*(self.radius-in_radius)]
-        self.thickness=self.radius-in_radius
-        self.r=self.thickness
         self.parry=True
-        self.mass=self.material.density*(self.length*(self.radius**2-in_radius**2))*3.14
         self.wield='grasp'
-        self.centermass=length*0.5
         self.curvature=0
         self.attacktype=['bludgeon']
-        self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
-        self.damagetype=self.material.damagetype
-        self.dissipationfactor=self.material.dissipationfactor
         self.function=1
+        self.recalc()
 
 
 
@@ -63,8 +57,8 @@ class Flesh(Item):
     #length is limb length in meters
     #in_radius is the inner radius of the flesh
     #out_radius is the radius of the skin
-    def __init__(self,length=0.5,in_radius=0.03,out_radius=0.05,material=Flesh_Material,name='flesh',plural=False,quality=1):
-        super().__init__()
+    def __init__(self,length=0.5,in_radius=0.03,out_radius=0.05,material=Flesh_Material,name='flesh',plural=False,quality=1,**kwargs):
+        super().__init__(**kwargs)
         self.plural=plural
         self.material=material(quality=quality)
         if isinstance(self.material,Flesh_Material):
@@ -75,18 +69,12 @@ class Flesh(Item):
         self.radius=out_radius
         self.in_radius=in_radius
         self.cross_section_range=[3.14*(self.radius**2-in_radius**2),self.length*2*(self.radius-in_radius)]
-        self.thickness=self.radius-self.in_radius
-        self.r=self.radius
         self.parry=False
-        self.mass=self.material.density*(self.length*self.radius**2-self.length*self.in_radius**2)*3.14
         self.wield='grasp'
-        self.centermass=length*0.5
         self.curvature=0
         self.attacktype=None
-        self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
-        self.damagetype=self.material.damagetype
-        self.dissipationfactor=self.material.dissipationfactor
         self.function=1
+        self.recalc()
 
 
 
@@ -114,19 +102,23 @@ class LongSword(Item):
         self.width=width
         self.thickness=thickness
         self.radius=self.thickness
-        self.r=self.width
         self.parry=True
-        self.mass=self.material.density*(self.length*self.width*self.thickness)
         self.wield='grasp'
-        self.centermass=length*0.1
         self.curvature=0
         self.attacktype=['stab','slash']
-        self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
-        self.damagetype=self.material.damagetype
-        self.damagetype.append('blunt')
         self.function=1
-        self.attacks=[Slash_1H]
+        self.attacks=[Slash_1H,Stab_1H]
+        self.recalc()
+        self.damagetype.append('blunt')
+
+    def recalc(self):
+        self.material_import()
+        self.mass=self.density*(self.length*self.width*self.thickness)
         self.movemass=self.mass
+        self.centermass=self.length*0.1
+        self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
+        self.r=self.width
+
 
 class Gladius(Item):
     #length is blade length in meters
@@ -235,26 +227,30 @@ class Claymore(Item):
 class Mace(Item):
     #length is length of mace in meters
     #head is head radius in meters
-    def __init__(self,length=0.8,head=0.06,material=Iron,quality=1):
+    def __init__(self,length=0.8,head=0.055,material=Iron,quality=1):
         super().__init__()
         self.material=material(quality=quality)
         self.length=length
         self.head=head
         self.parry=True
         self.name=self.material.name+' mace'
-        self.mass=self.material.density*(self.length*3.14*0.005**2+1.33*3.14*self.head**3)
         self.wield='grasp'
-        self.centermass=length*0.8
         self.curvature=0.5
-        self.contactarea=0.5*(1-self.curvature)*3.14*self.head**2
         self.attacktype=['bludgeon']
-        self.I=self.mass*self.centermass**2
         self.function=1
-        self.thickness=head*2
         self.damage={'bruise':0,'crack':0,'dent':0,'bend':0,'deform':0,'break':0,'cut':0,'shatter':0,'crush':0,'burn':0,'pierce':0}
-        self.r=self.head
-        self.radius=self.head
         self.attacks=[Bludgeon_1H]
+        self.recalc()
+
+    def recalc(self):
+        self.material_import()
+        self.mass=self.density*(self.length*3.14*0.005**2+1.33*3.14*self.head**3)
+        self.centermass=self.length*0.8
+        self.I=self.mass*self.centermass**2
+        self.contactarea=0.5*(1-self.curvature)*3.14*self.head**2
+        self.radius=self.head
+        self.thickness=0.02
+        self.r=0.015
         self.movemass=self.mass
 
 
@@ -297,25 +293,36 @@ class WarHammer(Item):
         self.damagetype=self.material.damagetype
         self.movemass=self.mass
 
-
 class Spear(Item):
-    #length is length of the spear in meters
-    #tip is area of tip in square meters
-    def __init__(self,length=1.5,tip=0.000000025,material=Iron,quality=1):
+    #length is spear length in meters
+    #tip is tip surface area in square meters
+    #thickness is shaft thickness in meters
+    def __init__(self,length=2,tip=0.000000025,thickness=0.01,material=Iron,quality=1):
+        super().__init__()
         self.material=material(quality=quality)
+        self.plural=False
+        self.name=self.material.name+' spear'
         self.length=length
         self.tip=tip
+        self.thickness=thickness
+        self.radius=self.thickness
         self.parry=True
-        self.mass=self.material.density* 0.0001 +self.length
         self.wield='grasp'
-        self.centermass=length*0.5
         self.curvature=0
-        self.attacktype=['stab']
-        self.I=(1/12)*self.length**3+self.mass*self.centermass**2
-        self.damagetype=self.material.damagetype
-        self.damage={'bruise':0,'crack':0,'dent':0,'bend':0,'deform':0,'break':0,'cut':0,'shatter':0,'crush':0,'burn':0,'pierce':0}
+        self.attacktype=['stab','slash']
+        self.function=1
+        self.attacks=[Stab_1H]
+        self.recalc()
         self.damagetype.append('blunt')
+
+    def recalc(self):
+        self.material_import()
+        self.mass=0.5*self.density*(3.14*self.length*self.thickness**2)
         self.movemass=self.mass
+        self.centermass=self.length*0.5
+        self.I=(1/12)*self.mass*self.length**2
+        self.r=self.thickness
+        print(self.mass)
 
 
 class Axe(Item):
@@ -330,9 +337,6 @@ class Axe(Item):
 
 ############################################Armor####################################################################
 
-#TODO: Shields need implemented.
-
-
 class Chest(Item):
     #length is bone length in meters
     #radius is bone radius in meters
@@ -345,20 +349,22 @@ class Chest(Item):
         self.radius=radius
         self.in_radius=in_radius
         self.cross_section_range=[3.14*(self.radius**2-in_radius**2),self.length*2*(self.radius-in_radius)]
-        self.thickness=self.radius-in_radius
-        self.r=self.radius
         self.parry=False
-        self.mass=self.material.density*(self.length*(self.radius**2-in_radius**2))*3.14
         self.wield='chest'
-        self.centermass=length*0.5
         self.curvature=0
         self.attacktype=[]
-        self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
-        self.damagetype=self.material.damagetype
-        self.dissipationfactor=self.material.dissipationfactor
         self.coverage=0.95
         self.damage={'bruise':0,'crack':0,'dent':0,'bend':0,'deform':0,'break':0,'cut':0,'shatter':0,'crush':0,'burn':0,'pierce':0}
         self.function=1
+        self.recalc()
+
+    def recalc(self):
+        self.material_import()
+        self.mass=self.material.density*(self.length*(self.radius**2-self.in_radius**2))*3.14
+        self.centermass=self.length*0.5
+        self.thickness=self.radius-self.in_radius
+        self.r=self.radius
+        self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
         self.movemass=self.mass
 
 class Glove(Item):
@@ -373,25 +379,20 @@ class Glove(Item):
         self.radius=radius
         self.in_radius=in_radius
         self.cross_section_range=[3.14*(self.radius**2-in_radius**2),self.length*2*(self.radius-in_radius)]
-        self.thickness=self.radius-in_radius
-        self.r=self.length/2
         self.parry=False
-        self.mass=self.material.density*(self.length*(self.radius**2-in_radius**2))*3.14
         self.wield='glove'
-        self.centermass=length*0.5
         self.curvature=0.2
         self.attacktype=[]
-        self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
-        self.damagetype=self.material.damagetype
-        self.dissipationfactor=self.material.dissipationfactor
         self.coverage=0.95
         self.damage={'bruise':0,'crack':0,'dent':0,'bend':0,'deform':0,'break':0,'cut':0,'shatter':0,'crush':0,'burn':0,'pierce':0}
         self.function=1
-        self.movemass=self.mass
+        self.recalc()
+
+    def recalc(self):
+        super().recalc()
+        self.r=self.length/2
 
 class Legging(Item):
-    #length is bone length in meters
-    #radius is bone radius in meters
     def __init__(self,length=0.8,radius=0.087,in_radius=0.085,material=Iron,plural=False,quality=1):
         super().__init__()
         self.plural=plural
@@ -401,26 +402,21 @@ class Legging(Item):
         self.radius=radius
         self.in_radius=in_radius
         self.cross_section_range=[3.14*(self.radius**2-in_radius**2),self.length*2*(self.radius-in_radius)]
-        self.thickness=self.radius-in_radius
-        self.r=self.radius
         self.parry=False
-        self.mass=self.material.density*(self.length*(self.radius**2-in_radius**2))*3.14
         self.wield='legging'
-        self.centermass=length*0.5
         self.curvature=0.1
         self.attacktype=[]
-        self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
-        self.damagetype=self.material.damagetype
-        self.dissipationfactor=self.material.dissipationfactor
         self.coverage=0.75
         self.damage={'bruise':0,'crack':0,'dent':0,'bend':0,'deform':0,'break':0,'cut':0,'shatter':0,'crush':0,'burn':0,'pierce':0}
         self.function=1
-        self.movemass=self.mass
+        self.recalc()
+
+    def recalc(self):
+        super().recalc()
+        self.r=self.radius
 
 class Armlet(Item):
-    #length is bone length in meters
-    #radius is bone radius in meters
-    def __init__(self,length=0.75,radius=0.054,in_radius=0.052,material=Iron,plural=False,quality=1):
+    def __init__(self,length=0.375,radius=0.0548,in_radius=0.052,material=Iron,plural=False,quality=1):
         super().__init__()
         self.plural=plural
         self.material=material(quality=quality)
@@ -432,18 +428,19 @@ class Armlet(Item):
         self.thickness=self.radius-in_radius
         self.r=self.radius
         self.parry=False
-        self.mass=self.material.density*(self.length*(self.radius**2-in_radius**2))*3.14
         self.wield='armlet'
-        self.centermass=length*0.5
         self.curvature=0.1
         self.attacktype=[]
-        self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
-        self.damagetype=self.material.damagetype
-        self.dissipationfactor=self.material.dissipationfactor
         self.coverage=0.75
         self.damage={'bruise':0,'crack':0,'dent':0,'bend':0,'deform':0,'break':0,'cut':0,'shatter':0,'crush':0,'burn':0,'pierce':0}
         self.function=1
+        self.recalc()
+
+    def recalc(self):
+        super().recalc()
+        self.mass=2*self.mass
         self.movemass=self.mass
+        self.r=self.radius
 
 class Boot(Item):
     #length is bone length in meters
@@ -457,25 +454,20 @@ class Boot(Item):
         self.radius=radius
         self.in_radius=in_radius
         self.cross_section_range=[3.14*(self.radius**2-in_radius**2),self.length*2*(self.radius-in_radius)]
-        self.thickness=self.radius-in_radius
-        self.r=self.length
         self.parry=False
-        self.mass=self.material.density*(self.length*(self.radius**2-in_radius**2))*3.14
         self.wield='boot'
-        self.centermass=length*0.5
         self.curvature=0.2
         self.attacktype=[]
-        self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
-        self.damagetype=self.material.damagetype
-        self.dissipationfactor=self.material.dissipationfactor
         self.coverage=0.95
         self.damage={'bruise':0,'crack':0,'dent':0,'bend':0,'deform':0,'break':0,'cut':0,'shatter':0,'crush':0,'burn':0,'pierce':0}
         self.function=1
-        self.movemass=self.mass
+        self.recalc()
+
+    def recalc(self):
+        super().recalc()
+        self.r=self.length
 
 class Helm(Item):
-    #length is bone length in meters
-    #radius is bone radius in meters
     def __init__(self,length=0.1,radius=0.082,in_radius=0.08,material=Iron,plural=False,quality=1):
         super().__init__()
         self.plural=plural
@@ -485,18 +477,116 @@ class Helm(Item):
         self.radius=radius
         self.in_radius=in_radius
         self.cross_section_range=[3.14*(self.radius**2-in_radius**2),self.length*2*(self.radius-in_radius)]
-        self.thickness=self.radius-in_radius
-        self.r=self.length
         self.parry=False
-        self.mass=self.material.density*(self.length*(self.radius**2-in_radius**2))*3.14
         self.wield='helmet'
-        self.centermass=length*0.5
         self.curvature=0
         self.attacktype=[]
-        self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
-        self.damagetype=self.material.damagetype
-        self.dissipationfactor=self.material.dissipationfactor
         self.coverage=0.55
         self.damage={'bruise':0,'crack':0,'dent':0,'bend':0,'deform':0,'break':0,'cut':0,'shatter':0,'crush':0,'burn':0,'pierce':0}
         self.function=1
-        self.movemass=self.mass
+        self.recalc()
+
+    def recalc(self):
+        super().recalc()
+        self.r=self.length
+
+class GreatHelm(Item):
+    def __init__(self,length=0.2,radius=0.082,in_radius=0.08,material=Iron,plural=False,quality=1):
+        super().__init__()
+        self.plural=plural
+        self.material=material(quality=quality)
+        self.name=self.material.name+' greathelm'
+        self.length=length
+        self.radius=radius
+        self.in_radius=in_radius
+        self.cross_section_range=[3.14*(self.radius**2-in_radius**2),self.length*2*(self.radius-in_radius)]
+        self.parry=False
+        self.wield='helmet'
+        self.vision_blocking=0.6
+        self.sound_blocking=0.5
+        self.smell_blocking=0.8
+        self.curvature=0
+        self.attacktype=[]
+        self.coverage=1
+        self.damage={'bruise':0,'crack':0,'dent':0,'bend':0,'deform':0,'break':0,'cut':0,'shatter':0,'crush':0,'burn':0,'pierce':0}
+        self.function=1
+        self.recalc()
+
+    def recalc(self):
+        super().recalc()
+        self.r=self.length
+
+class Shield(Item):
+    def __init__(self,length=0.02,radius=0.36,in_radius=0,material=Iron,plural=False,quality=1):
+        super().__init__()
+        self.image='c:/Project/shield.png'
+        self.plural=plural
+        self.material=material(quality=quality)
+        self.name=self.material.name+' shield'
+        self.length=length
+        self.radius=radius
+        self.in_radius=in_radius
+        self.cross_section_range=[3.14*(self.radius**2-in_radius**2),self.length*2*(self.radius-in_radius)]
+        self.parry=False
+        self.block=True
+        self.wield='grasp'
+        self.curvature=0
+        self.coverage=0.95
+        self.damage={'bruise':0,'crack':0,'dent':0,'bend':0,'deform':0,'break':0,'cut':0,'shatter':0,'crush':0,'burn':0,'pierce':0}
+        self.function=1
+        self.material.youngs=self.material.youngs/100
+        self.defaultmaterial=material
+        self.attacks=[Shield_Bash]
+        self.recalc()
+
+    def recalc(self):
+        if isinstance(self.material,self.defaultmaterial):
+            pass
+        else:
+            self.material.youngs=self.material.youngs/100
+            self.defaultmaterial=type(self.material)
+        self.material_import()
+        self.thickness=self.length
+        self.r=self.radius
+        self.mass=0.25*self.material.density*(self.length*(self.radius**2-self.in_radius**2))*3.14
+        self.centermass=self.length*0.5
+        self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
+        self.contactarea=3.14*self.radius**2
+
+class Buckler(Item):
+    def __init__(self,length=0.02,radius=0.1,in_radius=0,material=Iron,plural=False,quality=1):
+        super().__init__()
+        self.image='c:/Project/shield.png'
+        self.plural=plural
+        self.material=material(quality=quality)
+        self.defaultmaterial=material
+        self.name=self.material.name+' buckler'
+        self.length=length
+        self.radius=radius
+        self.in_radius=in_radius
+        self.cross_section_range=[3.14*(self.radius**2-in_radius**2),self.length*2*(self.radius-in_radius)]
+        self.parry=False
+        self.block=True
+        self.wield='grasp'
+        self.centermass=length*0.5
+        self.curvature=0
+        self.coverage=0.95
+        self.damage={'bruise':0,'crack':0,'dent':0,'bend':0,'deform':0,'break':0,'cut':0,'shatter':0,'crush':0,'burn':0,'pierce':0}
+        self.function=1
+        self.material.youngs=self.material.youngs/100
+        self.attacks=[Shield_Bash]
+        self.recalc()
+
+    def recalc(self):
+        if isinstance(self.material,self.defaultmaterial):
+            pass
+        else:
+            self.material.youngs=self.material.youngs/100
+            self.defaultmaterial=type(self.material)
+        self.material_import()
+        self.thickness=self.length
+        self.r=self.radius
+        self.mass=0.25*self.material.density*(self.length*(self.radius**2-self.in_radius**2))*3.14
+        self.centermass=self.length*0.5
+        self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
+        self.contactarea=3.14*self.radius**2

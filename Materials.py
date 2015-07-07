@@ -194,7 +194,7 @@ class Iron(Material):
         self.thickness=thickness
         self.density=7874
         self.youngs=118
-        self.fracture_energy=11*self.quality
+        self.fracture_energy=1100*self.quality
         self.tensile_strength=310*self.quality
         self.mode='brittle'
         self.fracture_toughness=(self.youngs*self.fracture_energy)**0.5
@@ -328,7 +328,7 @@ class Bronze(Material):
         self.mode='ductile'
         self.fracture_toughness=(self.youngs*self.fracture_energy)**0.5
         self.shear=43
-        self.shear_strength=297*self.tensile_strength
+        self.shear_strength=297*self.quality
         self.electric_conduction=True
         self.heat_conduction=True
         self.dissipationfactor=1
@@ -469,8 +469,8 @@ class Wood(Material):
         self.maxquality=1.5
         self.quality=min(quality,self.maxquality)
         self.thickness=thickness
-        self.density=450
-        self.youngs=11
+        self.density=700
+        self.youngs=10
         self.fracture_energy=1.5*self.quality
         self.tensile_strength=45*self.quality
         self.mode='brittle'
