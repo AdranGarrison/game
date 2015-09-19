@@ -256,6 +256,7 @@ class Human(Creature):
         self.limbs=[]
         self.vitals=[]
         self.attacks=[]
+        self.disabled_attack_types=[Bite]
         #self.body=Torso(self.stats,'torso',owner=self)
         humanoid_assembler(self,self.stats,self.name)
         self.mass_calc()
@@ -333,8 +334,9 @@ class Amorphous_Horror(Creature):
             self.unequip(i,log=False)
         self.vitals=[]
         current_mass=0
+        self.targetsize=0
         self.limbs=[]
-        possible_limbs=[Arm,Leg,Finger,Head,Upper_Torso,Neck,Toe,Eye,Nose,Ear,Jaw,Teeth,Hand,Abdomen,Foot]
+        possible_limbs=[Arm,Leg,Finger,Head,Upper_Torso,Neck,Toe,Eye,Nose,Ear,Jaw,Teeth,Hand,Abdomen,Foot,Wing]
         while current_mass<=available_mass:
             limbstats= {'s': int(random.triangular(low=5, high=25, mode=15)),
                          't': int(random.triangular(low=5, high=25, mode=15)),
@@ -348,6 +350,7 @@ class Amorphous_Horror(Creature):
             limbstats['luc']=limbstats['l']
             newlimb=random.choice(possible_limbs)(limbstats,scale=random.uniform(0.5,2),owner=self)
             current_mass+=newlimb.mass
+            self.targetsize+=newlimb.length
             if len(self.limbs)>1:
                 attempts=0
                 joint_location=random.choice(self.limbs)
@@ -516,6 +519,7 @@ class Halfling(Creature):
         self.limbs=[]
         self.vitals=[]
         self.attacks=[]
+        self.disabled_attack_types=[Bite]
         #self.body=Torso(self.stats,'torso',owner=self)
         humanoid_assembler(self,self.stats,self.name,scale=0.6)
         self.mass_calc()
@@ -535,8 +539,8 @@ class Fairy(Creature):
     def __init__(self,color=(1,1,1,1),name='the human',job='',named=False,hostile=True,player=False,stats='random'):
         super().__init__()
         if stats=='random':
-            self.stats= {'s': int(random.triangular(low=1, high=7, mode=3)),
-                         't': int(random.triangular(low=5, high=25, mode=15)),
+            self.stats= {'s': int(random.triangular(low=1, high=4, mode=2)),
+                         't': int(random.triangular(low=5, high=20, mode=12)),
                          'p': int(random.triangular(low=9, high=40, mode=20)),
                          'w': int(random.triangular(low=7, high=32, mode=18)),
                          'l': int(random.triangular(low=10, high=45, mode=21))}
@@ -563,8 +567,9 @@ class Fairy(Creature):
         self.limbs=[]
         self.vitals=[]
         self.attacks=[]
+        self.disabled_attack_types=[Bite]
         #self.body=Torso(self.stats,'torso',owner=self)
-        humanoid_assembler(self,self.stats,self.name,scale=0.1)
+        humanoid_assembler(self,self.stats,self.name,scale=0.15)
 
         self.leftwing=Wing(self.stats,'left wing',owner=self,scale=0.1)
         self.torso.limbs.append(self.leftwing)
@@ -575,6 +580,7 @@ class Fairy(Creature):
         self.rightwing.attachpoint=self.torso
 
         self.mass_calc()
+        print(self.mass,self.movemass)
         self.updateattacks()
 
         self.classification.append('humanoid')
@@ -586,6 +592,106 @@ class Fairy(Creature):
         if hostile==True:
             self.hostile.append('player')
 
+
+class Target_Dummy(Creature):
+    def __init__(self,color=(1,1,1,1),name='the target dummy',job='',named=False,hostile=True,player=False,stats='random'):
+        super().__init__()
+        if stats=='random':
+            self.stats= {'s': int(random.triangular(low=5, high=25, mode=15)),
+                         't': int(random.triangular(low=5, high=25, mode=15)),
+                         'p': int(random.triangular(low=5, high=25, mode=15)),
+                         'w': int(random.triangular(low=5, high=25, mode=15)),
+                         'l': int(random.triangular(low=5, high=25, mode=15))}
+        else:
+            self.stats=stats
+        self.stats['str']=self.stats['s']
+        self.stats['tec']=self.stats['t']
+        self.stats['per']=self.stats['p']
+        self.stats['wil']=self.stats['w']
+        self.stats['luc']=self.stats['l']
+        self.level=1
+        self.exp=[0,100]
+        self.focus=[int(20*(self.stats['p']**0.7+self.level**0.3)),int(20*(self.stats['p']**0.7+self.level**0.3))]
+        self.stamina=[int(10*(2*self.stats['s']**2+self.level**2)**0.5),int(10*(2*self.stats['s']**2+self.level**2)**0.5)]
+        self.maxstamina=int(10*(2*self.stats['s']**2+self.level**2)**0.5)
+        self.image='C:/Project/Untitled.jpg'
+        self.location=[None,None]
+        self.passable=False
+        self.color=color
+        self.name=name+job
+        self.indefinitename=name.replace('the ', 'an ',1)
+        self.targetable=True
+        self.player=player
+        self.limbs=[]
+        self.vitals=[]
+        self.attacks=[]
+
+        self.classification.append('magic')
+        self.classification.append('unnatural')
+        self.classification.append('chaos')
+        if hostile==True:
+            self.hostile.append('player')
+
+        self.hitdict={}
+        self.averagehits={}
+        self.reform()
+        self.mass_calc()
+
+
+        self.movemass=self.mass
+        self.updateattacks()
+
+
+    def reform(self):
+        self.pain=0
+        equipped_copy=self.equipped_items.copy()
+        for i in equipped_copy:
+            self.unequip(i,log=False)
+        self.vitals=[]
+        self.targetsize=0
+        self.limbs=[]
+        humanoid_assembler(self,self.stats,self.name)
+#        for i in self.inventory:
+#            self.equip(i,log=False)
+        self.mass_calc()
+
+    def on_turn(self):
+        self.reform()
+        self.sense_awareness()
+
+    def die(self):
+        self.reform
+        pass
+
+    def evasion(self,attack,blockable=True,dodgeable=True,parryable=True):
+        pass
+
+    def on_struck(self,attack):
+        self.hitdict.setdefault(str(type(attack)),[])
+        self.averagehits.setdefault(str(type(attack)),[])
+        self.hitdict[str(type(attack))].append((attack.time,attack.force,attack.pressure,attack.energy))
+
+
+    def report(self):
+        for keys in self.hitdict:
+            count=0
+            totalspeed=0
+            totalforce=0
+            totalpressure=0
+            totalenergy=0
+            for i in self.hitdict[keys]:
+                totalspeed+=i[0]
+                totalforce+=i[1]
+                totalpressure+=i[2]
+                totalenergy+=i[3]
+                count+=1
+            self.averagehits[keys]=(totalspeed/count,totalforce/count,totalpressure/count,totalenergy/count,count)
+        for keys in self.averagehits:
+            print(keys[16:-2],self.averagehits[keys][4],'iterations')
+            print('average execution time:',self.averagehits[keys][0])
+            print('average force delivered:',self.averagehits[keys][1])
+            print('average pressure:',self.averagehits[keys][2])
+            print('average energy:',self.averagehits[keys][3])
 
 
 ##################################################

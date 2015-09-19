@@ -3,6 +3,7 @@ import random
 from BaseClasses import *
 from UI_Elements import *
 
+
 #TODO: 2-handed attacks still require implementation. All weapons should be 1- or 2- handable at least. More than 2 hands is also a possibility
 
 def targetchoice(defender):
@@ -32,14 +33,16 @@ def hostilitycheck(attacker,defender):
 
 class Attack():
     def __init__(self):
+        self.useless=False
         self.blocked=False
         self.dodged=False
         self.parried=False
+        self.penetrate=False
         pass
 
     def resolve(self):
         f=self.force
-        #print('Force of',f,'time of',self.time)
+        #print(self.name,'Force of',f,'time of',self.time,'pressure of',self.pressure)
 
 
 
@@ -64,12 +67,15 @@ class Attack():
 
             return
 
+        self.target.on_struck(self)
+
         self.target.damageresolve(self, self.limb)
         if self.damage_dealt <= 0 and self.parried==False:
             messages.append("The attack glances off harmlessly")
         self.basetarget.owner.combataction = True
         self.attacker.focus[0] -= 1
 
+        self.penetrate=False
         self.arpen = -15
         self.force = f / (10*self.damagefactor)
         self.pressure = f / self.strikearea
@@ -80,12 +86,16 @@ class Attack():
             basetarget=self.basetarget
             self.target=self.weapon
             self.basetarget=self.weapon
-            self.weapon.damageresolve(self,basetarget,reactionforce=True)
+            if self.attacker.stats['luc']<random.gauss(12,8):
+                self.weapon.damageresolve(self,basetarget,reactionforce=True)
+            self.basetarget=basetarget
         else:
             basetarget=self.basetarget
             self.target=self.limb
             self.basetarget=self.limb
-            self.limb.damageresolve(self,basetarget, reactionforce=True)
+            if self.attacker.stats['luc']<random.gauss(12,8):
+                self.limb.damageresolve(self,basetarget, reactionforce=True)
+            self.basetarget=basetarget
         self.type=self.oldtype
         self.unstatweapon()
 
@@ -96,6 +106,14 @@ class Attack():
             pass
         if self.stattedweapon==False:
             del self.weapon.stats
+
+    def test_usability(self):
+        if self.arm.ability>0 and self.limb.ability>0:
+            self.useless=False
+        else:
+            self.useless=True
+
+
 
 class Punch(Attack):
     def __init__(self, limb):
@@ -123,17 +141,17 @@ class Punch(Attack):
                 self.anchor = None
                 self.basestrength = (self.arm.stats['str'] * self.arm.ability) * limb.ability ** 0.2 +0.1
             self.strikelength = limb.length + limb.attachpoint.length
-            self.strikearea = 3.14 * limb.radius ** 2
-            self.strikemass = limb.movemass + limb.owner.movemass
+            self.area = 3.14 * limb.radius ** 2 + 0.0001
+            self.strikemass = limb.movemass + limb.owner.mass
             self.strength = self.basestrength * (max(self.attacker.stamina[0] / self.attacker.stamina[1],0) ** 0.5)
         else:
             self.arm=self.limb
             self.strikelength=limb.length
-            self.strikearea=3.14 * limb.radius ** 2
+            self.area=3.14 * limb.radius ** 2 + 0.0001
             self.strikemass = limb.movemass
             self.basestrength=0.5*self.limb.stats['str']
             self.strength = self.basestrength * (max(self.attacker.stamina[0] / self.attacker.stamina[1],0) ** 0.5)
-
+        self.strikearea=self.area
 
 
     def do(self, target):
@@ -141,7 +159,7 @@ class Punch(Attack):
         self.basetarget = target
         self.target = target
         self.contact = True
-        highspeed = max(4 * (max(self.strength / self.arm.movemass,0)) ** 0.5, 8)
+        highspeed = max(4 * (max(self.strikelength*self.strength / self.arm.movemass,0)) ** 0.5, 8)
         self.speed = random.triangular(low=1, high=highspeed, mode=4) * (
             (self.attacker.stamina[0] / self.attacker.stamina[1]) ** 0.5) + 0.1
         broadcast_time=2*random.gauss(1,0.2)*self.attacker.focus[1]/(self.attacker.stats['tec']*(self.attacker.focus[0]+1))
@@ -149,36 +167,54 @@ class Punch(Attack):
 
         self.target.owner.evasion(self)
 
-        movemass = abs(random.gauss(self.target.movemass, 5))
+        movemass = abs(random.gauss(self.target.movemass, 5))*(self.limb.stats['tec']+15)/15
         if hasattr(self.target,"armor") and self.target.armor is not None:
             thickness=self.target.thickness+self.target.armor.thickness
+            density=self.target.armor.density
+            if self.target.armor.coverage*abs(random.gauss(self.target.stats['luc'],1))<random.random()*(self.limb.stats['luc']+2*self.limb.stats['tec'])/3+self.arpen:
+                self.youngs=self.target.arpen_youngs
+                self.shear=self.target.arpen_shear
+                thickness=self.target.thickness
+                density=self.target.layers[len(self.target.layers)-1].density
+                self.penetrate=True
+            else:
+                self.youngs=self.target.youngs
+                self.shear=self.target.shear
         else:
             thickness=self.target.thickness
-        self.strikemass = random.triangular(low=self.limb.movemass, high=self.strikemass, mode=self.strikemass)
+            self.youngs=self.target.youngs
+            self.shear=self.target.shear
+            if hasattr(self.target,'density'):
+                density=self.target.density
+            elif hasattr(self.target,'layers'):
+                density=self.target.layers[len(self.target.layers)-1].density
+            else:
+                density=5000
+        self.strikemass = random.triangular(low=self.limb.movemass, high=self.strikemass, mode=1.5*self.strikemass*self.limb.stats['tec']/(10+self.limb.stats['tec']))
         self.reducedmass = self.strikemass * movemass / (self.strikemass + movemass)
         self.pushforce = 10 * self.strength * self.reducedmass ** 0.5
-        self.force = self.damagefactor*((self.limb.ability ** 0.2) * 1.1 * self.speed * (1000000000 * self.reducedmass * self.strikearea / (
-            self.limb.thickness / self.limb.youngs + thickness / self.target.youngs)) ** 0.5 + self.pushforce + 1)
-        self.pressure = self.force / self.strikearea
+        self.force = self.damagefactor*0.5* (self.speed * (10**3) * (self.shear**0.25) * (self.reducedmass**0.75) / ((density**0.25)*(
+            self.limb.thickness / self.limb.youngs + thickness / self.youngs)**0.25) + self.pushforce)+1
+        self.pressure = self.force / self.area
         self.energy = 0.5 * self.strikemass * self.speed ** 2
 
         self.time = broadcast_time+self.strikelength / self.speed
         self.attacker.stamina[0] -= int(max(1, 7 * self.arm.movemass / self.basestrength))
+        self.strikearea=self.area
 
 
         self.resolve()
-
-
 
 
     def energy_recalc(self):
         if self.energy < 0:
             self.force = 0
             self.pressure = 0
+            self.energy=0
             return
         self.speed = (2 * self.energy / self.strikemass) ** 0.5
-        self.force = self.damagefactor * self.speed * (1000000000 * self.reducedmass * self.strikearea / (
-            self.limb.thickness / self.limb.youngs + self.basetarget.thickness / self.basetarget.youngs)) ** 0.5 + self.pushforce
+        self.force = self.damagefactor*0.5* (self.speed * (10**3) * (self.shear**0.25) * (self.reducedmass**0.75) / ((self.basetarget.layers[len(self.basetarget.layers)-1].density**0.25)*(
+            self.limb.thickness / self.limb.youngs + self.basetarget.thickness / self.youngs)**0.25) + self.pushforce)+1
 
 
 class Kick(Attack):
@@ -208,7 +244,7 @@ class Kick(Attack):
                 self.basestrength = (self.leg.stats['str'] * self.leg.ability) * limb.ability ** 0.2 + 0.1
             self.strikelength = limb.length + limb.attachpoint.length
             self.strikearea = limb.length*limb.radius*2
-            self.strikemass = limb.movemass + limb.owner.movemass
+            self.strikemass = limb.movemass + limb.owner.mass
             self.strength = self.basestrength * (max(self.attacker.stamina[0] / self.attacker.stamina[1],0) ** 0.5)
         else:
             self.leg=self.limb
@@ -217,9 +253,7 @@ class Kick(Attack):
             self.strikemass = limb.movemass
             self.basestrength=0.5*self.limb.stats['str']
             self.strength = self.basestrength * (max(self.attacker.stamina[0] / self.attacker.stamina[1],0) ** 0.5)
-        self.I=0.3333*self.leg.movemass*self.leg.length**2+limb.movemass*self.leg.length**2
-
-
+        self.I=0.25*self.leg.movemass*self.leg.length**2+limb.movemass*self.leg.length**2
 
     def do(self, target,anglefactor=1):
         self.__init__(self.limb)
@@ -227,39 +261,51 @@ class Kick(Attack):
         self.target = target
         self.contact = True
 
-        torque =  5 * self.strength * self.I ** 0.5 + 0.001
+        torque =  7 * self.strength * self.I ** 0.5 + 0.001
         swingangle = random.triangular(low=0.5, high=3, mode=2 * self.attacker.stats['tec'] / target.stats['luc'])*anglefactor
         self.w = ((2 * torque * swingangle / self.I) ** 0.5)
         self.collidepoint = self.leg.length + self.limb.length / 2
         self.speed = self.w * self.collidepoint
-        self.area = self.strikearea * random.triangular(0.001, 1)
+        self.area = self.strikearea * random.triangular(0.001, 1)+0.0001
         self.energy = 0.5 * self.I * self.w ** 2
         broadcast_time=10*random.gauss(1,0.2)*self.attacker.focus[1]/max(self.attacker.stats['tec']*(self.attacker.focus[0]+1),1)
-        print('broadcast time of',broadcast_time)
+        #print('broadcast time of',broadcast_time,'top w of',self.w,'I of',self.I,'with applied torque of',torque)
         self.time = broadcast_time+(self.I**1.25) * self.w / torque
-
-        '''
-        highspeed = max(4 * (max(self.strength / self.leg.movemass,0)) ** 0.5, 8)
-        self.speed = random.triangular(low=1, high=highspeed, mode=4) * (
-            (self.attacker.stamina[0] / self.attacker.stamina[1]) ** 2) + 0.1
-        broadcast_time=2*random.gauss(1,0.2)*self.attacker.focus[1]/(self.attacker.stats['tec']*(self.attacker.focus[0]+1))
-        self.time = broadcast_time+self.strikelength / self.speed
-        '''
 
         self.target.owner.evasion(self)
 
         movemass = abs(random.gauss(self.target.movemass, 5))
         if hasattr(self.target,"armor") and self.target.armor is not None:
             thickness=self.target.thickness+self.target.armor.thickness
+            density=self.target.armor.density
+            if self.target.armor.coverage*abs(random.gauss(self.target.stats['luc'],1))<random.random()*(self.limb.stats['luc']+2*self.limb.stats['tec'])/3+self.arpen:
+                self.youngs=self.target.arpen_youngs
+                self.shear=self.target.arpen_shear
+                thickness=self.target.thickness
+                density=self.target.layers[len(self.target.layers)-1].density
+                self.penetrate=True
+            else:
+                self.youngs=self.target.youngs
+                self.shear=self.target.shear
         else:
             thickness=self.target.thickness
+            self.youngs=self.target.youngs
+            self.shear=self.target.shear
+            if hasattr(self.target,'density'):
+                density=self.target.density
+            elif hasattr(self.target,'layers'):
+                density=self.target.layers[len(self.target.layers)-1].density
+            else:
+                density=5000
         self.strikemass = random.triangular(low=self.limb.movemass, high=self.strikemass, mode=self.strikemass)
         self.reducedmass = self.strikemass * movemass / (self.strikemass + movemass)
-        self.pushforce = 10 * self.strength * self.reducedmass ** 0.5
-        self.force = self.damagefactor*((self.limb.ability ** 0.2) * 1.1 * self.speed * (1000000000 * self.reducedmass * self.strikearea / (
-            self.limb.thickness / self.limb.youngs + thickness / self.target.youngs)) ** 0.5 + self.pushforce + 1)
+        self.pushforce = 9 * self.strength * self.reducedmass ** 0.5
+        #self.force = self.damagefactor*((self.limb.ability ** 0.2) * 1.1 * 0.016 * self.speed * (1000000000 * self.reducedmass / (
+         #   self.limb.thickness / self.limb.youngs + thickness / self.target.youngs)) ** 0.5 + self.pushforce + 1)
+        self.force = self.damagefactor*0.5* (self.speed * (10**3) * (self.shear**0.25) * (self.reducedmass**0.75) / ((density**0.25)*(
+            self.limb.thickness / self.limb.youngs + thickness / self.youngs)**0.25) + self.pushforce)
         self.pressure = self.force / self.strikearea
-        self.energy = 0.5 * self.strikemass * self.speed ** 2
+        #self.energy = 0.5 * self.strikemass * self.speed ** 2
 
 
         self.attacker.stamina[0] -= int(max(1, 7 * self.leg.movemass / self.basestrength))
@@ -268,17 +314,29 @@ class Kick(Attack):
 
         self.resolve()
 
-
-
-
     def energy_recalc(self):
         if self.energy < 0:
             self.force = 0
             self.pressure = 0
+            self.energy=0
             return
-        self.speed = (2 * self.energy / self.strikemass) ** 0.5
-        self.force = self.damagefactor * self.speed * (1000000000 * self.reducedmass * self.strikearea / (
-            self.limb.thickness / self.limb.youngs + self.basetarget.thickness / self.basetarget.youngs)) ** 0.5 + self.pushforce
+        if hasattr(self.basetarget,'layers'):
+            density=self.basetarget.layers[len(self.basetarget.layers)-1].density
+        elif hasattr(self.basetarget,'density'):
+            density=self.basetarget.density
+        else:
+            density=5000
+        self.w = (2 * self.energy / self.I) ** 0.5
+        self.speed = self.w * self.collidepoint
+        new = self.damagefactor*0.5* (self.w * (10**3) * (self.shear**0.25) * (self.reducedmass**0.75) / ((density**0.25)*(
+            self.limb.thickness / self.limb.youngs + self.basetarget.thickness / self.youngs)**0.25) + self.pushforce)
+        self.force = min(new, 0.9 * self.force)
+
+    def test_usability(self):
+        if self.leg.ability>0 and self.limb.ability>0:
+            self.useless=False
+        else:
+            self.useless=True
 
 
 class Slash_1H(Attack):
@@ -301,21 +359,21 @@ class Slash_1H(Attack):
             armlength = self.arm.length
             self.strikemass = self.arm.movemass + weapon.mass + self.attacker.mass
             self.strikelength = weapon.length + armlength
-            self.I = weapon.I + (1 / 3) * self.arm.mass * armlength ** 2 + weapon.mass * self.arm.length ** 2
+            self.I = 3 * weapon.I + 0.5*weapon.mass * (self.arm.length/2+weapon.centermass) ** 2
         elif self.limb.attachpoint is not None:
             self.anchor = None
             self.basestrength = 0.5 * self.limb.stats['str'] * self.limb.ability + 0.5 * self.arm.stats['str'] * self.arm.ability + 0.1
             armlength = self.limb.length
             self.strikemass = self.arm.movemass + weapon.mass + self.attacker.mass
             self.strikelength = weapon.length + armlength
-            self.I = weapon.I + (1 / 3) * self.arm.mass * armlength ** 2 + weapon.mass * self.arm.length ** 2
+            self.I = 3 * weapon.I + 0.5*weapon.mass * (self.arm.length/2+weapon.centermass) ** 2
         else:
             self.basestrength=self.limb.stats['str']
             armlength=self.limb.length
             self.arm=self.limb
             self.strikemass = self.limb.movemass + weapon.mass + self.attacker.mass
             self.strikelength = weapon.length + armlength
-            self.I = weapon.I
+            self.I = 3*weapon.I
 
         if self.attacker.player == True:
             self.name = 'a slash with your {}'.format(weapon.name)
@@ -324,38 +382,59 @@ class Slash_1H(Attack):
         self.strength = self.basestrength * (
             (max(self.attacker.stamina[0] / self.attacker.stamina[1], 0)) ** 0.5) + 0.01
 
-
     def do(self, target,anglefactor=1):
         self.__init__(self.weapon, self.limb)
         self.basetarget = target
         self.target = target
         self.contact = True
-        torque =  9 * self.strength * self.I ** 0.5
+        torque =  7 * self.strength * self.I ** 0.5
         swingangle = random.triangular(low=0.5, high=4.5, mode=2 * self.attacker.stats['tec'] / target.stats['luc'])*anglefactor
         self.w = ((2 * torque * swingangle / self.I) ** 0.5)
         self.collidepoint = self.arm.length + self.weapon.length * random.triangular(
             mode=(self.attacker.stats['tec'] + 0.5 * self.attacker.stats['luc']) / (
                 target.stats['luc'] + 0.5 * target.stats['tec']))
-        self.pushforce = torque / self.collidepoint
+        self.pushforce = torque #/ self.collidepoint
         self.speed = self.w * self.collidepoint
-        self.area = self.strikearea * random.triangular(0.001, 1, mode=1/self.attacker.stats['tec']**0.5)
+        self.area = self.strikearea * random.triangular(0.05, 0.5, mode=0.5/self.attacker.stats['tec']**0.5)
         self.energy = 0.5 * self.I * self.w ** 2
-        broadcast_time=3*random.gauss(1,0.2)*self.attacker.focus[1]/max(self.attacker.stats['tec']*(self.attacker.focus[0]+1),1)
-        self.time = broadcast_time+(self.I**1.25) * self.w / torque
+        broadcast_time=3*random.gauss(1.5,0.2)*self.attacker.focus[1]/max(self.attacker.stats['tec']*(self.attacker.focus[0]+1),1)
+        self.time = broadcast_time+(self.I) * self.w / torque
 
         self.target.owner.evasion(self)
 
         maxtargetmass = self.target.movemass + target.owner.movemass/2
         #movemass = random.triangular(low=self.target.movemass, high=maxtargetmass, mode=self.target.movemass)
-        movemass = abs(random.gauss(self.target.movemass, 1))
-        self.reducedmass = self.strikemass * movemass / (self.strikemass + movemass)
+        movemass = abs(random.gauss(self.target.movemass*self.collidepoint**2, 1))
+        self.reducedmass = self.I * movemass / (self.I + movemass)
         if hasattr(self.target,"armor") and self.target.armor is not None:
             thickness=self.target.thickness+self.target.armor.thickness
+            density=self.target.armor.density
+            if self.target.armor.coverage*abs(random.gauss(self.target.stats['luc'],1))<random.random()*(self.limb.stats['luc']+2*self.limb.stats['tec'])/3+self.arpen:
+                self.youngs=self.target.arpen_youngs
+                self.shear=self.target.arpen_shear
+                thickness=self.target.thickness
+                density=self.target.layers[len(self.target.layers)-1].density
+                self.penetrate=True
+            else:
+                self.youngs=self.target.youngs
+                self.shear=self.target.shear
         else:
             thickness=self.target.thickness
-        self.force = self.damagefactor* (self.speed * (1000000000 * self.reducedmass * self.area / (
-            self.weapon.thickness / self.weapon.material.youngs + thickness / self.target.youngs)) ** 0.5 + self.pushforce)
+            self.youngs=self.target.youngs
+            self.shear=self.target.shear
+            if hasattr(self.target,'density'):
+                density=self.target.density
+            elif hasattr(self.target,'layers'):
+                density=self.target.layers[len(self.target.layers)-1].density
+            else:
+                density=5000
+        #self.force = self.damagefactor* (self.speed * (1000000000 * self.reducedmass * self.area / (
+        #    self.weapon.thickness / self.weapon.material.youngs + thickness / self.target.youngs)) ** 0.5 + self.pushforce)
 
+        self.force = self.damagefactor*0.5* (self.w * (10**3) * (self.shear**0.25) * (self.reducedmass**0.75) / ((density**0.25)*(
+            self.weapon.thickness / self.weapon.material.youngs + thickness / self.youngs)**0.25) + self.pushforce)
+
+        #print(self.w,self.reducedmass,1/( self.weapon.thickness / self.weapon.material.youngs + thickness / self.target.youngs))
 
         self.pressure = self.force / self.area
         f = self.force
@@ -369,8 +448,6 @@ class Slash_1H(Attack):
 
         self.resolve()
 
-
-
     def energy_recalc(self):
         if self.energy < 0:
             self.force = 0
@@ -380,8 +457,8 @@ class Slash_1H(Attack):
         self.w = (2 * self.energy / self.I) ** 0.5
         self.speed = self.w * self.collidepoint
         target = self.target
-        new = self.damagefactor * self.speed * (1000000000 * self.reducedmass * self.area / (
-            self.weapon.thickness / self.weapon.material.youngs + self.basetarget.thickness / self.basetarget.youngs)) ** 0.5 + self.pushforce
+        new = self.damagefactor* (self.w * (10**3) * (self.shear**0.25) * (self.reducedmass**0.75) / ((self.basetarget.layers[len(self.basetarget.layers)-1].density**0.25)*(
+            self.weapon.thickness / self.weapon.material.youngs + self.basetarget.thickness / self.youngs)**0.25) + self.pushforce)
         self.force = min(new, 0.9 * self.force)
 
 
@@ -403,21 +480,21 @@ class Stab_1H(Attack):
             self.basestrength = 0.2 * self.limb.stats['str'] * self.limb.ability + 0.7 * self.arm.stats[
                 'str'] * self.arm.ability + 0.1 * self.anchor.stats['str'] * self.anchor.ability + 0.1
             armlength = self.arm.length
-            self.strikemass = self.arm.movemass + weapon.mass + (self.attacker.stats['tec']/(15+self.attacker.stats['tec']))*self.attacker.mass**0.5
+            self.strikemass = self.arm.movemass + weapon.mass + (self.attacker.stats['tec']/(15+self.attacker.stats['tec']))*self.attacker.mass
             self.strikelength = weapon.length + armlength
             self.I = weapon.I + (1 / 3) * self.arm.mass * armlength ** 2 + weapon.mass * self.arm.length ** 2
         elif self.limb.attachpoint is not None:
             self.anchor = None
             self.basestrength = 0.5 * self.limb.stats['str'] * self.limb.ability + 0.5 * self.arm.stats['str'] * self.arm.ability + 0.1
             armlength = self.limb.length
-            self.strikemass = self.arm.movemass + weapon.mass + (self.attacker.stats['tec']/(15+self.attacker.stats['tec']))*self.attacker.mass**0.5
+            self.strikemass = self.arm.movemass + weapon.mass + (self.attacker.stats['tec']/(15+self.attacker.stats['tec']))*self.attacker.mass
             self.strikelength = weapon.length + armlength
             self.I = weapon.I + (1 / 3) * self.arm.mass * armlength ** 2 + weapon.mass * self.arm.length ** 2
         else:
             self.basestrength=self.limb.stats['str']
             armlength=self.limb.length
             self.arm=self.limb
-            self.strikemass = self.limb.movemass + weapon.mass + (self.attacker.stats['tec']/(15+self.attacker.stats['tec']))*self.attacker.mass**0.5
+            self.strikemass = self.limb.movemass + weapon.mass + (self.attacker.stats['tec']/(15+self.attacker.stats['tec']))*self.attacker.mass
             self.strikelength = weapon.length + armlength
             self.I = weapon.I
 
@@ -428,18 +505,17 @@ class Stab_1H(Attack):
         self.strength = self.basestrength * (
             (max(self.attacker.stamina[0] / self.attacker.stamina[1], 0)) ** 0.5) + 0.01
 
-
     def do(self, target,anglefactor=1):
         self.__init__(self.weapon, self.limb)
         self.basetarget = target
         self.target = target
         self.contact = True
 
-        self.pushforce=10*self.strength*self.strikemass**0.5
+        self.pushforce=7*self.strength*self.strikemass**0.5
 
-        self.speed = (self.strikelength*2*self.pushforce/self.strikemass)**0.5
+        self.speed = (random.triangular(0.1,1.1,0.5)*self.strikelength*self.pushforce/self.strikemass)**0.5
         broadcast_time=2*random.gauss(1,0.2)*self.attacker.focus[1]/max(self.attacker.stats['tec']*(self.attacker.focus[0]+1),1)
-        self.time = broadcast_time+self.speed*self.strikemass/self.pushforce
+        self.time = broadcast_time+0.5*(self.speed*self.strikemass**1.25)/self.pushforce
 
 
         self.area = self.strikearea
@@ -449,14 +525,36 @@ class Stab_1H(Attack):
 
         maxtargetmass = self.target.movemass + target.owner.movemass/2
         #movemass = random.triangular(low=self.target.movemass, high=maxtargetmass, mode=self.target.movemass)
-        movemass = abs(random.gauss(self.target.movemass, 1))+0.1
+        movemass = abs(random.gauss(self.target.movemass, 1))*(self.limb.stats['tec']+15)/15+0.1
+        self.strikemass = random.triangular(low=self.limb.movemass, high=self.strikemass, mode=1.5*self.strikemass*self.limb.stats['tec']/(10+self.limb.stats['tec']))
         self.reducedmass = self.strikemass * movemass / (self.strikemass + movemass)
         if hasattr(self.target,"armor") and self.target.armor is not None:
             thickness=self.target.thickness+self.target.armor.thickness
+            density=self.target.armor.density
+            if self.target.armor.coverage*abs(random.gauss(self.target.stats['luc'],1))<random.random()*(self.limb.stats['luc']+2*self.limb.stats['tec'])/3+self.arpen:
+                self.youngs=self.target.arpen_youngs
+                self.shear=self.target.arpen_shear
+                thickness=self.target.thickness
+                density=self.target.layers[len(self.target.layers)-1].density
+                self.penetrate=True
+            else:
+                self.youngs=self.target.youngs
+                self.shear=self.target.shear
         else:
             thickness=self.target.thickness
-        self.force = self.damagefactor* (self.speed * (1000000000 * self.reducedmass * (self.area+0.01) / (
-            self.weapon.thickness / self.weapon.material.youngs + thickness / self.target.youngs)) ** 0.5 + self.pushforce)
+            self.youngs=self.target.youngs
+            self.shear=self.target.shear
+            if hasattr(self.target,'density'):
+                density=self.target.density
+            elif hasattr(self.target,'layers'):
+                density=self.target.layers[len(self.target.layers)-1].density
+            else:
+                density=5000
+        #self.force = self.damagefactor* (self.speed * (1000000000 * self.reducedmass * (self.area**0.5) / (
+        #    self.weapon.thickness / self.weapon.material.youngs + thickness / self.target.youngs)) ** 0.5 + self.pushforce)
+
+        self.force = self.damagefactor*0.5* (self.speed * (10**3) * (self.shear**0.25) * (self.reducedmass**0.75) / ((density**0.25)*(
+            self.limb.thickness / self.limb.youngs + thickness / self.youngs)**0.25) + self.pushforce)+1
 
 
         self.pressure = self.force / self.area
@@ -469,11 +567,9 @@ class Stab_1H(Attack):
             self.weapon.stats = self.limb.stats
         self.attacker.stamina[0] -= int(max(1, 5 * (self.arm.movemass + self.weapon.mass) / self.basestrength))
 
-        print(self.time,self.speed,self.pushforce,self.force,self.pressure)
+        #print(self.time,self.speed,self.pushforce,self.force,self.pressure)
 
         self.resolve()
-
-
 
     def energy_recalc(self):
         if self.energy < 0:
@@ -483,8 +579,8 @@ class Stab_1H(Attack):
             return
         self.speed = (2 * self.energy / self.strikemass) ** 0.5
         target = self.target
-        new = self.damagefactor * self.speed * (1000000000 * self.reducedmass * (self.area+0.01) / (
-            self.weapon.thickness / self.weapon.material.youngs + self.basetarget.thickness / self.basetarget.youngs)) ** 0.5 + self.pushforce
+        new = self.damagefactor * (0.001 * self.speed * (1000000000 * self.reducedmass / (
+            self.weapon.thickness / self.weapon.material.youngs + self.basetarget.thickness / self.target.youngs)) ** 0.5 + self.pushforce)
         self.force = min(new, 0.9 * self.force)
 
 
@@ -495,7 +591,7 @@ class Bludgeon_1H(Attack):
         self.type = 'crush'
         self.oldtype = 'crush'
         self.weapon = weapon
-        self.arpen = -0.1
+        self.arpen = -0.15
         self.limb = limb
         self.accuracy=self.limb.dexterity
         self.attacker = limb.owner
@@ -508,20 +604,21 @@ class Bludgeon_1H(Attack):
             armlength = self.arm.length
             self.strikemass = self.arm.movemass + weapon.mass + self.attacker.mass
             self.strikelength = weapon.length + armlength
-            self.I = weapon.I + (1 / 3) * self.arm.mass * armlength ** 2 + weapon.mass * self.arm.length ** 2
+            self.I = 3 * weapon.I + 0.5*weapon.mass * (self.arm.length/2+weapon.centermass) ** 2
         elif self.limb.attachpoint is not None:
             self.anchor = None
             self.basestrength = 0.5 * self.limb.stats['str'] * self.limb.ability + 0.5 * self.arm.stats['str'] * self.arm.ability + 0.1
             armlength = self.limb.length
             self.strikemass = self.arm.movemass + weapon.mass + self.attacker.mass
             self.strikelength = weapon.length + armlength
-            self.I = weapon.I + (1 / 3) * self.arm.mass * armlength ** 2 + weapon.mass * self.arm.length ** 2
+            self.I = 3 * weapon.I + 0.5*weapon.mass * (self.arm.length/2+weapon.centermass) ** 2
         else:
             self.basestrength=self.limb.stats['str']
             armlength=self.limb.length
+            self.arm=self.limb
             self.strikemass = self.limb.movemass + weapon.mass + self.attacker.mass
             self.strikelength = weapon.length + armlength
-            self.I = weapon.I
+            self.I = 3*weapon.I
 
         if self.attacker.player == True:
             self.name = 'a swing of your {}'.format(weapon.name)
@@ -535,31 +632,47 @@ class Bludgeon_1H(Attack):
         self.basetarget = target
         self.target = target
         self.contact = True
-        torque = 9 * self.strength * self.I ** 0.5
+        torque = 7 * self.strength * self.I ** 0.5
         self.swingangle = random.triangular(low=0.5, high=4.5, mode=2 * self.attacker.stats['tec'] / target.stats['luc'])*anglefactor
         self.w = ((2 * torque * self.swingangle / self.I) ** 0.5)
-        self.collidepoint = self.arm.length + self.weapon.length * random.triangular(mode=1) * (
-            self.attacker.stats['tec'] + 0.5 * self.attacker.stats['luc']) / (
-                                                  target.stats['luc'] + 0.5 * target.stats['tec'])
-        self.pushforce = torque / self.collidepoint
+        self.collidepoint = self.arm.length + self.weapon.length * random.triangular(mode=1)
+        self.pushforce = 3 * torque / self.collidepoint
         self.speed = self.w * self.collidepoint
-        self.area = self.strikearea * random.triangular(0.0001, 1, mode=1/self.attacker.stats['tec']**0.5)
+        self.area = self.strikearea * random.triangular(0.1, 1,mode=max(1/self.attacker.stats['tec']**0.5,0.1))
         self.energy = 0.5 * self.I * self.w ** 2
-        broadcast_time=4*random.gauss(1,0.2)*self.attacker.focus[1]/(self.attacker.stats['tec']*max(self.attacker.focus[0],1))
-        self.time = broadcast_time + (self.I**1.25) * self.w / torque
+        broadcast_time=3*random.gauss(1,0.2)*self.attacker.focus[1]/(self.attacker.stats['tec']*max(self.attacker.focus[0],1))
+        self.time = broadcast_time + (self.I) * self.w / torque
 
         self.target.owner.evasion(self)
 
         maxtargetmass = self.target.movemass + target.owner.movemass / 2
         #movemass = random.triangular(low=self.target.movemass, high=maxtargetmass, mode=self.target.movemass)
-        movemass = abs(random.gauss(self.target.movemass, 1))
+        movemass = abs(random.gauss(self.target.movemass*self.collidepoint**2, 1))
+        self.reducedmass = self.I * movemass / (self.I + movemass)
         if hasattr(self.target,"armor") and self.target.armor is not None:
             thickness=self.target.thickness+self.target.armor.thickness
+            density=self.target.armor.density
+            if self.target.armor.coverage*abs(random.gauss(self.target.stats['luc'],1))<random.random()*(self.limb.stats['luc']+2*self.limb.stats['tec'])/3+self.arpen:
+                self.youngs=self.target.arpen_youngs
+                self.shear=self.target.arpen_shear
+                thickness=self.target.thickness
+                density=self.target.layers[len(self.target.layers)-1].density
+                self.penetrate=True
+            else:
+                self.youngs=self.target.youngs
+                self.shear=self.target.shear
         else:
             thickness=self.target.thickness
-        self.reducedmass = self.strikemass * movemass / (self.strikemass + movemass)
-        self.force = self.damagefactor*(self.speed * (1000000000 * self.reducedmass * self.area / (
-            2 * self.weapon.radius / self.weapon.material.youngs + thickness / self.target.youngs)) ** 0.5 + self.pushforce)
+            self.youngs=self.target.youngs
+            self.shear=self.target.shear
+            if hasattr(self.target,'density'):
+                density=self.target.density
+            elif hasattr(self.target,'layers'):
+                density=self.target.layers[len(self.target.layers)-1].density
+            else:
+                density=5000
+        self.force = self.damagefactor* (self.w * (10**3) * (self.shear**0.25) * (self.reducedmass**0.75) / ((density**0.25)*(
+            self.weapon.thickness / self.weapon.material.youngs + thickness / self.youngs)**0.25) + self.pushforce)
         self.pressure = self.force / self.area
         f = self.force
         if hasattr(self.weapon,'stats'):
@@ -568,7 +681,7 @@ class Bludgeon_1H(Attack):
         else:
             self.stattedweapon=False
             self.weapon.stats = self.limb.stats
-        self.attacker.stamina[0] -= int(max(1, 5 * (self.arm.movemass + self.I) / self.basestrength))
+        self.attacker.stamina[0] -= int(max(1, 4 * (self.arm.movemass + self.I) / self.basestrength))
 
         self.resolve()
 
@@ -576,14 +689,123 @@ class Bludgeon_1H(Attack):
         if self.energy < 0:
             self.force = 0
             self.pressure = 0
+            self.energy=0
             return
         self.w = (2 * self.energy / self.I) ** 0.5
         self.speed = self.w * self.collidepoint
-        target = self.target
-        new = self.damagefactor * self.speed * (1000000000 * self.reducedmass * self.area / (
-            self.weapon.thickness / self.weapon.material.youngs + self.basetarget.thickness / self.basetarget.youngs)) ** 0.5 + self.pushforce
+        if hasattr(self.basetarget,'layers'):
+            density=self.basetarget.layers[len(self.basetarget.layers)-1].density
+        elif hasattr(self.basetarget,'density'):
+            density=self.basetarget.density
+        else:
+            density=5000
+        new = self.damagefactor*(self.w * (10**3.5) * (self.shear**0.25) * (self.reducedmass**0.75) / ((density**0.25)*(
+            self.weapon.thickness / self.weapon.material.youngs + self.basetarget.thickness / self.youngs)**0.25) + self.pushforce)
         self.force = min(new, 0.9 * self.force)
 
+
+class Bite(Attack):
+    def __init__(self, limb):
+        super().__init__()
+        self.damagefactor=1
+        self.weapon = None
+        self.type = 'pierce'
+        self.oldtype = 'pierce'
+        self.limb = limb
+        self.attacker = limb.owner
+        if self.attacker.player == True:
+            self.name = 'a bite'
+        else:
+            self.name = 'a bite'
+        self.arpen = -0.2
+        self.accuracy=2
+        limb = self.limb
+        if hasattr(limb,'attachpoint') and self.limb.attachpoint is not None:
+            self.head=limb.attachpoint
+        else:
+            self.head=limb
+        if any(hasattr(i,'is_teeth') for i in self.limb.limbs):
+            self.teeth=[i for i in limb.limbs if hasattr(i,'is_teeth')]
+            self.teeth=random.choice(self.teeth)
+            self.weapon=self.teeth
+        else:
+            self.teeth=self.limb
+            self.useless=True
+        self.bitesize=max(self.limb.radius,self.limb.length)
+        self.basestrength=self.limb.stats['str'] * self.bitesize + self.limb.stats['str'] * self.teeth.radius
+        self.strength=self.basestrength * (
+            (max(self.attacker.stamina[0] / self.attacker.stamina[1], 0)) ** 0.2) + 0.01
+
+
+    def do(self, target):
+        self.__init__(self.limb)
+        self.basetarget = target
+        self.target = target
+        self.contact = True
+
+        broadcast_time=4*random.gauss(1,0.2)*self.attacker.focus[1]/(self.attacker.stats['tec']*(self.attacker.focus[0]+1))
+        self.time = broadcast_time+self.head.movemass / self.head.stats['str']
+        self.strikearea=(self.teeth.length*self.teeth.radius)
+        self.area=self.strikearea
+
+        self.target.owner.evasion(self,parryable=False)
+
+        if hasattr(self.target,"armor") and self.target.armor is not None:
+            thickness=self.target.thickness+self.target.armor.thickness
+        else:
+            thickness=self.target.thickness
+
+        if thickness<self.limb.length/2:
+            self.type='cut'
+
+        if thickness>self.teeth.radius:
+            self.damagefactor=self.damagefactor**0.3
+
+
+        self.reducedmass=1000
+
+        self.force = self.damagefactor*self.strength*250
+        self.pressure = self.force / self.area
+        self.energy = 0
+
+        #print('biting attack force, pressure, time',self.force,self.pressure,self.time)
+
+        self.attacker.stamina[0] -= int(max(1, 7 * self.head.movemass / self.basestrength))
+
+
+        self.resolve()
+
+    def energy_recalc(self):
+        self.force = self.damagefactor*self.strength*250
+        self.pressure = self.force / (self.teeth.length*self.teeth.radius)
+        self.energy = 0
+
+    def test_usability(self):
+        if any(hasattr(i,'is_teeth') for i in self.limb.limbs):
+            self.teeth=[i for i in self.limb.limbs if hasattr(i,'is_teeth')]
+            self.teeth=random.choice(self.teeth)
+            self.weapon=self.teeth
+            self.stattedweapon=True
+            if self.limb.ability>0:
+                self.useless=False
+        else:
+            self.useless=True
+            print('no teeth')
+            return
+            #self.limb.attacks.remove(self)
+
+
+class Swing_Pierce_1H(Bludgeon_1H):
+    def __init__(self,weapon,limb):
+        super().__init__(weapon,limb)
+        self.type='pierce'
+        self.oldtype='pierce'
+        self.arpen=0
+        self.strikearea=weapon.tip
+        self.area=self.strikearea
+
+    def do(self,target,anglefactor=1):
+        super().do(target,anglefactor)
 
 class Shield_Bash(Bludgeon_1H):
     def __init__(self,weapon,limb):
@@ -610,10 +832,229 @@ class Shield_Bash(Bludgeon_1H):
                     messages.append("{} is knocked off balance!".format(creature.name))
 
 
+class Experimental_Bash(Attack):
+    def __init__(self, weapon, limb):
+        super().__init__()
+        self.damagefactor=1
+        self.type = 'crush'
+        self.oldtype = 'crush'
+        self.weapon = weapon
+        self.arpen = -0.1
+        self.limb = limb
+        self.accuracy=self.limb.dexterity
+        self.attacker = limb.owner
+        self.arm = limb.attachpoint
+        self.strikearea = weapon.contactarea
+        if hasattr(self.arm,'attachpoint') and self.arm.attachpoint is not None:
+            self.anchor = self.arm.attachpoint
+            self.basestrength = 0.2 * self.limb.stats['str'] * self.limb.ability + 0.7 * self.arm.stats[
+                'str'] * self.arm.ability + 0.1 * self.anchor.stats['str'] * self.anchor.ability + 0.1
+            armlength = self.arm.length
+            self.strikemass = self.arm.movemass + weapon.mass + self.attacker.mass
+            self.strikelength = weapon.length + armlength
+            self.I = 3 * weapon.I + 0.5*weapon.mass * (self.arm.length/2+weapon.centermass) ** 2
+        elif self.limb.attachpoint is not None:
+            self.anchor = None
+            self.basestrength = 0.5 * self.limb.stats['str'] * self.limb.ability + 0.5 * self.arm.stats['str'] * self.arm.ability + 0.1
+            armlength = self.limb.length
+            self.strikemass = self.arm.movemass + weapon.mass + self.attacker.mass
+            self.strikelength = weapon.length + armlength
+            self.I = 3 * weapon.I + 0.5*weapon.mass * (self.arm.length/2+weapon.centermass) ** 2
+        else:
+            self.basestrength=self.limb.stats['str']
+            armlength=self.limb.length
+            self.arm=self.limb
+            self.strikemass = self.limb.movemass + weapon.mass + self.attacker.mass
+            self.strikelength = weapon.length + armlength
+            self.I = 3*weapon.I
+
+        if self.attacker.player == True:
+            self.name = 'a swing of your {}'.format(weapon.name)
+        else:
+            self.name = 'a swing of its {}'.format(weapon.name)
+        self.strength = self.basestrength * (
+            (max(self.attacker.stamina[0] / self.attacker.stamina[1], 0)) ** 0.5) + 0.01
+
+    def do(self, target,anglefactor=1):
+        self.__init__(self.weapon, self.limb)
+        self.basetarget = target
+        self.target = target
+        self.contact = True
+        torque = 8 * self.strength * self.I ** 0.5
+        self.swingangle = random.triangular(low=0.5, high=4.5, mode=2 * self.attacker.stats['tec'] / target.stats['luc'])*anglefactor
+        self.w = ((2 * torque * self.swingangle / self.I) ** 0.5)
+        self.collidepoint = self.arm.length + self.weapon.length * random.triangular(mode=1)
+        self.pushforce = torque / self.collidepoint
+        self.speed = self.w * self.collidepoint
+        self.area = self.strikearea * random.triangular(0.1, 1,mode=max(1/self.attacker.stats['tec']**0.5,0.1))
+        self.energy = 0.5 * self.I * self.w ** 2
+        broadcast_time=3*random.gauss(1,0.2)*self.attacker.focus[1]/(self.attacker.stats['tec']*max(self.attacker.focus[0],1))
+        self.time = broadcast_time + (self.I) * self.w / torque
+
+        self.target.owner.evasion(self)
+
+        maxtargetmass = self.target.movemass + target.owner.movemass / 2
+        #movemass = random.triangular(low=self.target.movemass, high=maxtargetmass, mode=self.target.movemass)
+        movemass = abs(random.gauss(self.target.movemass*self.collidepoint**2, 1))
+        self.reducedmass = self.I * movemass / (self.I + movemass)
+        if hasattr(self.target,"armor") and self.target.armor is not None:
+            thickness=self.target.thickness+self.target.armor.thickness
+            density=self.target.armor.density
+        else:
+            thickness=self.target.thickness
+            if hasattr(self.target,'density'):
+                density=self.target.density
+            elif hasattr(self.target,'layers'):
+                density=self.target.layers[len(self.target.layers)-1].density
+            else:
+                density=5000
+        self.force = self.damagefactor* (self.w * (10**3.4) * (self.target.shear**0.25) * (self.reducedmass**0.75) / ((density**0.25)*(
+            self.weapon.thickness / self.weapon.material.youngs + thickness / self.target.youngs)**0.25) + self.pushforce)
+        self.pressure = self.force / self.area
+        f = self.force
+        if hasattr(self.weapon,'stats'):
+            self.stattedweapon=True
+            pass
+        else:
+            self.stattedweapon=False
+            self.weapon.stats = self.limb.stats
+        self.attacker.stamina[0] -= int(max(1, 4 * (self.arm.movemass + self.I) / self.basestrength))
+
+        self.resolve()
+
+    def energy_recalc(self):
+        if self.energy < 0:
+            self.force = 0
+            self.pressure = 0
+            return
+        self.w = (2 * self.energy / self.I) ** 0.5
+        self.speed = self.w * self.collidepoint
+        target = self.target
+        new = self.damagefactor*(self.w * (10**3.5) * (self.target.shear**0.25) * (self.reducedmass**0.75) / ((self.basetarget.layers[len(self.basetarget.layers)-1].density**0.25)*(
+            self.weapon.thickness / self.weapon.material.youngs + self.basetarget.thickness / self.target.youngs)**0.25) + self.pushforce)
+        self.force = min(new, 0.9 * self.force)
+
+
+#Abilities go below here
+
+class Targeted_Ability(Attack):
+    pass
+
+
+
+
+
+
 # A person can swing with two hands an object with a moment of inertia of 0.1646 kg m^2 with a top radial speed
 #of about 30 rad/sec. It seems that I*w^4 is approximately constant, though there is clearly more work that needs done.
 
+#Old slash is stored here:
+'''
+class Slash_1H(Attack):
+    def __init__(self, weapon, limb):
+        super().__init__()
+        self.damagefactor=1
+        self.type = 'cut'
+        self.oldtype = 'cut'
+        self.weapon = weapon
+        self.arpen = 0.05
+        self.limb = limb
+        self.accuracy=self.limb.dexterity
+        self.attacker = limb.owner
+        self.arm = limb.attachpoint
+        self.strikearea = weapon.edge * weapon.length*(1-weapon.curvature)
+        if hasattr(self.arm,'attachpoint') and self.arm.attachpoint is not None:
+            self.anchor = self.arm.attachpoint
+            self.basestrength = 0.2 * self.limb.stats['str'] * self.limb.ability + 0.7 * self.arm.stats[
+                'str'] * self.arm.ability + 0.1 * self.anchor.stats['str'] * self.anchor.ability + 0.1
+            armlength = self.arm.length
+            self.strikemass = self.arm.movemass + weapon.mass + self.attacker.mass
+            self.strikelength = weapon.length + armlength
+            self.I = 10*weapon.I + (1 / 24) * self.arm.movemass * armlength ** 2 + weapon.mass * (self.arm.length/2+weapon.centermass) ** 2
+        elif self.limb.attachpoint is not None:
+            self.anchor = None
+            self.basestrength = 0.5 * self.limb.stats['str'] * self.limb.ability + 0.5 * self.arm.stats['str'] * self.arm.ability + 0.1
+            armlength = self.limb.length
+            self.strikemass = self.arm.movemass + weapon.mass + self.attacker.mass
+            self.strikelength = weapon.length + armlength
+            self.I =10*weapon.I + (1 / 24) * self.arm.movemass * armlength ** 2 + weapon.mass * (self.arm.length/2+weapon.centermass) ** 2
+        else:
+            self.basestrength=self.limb.stats['str']
+            armlength=self.limb.length
+            self.arm=self.limb
+            self.strikemass = self.limb.movemass + weapon.mass + self.attacker.mass
+            self.strikelength = weapon.length + armlength
+            self.I = 10*weapon.I
 
+        if self.attacker.player == True:
+            self.name = 'a slash with your {}'.format(weapon.name)
+        else:
+            self.name = 'a slash with its {}'.format(weapon.name)
+        self.strength = self.basestrength * (
+            (max(self.attacker.stamina[0] / self.attacker.stamina[1], 0)) ** 0.5) + 0.01
+
+    def do(self, target,anglefactor=1):
+        self.__init__(self.weapon, self.limb)
+        self.basetarget = target
+        self.target = target
+        self.contact = True
+        torque =  10 * self.strength * self.I ** 0.5
+        swingangle = random.triangular(low=0.5, high=4.5, mode=2 * self.attacker.stats['tec'] / target.stats['luc'])*anglefactor
+        self.w = ((2 * torque * swingangle / self.I) ** 0.5)
+        self.collidepoint = self.arm.length + self.weapon.length * random.triangular(
+            mode=(self.attacker.stats['tec'] + 0.5 * self.attacker.stats['luc']) / (
+                target.stats['luc'] + 0.5 * target.stats['tec']))
+        self.pushforce = torque #/ self.collidepoint
+        self.speed = self.w * self.collidepoint
+        self.area = self.strikearea * random.triangular(0.001, 1, mode=1/self.attacker.stats['tec']**0.5)
+        self.energy = 0.5 * self.I * self.w ** 2
+        broadcast_time=3*random.gauss(1.5,0.2)*self.attacker.focus[1]/max(self.attacker.stats['tec']*(self.attacker.focus[0]+1),1)
+        self.time = broadcast_time+1.5*(self.I) * self.w / torque
+
+        self.target.owner.evasion(self)
+
+        maxtargetmass = self.target.movemass + target.owner.movemass/2
+        #movemass = random.triangular(low=self.target.movemass, high=maxtargetmass, mode=self.target.movemass)
+        movemass = abs(random.gauss(self.target.movemass*self.collidepoint**2, 1))
+        self.I=self.I*4
+        self.reducedmass = self.I * movemass / (self.I + movemass)
+        if hasattr(self.target,"armor") and self.target.armor is not None:
+            thickness=self.target.thickness+self.target.armor.thickness
+        else:
+            thickness=self.target.thickness
+        #self.force = self.damagefactor* (self.speed * (1000000000 * self.reducedmass * self.area / (
+        #    self.weapon.thickness / self.weapon.material.youngs + thickness / self.target.youngs)) ** 0.5 + self.pushforce)
+
+        self.force = self.damagefactor* (0.005 * self.w * (1000000000 * self.reducedmass / (
+            self.weapon.thickness / self.weapon.material.youngs + thickness / self.target.youngs)) ** 0.5 + self.pushforce)
+
+        #print(self.w,self.reducedmass,1/( self.weapon.thickness / self.weapon.material.youngs + thickness / self.target.youngs))
+
+        self.pressure = self.force / self.area
+        f = self.force
+        if hasattr(self.weapon,'stats'):
+            self.stattedweapon=True
+            pass
+        else:
+            self.stattedweapon=False
+            self.weapon.stats = self.limb.stats
+        self.attacker.stamina[0] -= int(max(1, 5 * (self.arm.movemass + self.I) / self.basestrength))
+
+        self.resolve()
+
+    def energy_recalc(self):
+        if self.energy < 0:
+            self.force = 0
+            self.pressure = 0
+            self.energy=0
+            return
+        self.w = (2 * self.energy / self.I) ** 0.5
+        self.speed = self.w * self.collidepoint
+        target = self.target
+        new = self.damagefactor* (0.005 * self.w * (1000000000 * self.reducedmass / (
+            self.weapon.thickness / self.weapon.material.youngs + self.basetarget.thickness / self.target.youngs)) ** 0.5 + self.pushforce)
+        self.force = min(new, 0.9 * self.force)
+'''
 
 def SwingSpeed(attacker, twohand=False):
     if twohand == True:
@@ -628,4 +1069,6 @@ def SwingSpeed(attacker, twohand=False):
         swingtime = I * (vmax / (weapon.length + ((arm1.length + arm2.length) / 2))) / torque
 
     return swingtime, vmax
+
+
 

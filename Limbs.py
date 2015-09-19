@@ -10,6 +10,7 @@ from Items import *
 
 
 
+
 ##############################################LIMBS###################################################################
 '''Here are all the body parts we will use to create our creatures. Here we lay out the format we will adhere to:
 
@@ -38,7 +39,7 @@ self.limbs indicates all limbs attached to the limb in question.
 
 self.scars is currently a placeholder, but will keep track of scars from past wounds
 
-self.diagnosis is what the game will print to the player upon query
+self.descriptor is what the game will print to the player upon query
 
 self.attacktype is the type of attack the limb grants. It depends upon current equipment when applicable
 '''
@@ -69,7 +70,7 @@ class Finger(Limb):
         self.equipment={'ring':None,'glove':None}
         self.armor=self.equipment['glove']
         self.scars=[]
-        self.diagnosis='This is a humanoid finger of {}.'.format(self.owner.indefinitename)
+        self.descriptor='This is a humanoid finger of {}.'.format(self.owner.indefinitename)
         self.attacktype=None
         self.attachpoint=None
         self.layers=[Bone(length=self.length,radius=self.radius*0.8,quality=0.25),Flesh(length=self.length,in_radius=self.radius*0.8,out_radius=self.radius)]
@@ -93,7 +94,6 @@ class Finger(Limb):
         if item.wield=='glove':
             self.equipment['glove']=item
             self.armor=self.equipment['glove']
-            item.equipped=self
 
         self.youngscalc()
 
@@ -135,7 +135,7 @@ class Hand(Limb):
             self.limbs=[self.thumb,self.firstfinger,self.secondfinger,self.thirdfinger,self.fourthfinger]
 
         self.scars=[]
-        self.diagnosis='This is a humanoid hand of {}.'.format(self.owner.indefinitename)
+        self.descriptor='This is a humanoid hand of {}.'.format(self.owner.indefinitename)
         self.attacktype='punch'
         self.dexterity=self.ability
         for i in self.limbs:
@@ -157,6 +157,11 @@ class Hand(Limb):
                 self.unequip('glove')
             self.equipment['glove']=item
             self.armor=self.equipment['glove']
+#TODO: size of items should determine when it can be equipped. This bit of code does so, but I don't feel like implementing it everywhere right now
+#            if self.radius<0.5*item.radius:
+#                print("{} is too big!".format(item.name))
+#            if self.radius>2*item.radius:
+#                print("{} is too small!".format(item.name))
             item.equipped=self
             if item.mass:
                 self.movemass+=item.mass
@@ -252,7 +257,7 @@ class Arm(Limb):
 
             self.limbs=[self.hand]
         self.scars=[]
-        self.diagnosis='This is an arm of {}.'.format(self.owner.indefinitename)
+        self.descriptor='This is an arm of {}.'.format(self.owner.indefinitename)
         self.attacktype=None
         self.attachpoint=None
         self.layers=[Bone(length=self.length,radius=boneradius),Flesh(length=self.length,in_radius=boneradius,out_radius=self.radius)]
@@ -349,7 +354,7 @@ class Torso(Limb):
 
 
         self.scars=[]
-        self.diagnosis='This is a torso of {}.'.format(self.owner.indefinitename)
+        self.descriptor='This is a torso of {}.'.format(self.owner.indefinitename)
         self.attacktype=None
         self.attachpoint=None
         self.layers=[self.organs,
@@ -380,7 +385,7 @@ class Torso(Limb):
 
     def on_wounds(self,*args):
         self.ability=1
-        self.diagnosis='This is a torso of {}.'.format(self.owner.indefinitename)
+        self.descriptor='This is a torso of {}.'.format(self.owner.indefinitename)
 
 
 
@@ -417,7 +422,7 @@ class Toe(Limb):
 
         self.limbs=[]
         self.scars=[]
-        self.diagnosis='This is a humanoid toe of {}.'.format(self.owner.indefinitename)
+        self.descriptor='This is a humanoid toe of {}.'.format(self.owner.indefinitename)
         self.attacktype=None
         self.attachpoint=None
         self.layers=[Bone(length=self.length,radius=self.radius*0.8,quality=0.25),Flesh(length=self.length,in_radius=self.radius*0.8,out_radius=self.radius)]
@@ -481,7 +486,7 @@ class Foot(Limb):
             self.limbs=[self.firsttoe,self.secondtoe,self.thirdtoe,self.fourthtoe,self.fifthtoe]
 
         self.scars=[]
-        self.diagnosis='This is a humanoid foot of {}.'.format(self.owner.indefinitename)
+        self.descriptor='This is a humanoid foot of {}.'.format(self.owner.indefinitename)
         self.attacktype='kick'
         self.balance=self.ability
         for i in self.limbs:
@@ -534,7 +539,7 @@ class Foot(Limb):
 
 
         if self.support==False:
-            self.diagnosis+=' Injuries have left it impossible to walk on.'
+            self.descriptor+=' Injuries have left it impossible to walk on.'
             self.attacktype=None
 
 
@@ -591,7 +596,7 @@ class Leg(Limb):
             self.limbs=[self.foot]
 
         self.scars=[]
-        self.diagnosis='This is a humanoid leg of {}.'.format(self.owner.indefinitename)
+        self.descriptor='This is a humanoid leg of {}.'.format(self.owner.indefinitename)
         self.attacktype=None
         self.attachpoint=None
         self.layers=[Bone(length=self.length,radius=boneradius),Flesh(length=self.length,in_radius=boneradius,out_radius=self.radius)]
@@ -654,7 +659,7 @@ class Ear(Limb):
         self.armor=self.equipment['helmet']
         self.armortype='helmet'
         self.scars=[]
-        self.diagnosis='This is an ear of {}.'.format(self.owner.indefinitename)
+        self.descriptor='This is an ear of {}.'.format(self.owner.indefinitename)
         self.attacktype=None
         self.attachpoint=None
         self.layers=[Flesh(length=self.length,in_radius=0,out_radius=self.radius)]
@@ -702,7 +707,7 @@ class Nose(Limb):
         self.armor=self.equipment['helmet']
         self.armortype='helmet'
         self.scars=[]
-        self.diagnosis='This is a nose of {}.'.format(self.owner.indefinitename)
+        self.descriptor='This is a nose of {}.'.format(self.owner.indefinitename)
         self.attacktype=None
         self.attachpoint=None
         self.layers=[Flesh(length=self.length,in_radius=0,out_radius=self.radius)]
@@ -754,10 +759,10 @@ class Eye(Limb):
         self.armor=self.equipment['helmet']
         self.armortype='helmet'
         self.scars=[]
-        self.diagnosis='This is an eye of {}.'.format(self.owner.indefinitename)
+        self.descriptor='This is an eye of {}.'.format(self.owner.indefinitename)
         self.attacktype=None
         self.attachpoint=None
-        self.layers=[Flesh(length=self.length,in_radius=0,out_radius=self.radius)]
+        self.layers=[Flesh(length=self.length,in_radius=0,out_radius=self.radius,threshold=0.4)]
         self.mass_calc()
         self.youngscalc()
         self.defaultattacks=[]
@@ -789,6 +794,7 @@ class Teeth(Limb):
         super().__init__(stats,**kwargs)
         self.sizefactor=1
         self.owner=owner
+        self.is_teeth=True
         self.owner.limbs.append(self)
         self.natural=natural
         self.name=name
@@ -807,7 +813,7 @@ class Teeth(Limb):
 
         self.limbs=[]
         self.scars=[]
-        self.diagnosis='These are the teeth of {}.'.format(self.owner.indefinitename)
+        self.descriptor='These are the teeth of {}.'.format(self.owner.indefinitename)
         self.attacktype=None
         self.attachpoint=None
         self.layers=[Bone(length=self.length,radius=self.radius)]
@@ -843,7 +849,7 @@ class Teeth(Limb):
 class Jaw(Limb):
     
     
-    def __init__(self,stats,name='jaw',scale=1,length=0.2,radius=0.018,natural=True,owner=None,**kwargs):
+    def __init__(self,stats,name='jaw',scale=1,length=0.2,radius=0.018,natural=True,owner=None, can_bite=True,**kwargs):
         super().__init__(stats,**kwargs)
         self.sizefactor=3
         self.owner=owner
@@ -867,13 +873,16 @@ class Jaw(Limb):
             self.limbs=[self.teeth]
 
         self.scars=[]
-        self.diagnosis='This is a jaw of {}.'.format(self.owner.indefinitename)
+        self.descriptor='This is a jaw of {}.'.format(self.owner.indefinitename)
         self.attacktype='bite'
         self.attachpoint=None
         self.layers=[Bone(length=self.length,radius=self.radius*0.8,quality=0.5),Flesh(length=self.length,in_radius=self.radius*0.8,out_radius=self.radius)]
         self.mass_calc()
         self.youngscalc()
-        self.defaultattacks=[]
+        if can_bite==True:
+            self.defaultattacks=[Bite(self)]
+        else:
+            self.defaultattacks=[]
         self.attacks=self.defaultattacks
 
 
@@ -938,7 +947,7 @@ class Head(Limb):
             self.teeth.attachpoint=self
             self.limbs=[self.righteye,self.lefteye,self.rightear,self.leftear,self.jaw,self.nose,self.teeth]
 
-        self.brain=Flesh(length=self.length*0.8,in_radius=0,out_radius=self.radius*0.75,name='brain')
+        self.brain=Flesh(length=self.length*0.8,in_radius=0,out_radius=self.radius*0.75,name='brain',threshold=0.6)
         self.skull=Bone(length=self.length,radius=self.radius*0.98,in_radius=self.radius*0.8,name='skull',quality=0.7)
         self.owner.vitals.append(self.brain)
         self.owner.vitals.append(self.skull)
@@ -946,7 +955,7 @@ class Head(Limb):
 
 
         self.scars=[]
-        self.diagnosis='This is a head of {}.'.format(self.owner.indefinitename)
+        self.descriptor='This is a head of {}.'.format(self.owner.indefinitename)
         self.attacktype=None
         self.attachpoint=None
         self.layers=[self.brain,self.skull,Flesh(length=self.length,in_radius=self.radius*0.98,out_radius=self.radius)]
@@ -980,7 +989,7 @@ class Head(Limb):
 
     def on_wounds(self,*args):
         self.ability=1
-        self.diagnosis='This is a head of {}.'.format(self.owner.indefinitename)
+        self.descriptor='This is a head of {}.'.format(self.owner.indefinitename)
 
 
 
@@ -1021,12 +1030,12 @@ class Neck(Limb):
             self.limbs=[self.head]
 
         self.scars=[]
-        self.diagnosis='This is a neck of {}.'.format(self.owner.indefinitename)
+        self.descriptor='This is a neck of {}.'.format(self.owner.indefinitename)
         self.attacktype=None
         self.attachpoint=None
 
-        self.spine=Bone(length=self.length,radius=boneradius*scale,name='spine')
-        self.throat=Flesh(length=self.length,in_radius=boneradius*scale,out_radius=self.radius,name='throat',quality=2)
+        self.spine=Bone(length=self.length,radius=boneradius*scale,name='spine',threshold=0.2)
+        self.throat=Flesh(length=self.length,in_radius=boneradius*scale,out_radius=self.radius,name='throat',quality=2,threshold=0.3)
         self.layers=[self.spine,self.throat]
         self.owner.vitals.append(self.spine)
         self.owner.vitals.append(self.throat)
@@ -1088,16 +1097,17 @@ class Abdomen(Limb):
         self.armor=self.equipment['chest']
 
 
-        self.liver=Flesh(length=0.1,in_radius=0,out_radius=0.07,name='liver',painfactor=5)
-        self.intestines=Flesh(length=self.length,in_radius=0,out_radius=0.8*self.radius,name='intestines',painfactor=2,plural=True)
-        self.spine=Bone(length=self.length,radius=0.02,name='spine',painfactor=3)
+        self.liver=Flesh(length=0.1,in_radius=0,out_radius=0.06,name='liver',painfactor=5,quality=0.5)
+        self.intestines=Flesh(length=self.length,in_radius=0,out_radius=0.8*self.radius,name='intestines',painfactor=2,plural=True,quality=0.5,threshold=0.2)
+        self.spine=Bone(length=self.length,radius=0.02,name='spine',painfactor=3,threshold=0.2)
+
 
         self.owner.vitals.append(self.liver)
         self.owner.vitals.append(self.intestines)
 
 
         self.scars=[]
-        self.diagnosis='This is an abdomen of {}.'.format(self.owner.indefinitename)
+        self.descriptor='This is an abdomen of {}.'.format(self.owner.indefinitename)
         self.attacktype=None
         self.attachpoint=None
         self.layers=[self.liver,self.intestines,self.spine,Flesh(length=self.length,in_radius=0.8*self.radius,out_radius=self.radius)]
@@ -1117,7 +1127,7 @@ class Abdomen(Limb):
 
     def on_wounds(self,*args):
         self.ability=1
-        self.diagnosis='This is a torso of {}.'.format(self.owner.indefinitename)
+        self.descriptor='This is a torso of {}.'.format(self.owner.indefinitename)
 
 
 
@@ -1193,8 +1203,8 @@ class Upper_Torso(Limb):
         self.equipment={'chest':None}
         self.armor=self.equipment['chest']
 
-        self.heart=Flesh(length=0.1,in_radius=0,out_radius=0.05,name='heart',quality=2,painfactor=5)
-        self.lungs=Flesh(length=self.length,in_radius=0,out_radius=self.radius*0.74,name='lungs',plural=True)
+        self.heart=Flesh(length=0.1,in_radius=0,out_radius=0.05,name='heart',quality=2,painfactor=5,threshold=0.5)
+        self.lungs=Flesh(length=self.length,in_radius=0,out_radius=self.radius*0.74,name='lungs',plural=True,threshold=0.2)
 
 
 
@@ -1203,7 +1213,7 @@ class Upper_Torso(Limb):
 
 
         self.scars=[]
-        self.diagnosis='This is a torso of {}.'.format(self.owner.indefinitename)
+        self.descriptor='This is a torso of {}.'.format(self.owner.indefinitename)
         self.attacktype=None
         self.attachpoint=None
         self.layers=[self.heart,self.lungs,
@@ -1237,7 +1247,7 @@ class Upper_Torso(Limb):
 
     def on_wounds(self,*args):
         self.ability=1
-        self.diagnosis='This is a torso of {}.'.format(self.owner.indefinitename)
+        self.descriptor='This is a torso of {}.'.format(self.owner.indefinitename)
 
 
 
@@ -1295,10 +1305,10 @@ class Wing(Limb):
 
 
         self.scars=[]
-        self.diagnosis='This is a wing of {}.'.format(self.owner.indefinitename)
+        self.descriptor='This is a wing of {}.'.format(self.owner.indefinitename)
         self.attacktype=None
         self.attachpoint=None
-        self.layers=[Bone(length=self.radius,radius=self.length*0.5),Flesh(length=self.radius*1.2,in_radius=self.length*0.8,out_radius=self.length)]
+        self.layers=[Bone(length=self.radius,radius=self.length*0.5,threshold=0.5),Flesh(length=self.radius*1.2,in_radius=self.length*0.8,out_radius=self.length,threshold=0.2)]
         self.mass_calc()
         self.youngscalc()
         self.balance_calc()
@@ -1333,7 +1343,7 @@ class Wing(Limb):
 
 
         if self.support==False:
-            self.diagnosis+=' Injuries have left it impossible to walk on.'
+            self.descriptor+=' Injuries have left it impossible to walk on.'
             self.attacktype=None
 
 

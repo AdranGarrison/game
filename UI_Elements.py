@@ -52,6 +52,7 @@ def flatten(l,ltypes=(list,tuple)):
     return ltype(l)
 
 Config.set('modules','monitor','1')
+Config.set('kivy', 'exit_on_escape', 0)
 Config.write()
 
 Builder.load_string('''
@@ -152,6 +153,117 @@ Builder.load_string('''
     id:cell
     size_hint:None,None
     size:16,16
+
+
+<ItemGraphic@Widget>
+    canvas:
+        Color:
+            rgba:1,1,1,1
+        Rectangle:
+            id:graphics
+            size:self.height*0.8,self.height*0.8
+            pos:self.center_x-self.height*0.4,self.y
+            source:self.source
+
+
+<OutlinedTextBox@Label>
+    outline:(0,0,0,1)
+    text_size:self.size
+    shorten:True
+    halign:'center'
+    valign:'middle'
+    markup:True
+    canvas.before:
+        Color:
+            rgba:self.outline[0],self.outline[1],self.outline[2],self.outline[3]
+        Rectangle:
+            pos:self.x,self.y
+            size:self.width,self.height
+        Color:
+            rgba: 0,0,0,1
+        Rectangle:
+            pos:self.x+1,self.y+1
+            size:self.width-2,self.height-2
+
+
+
+<ItemDescription@FloatLayout>
+    damage:''
+    canvas.before:
+        Color:
+            rgba: 0.2,0.2,0.2,0.95
+        Rectangle:
+            id: backdrop
+            size:self.width,self.height
+            pos:self.pos
+        Color:
+            rgba: 0,0,0,1
+        Rectangle:
+            size:0.05*self.width,0.05*self.height
+            pos: self.x+10,self.y+0.95*self.height-10
+        Color:
+            rgba: 0,0,0,1
+        Rectangle:
+            size:0.05*self.width-2,0.05*self.height-2
+            pos: self.x+11,self.y+0.95*self.height-9
+        Color:
+            rgba: 1,1,1,1
+        Rectangle:
+            size:0.05*self.width,0.05*self.height
+            pos: self.x+10,self.y+0.95*self.height-10
+            source:self.item.image
+    OutlinedTextBox:
+        shorten:True
+        halign:'left'
+        font_size:18
+        text: '[b]      '+root.item.name+': '
+        size_hint:(root.width*0.95-30)/root.width,(root.height*0.05+10)/root.height
+        text_size: root.width*0.9,root.height*0.05
+        size: self.texture_size
+        pos:root.x+0.08*root.width,root.y+0.95*root.height-20
+    OutlinedTextBox:
+        text:root.item.descriptor
+        text_size:root.width-20,root.height*0.05
+        size:self.texture_size
+        size_hint:(root.width-20)/root.width,0.1
+        pos:root.x+10,root.y+0.85*root.height-20
+    OutlinedTextBox:
+        id:damagebox
+        text:root.damage
+        text_size:root.width-20,root.height*0.1
+        size:self.texture_size
+        size_hint: (root.width-20)/root.width,0.2
+        pos:root.x+10,root.y+0.65*root.height-30
+        Label:
+            color:.6,.6,.6,.6
+            markup:True
+            halign:'left'
+            valign:'top'
+            size:self.texture_size
+            font_size:18
+            text:'[b]Damage:[/b]'
+            pos:damagebox.x,damagebox.y+damagebox.height-self.height
+    GridLayout:
+        id:infobox
+        cols:2
+        rows:len(root.item.info)
+        pos:root.x+10,root.y+10+0.1*root.height
+        size_hint:(root.width-20)/root.width,(root.height*0.55-50)/root.height
+        canvas.before:
+            Color:
+                rgba:0,0,0,1
+            Rectangle:
+                pos:self.pos
+                size:self.size
+    OutlinedTextBox:
+        id:instructions
+        pos:root.x+10,root.y+10
+        size_hint:(root.width-20)/root.width,(root.height*0.1-10)/root.height
+        text:'Press[b][color=ffff00] Enter[/color][/b] for further options'
+
+
+
+
     ''')
 '''
     canvas:
@@ -304,6 +416,316 @@ class Portrait(Widget):
             Color(0.2,0.2,0.2,0.7)
             self.canvas.clear()
             self.graphics=Rectangle(source=self.source,size=self.size,pos=self.pos)
+
+class OutlinedTextBox(Label):
+    def __init__(self,color=(0,0,0,1),**kwargs):
+        self.outline=color
+        super().__init__(**kwargs)
+
+class ItemGraphic(Widget):
+    def __init__(self,item,**kwargs):
+        self.source=item.image
+        super().__init__(**kwargs)
+
+class ItemDescription(FloatLayout):
+    def __init__(self,item,player,pos_hint={'x':0.1,'y':0.3},**kwargs):
+        self.item=item
+        self.size_hint=(0.4,0.5)
+        self.pos_hint=pos_hint
+        super().__init__(pos_hint=pos_hint,**kwargs)
+        self.item.generate_descriptions(per=player.stats['per'])
+        self.item_description=item.descriptor
+        self.damage=item.describe_damage()
+        if self.damage=='':
+            self.damage='No damage'
+        for i in self.item.info:
+            self.ids['infobox'].add_widget(OutlinedTextBox(text='{}:'.format(i),color=(1,0,0,1),halign='left'))
+            self.ids['infobox'].add_widget(OutlinedTextBox(text=self.item.info[i],color=(1,0,0,1),halign='right'))
+
+
+
+
+
+class InventoryItem(GridLayout):
+    def __init__(self,item,letter='playerinventory',**kwargs):
+        super().__init__(cols=4,**kwargs)
+        self.item=item
+        self.graphicsbox=ItemGraphic(item,size_hint=(0.1,None),height=self.height)
+        mass=int(item.mass*100)/100
+        text='[color=333300][b] {} [/b]({} kg) [/color]'.format(item.name,mass)
+        if hasattr(item,'equipped') and item.equipped is not None:
+            text=' '.join((text,' [color=ff33ff](equipped on {})[/color]'.format(item.equipped.name)))
+        self.text=Label(markup=True,text=text,halign='left',text_size=(500,None),shorten=True)
+        if letter=='playerinventory':
+            self.index=Label(markup=True, text='[b][color=333300]     {}: [/color][/b]'.format(item.inventory_index),shorten=True,size_hint=(0.1,1))
+        else:
+            self.index=Label(markup=True, text='[b][color=333300]     {}: [/color][/b]'.format(letter),shorten=True,size_hint=(0.1,1))
+        self.add_widget(self.index)
+        self.add_widget(self.graphicsbox)
+        self.add_widget(self.text)
+        self.index.bind(size=self.index.setter('text_size'))
+        self.text.bind(size=self.text.setter('text_size'))
+
+    def highlight(self):
+        with self.canvas.before:
+            Color(1,0,0,0.1)
+            Rectangle(size=self.size,pos=self.pos)
+        pass
+
+    def unhighlight(self):
+        self.canvas.before.clear()
+        pass
+
+    def inspect(self):
+        pass
+
+
+        
+
+class InventorySidebar(ScrollView):
+    def __init__(self,shell,**kwargs):
+        super().__init__(**kwargs)
+        self.inspection_open=False
+        self.size_hint=(0.35,0.9)
+        self.pos_hint={'right':1,'top':1}
+        self.shell=shell
+
+    def show_player_inventory(self):
+        self.shell.player.inventory_order()
+        self.shell.player.mass_calc()
+        self.selected_items=[]
+        letters='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-='
+        self.selectionindex={}
+        self.list=BoxLayout(orientation='vertical',size_hint=(1,None))
+        self.list.size[1]=len(self.shell.player.inventory)*30+120
+        self.add_widget(self.list)
+        with self.canvas.before:
+            Color(0.7,0.7,0.7)
+            self.graphics=Rectangle(size=(10000,10000),pos_hint=self.pos_hint)
+
+        weaponlabel=Label(markup=True,text="[color=333300]  Weapons:[/color]",halign='left',text_size=(500,None),shorten=True)
+        self.list.add_widget(weaponlabel)
+        weaponlabel.bind(size=weaponlabel.setter('text_size'))
+        weapons=0
+        for i in self.shell.player.inventory:
+            if i.sortingtype=='weapon':
+                new=InventoryItem(i,size_hint=(1,None),height=30)
+                self.selectionindex[new.item.inventory_index]=new
+                self.list.add_widget(new)
+                weapons+=1
+        if weapons==0:
+            self.list.remove_widget(weaponlabel)
+
+
+        armorlabel=Label(markup=True,text="[color=333300]  Armor:[/color]",halign='left',text_size=(500,None),shorten=True)
+        armorlabel.bind(size=armorlabel.setter('text_size'))
+        self.list.add_widget(armorlabel)
+        armor=0
+        for i in self.shell.player.inventory:
+            if i.sortingtype=='armor':
+                new=InventoryItem(i,size_hint=(1,None),height=30)
+                self.selectionindex[new.item.inventory_index]=new
+                self.list.add_widget(new)
+                armor+=1
+        if armor==0:
+            self.list.remove_widget(armorlabel)
+
+        misclabel=Label(markup=True,text="[color=333300]  Miscellaneous:[/color]",halign='left',text_size=(500,None),shorten=True)
+        misclabel.bind(size=misclabel.setter('text_size'))
+        self.list.add_widget(misclabel)
+        misc=0
+        for i in self.shell.player.inventory:
+            if i.sortingtype=='misc':
+                new=InventoryItem(i,size_hint=(1,None),height=30)
+                self.selectionindex[new.item.inventory_index]=new
+                self.list.add_widget(new)
+                misc+=1
+        if misc==0:
+            self.list.remove_widget(misclabel)
+        
+        item_mass=0
+        for i in self.shell.player.inventory:
+            item_mass+=i.mass
+        item_mass=int(item_mass*100)/100
+        
+        carryweight=Label(markup=True,text="[b][color=333300]Carried Weight:[/b] {}[/color]".format(item_mass),halign='right',text_size=(500,None),shorten=True)
+        carryweight.bind(size=carryweight.setter('text_size'))
+        self.list.add_widget(carryweight)
+
+        body_mass=int(100*self.shell.player.mass)/100
+        bodyweight=Label(markup=True,text="[b][color=333300]Body Weight:[/b] {}[/color]".format(body_mass),halign='right',text_size=(500,None),shorten=True)
+        bodyweight.bind(size=bodyweight.setter('text_size'))
+        self.list.add_widget(bodyweight)
+
+        total_mass=int(self.shell.player.movemass*100)/100
+        totalweight=Label(markup=True,text="[b][color=333300]Total Weight: [/b] {}[/color]".format(total_mass),halign='right',text_size=(500,None),shorten=True)
+        totalweight.bind(size=totalweight.setter('text_size'))
+        self.list.add_widget(totalweight)
+
+        encumbrance_factor=int(total_mass/self.shell.player.stats['str']*100)/100
+        encumbrance=Label(markup=True,text="[b][color=333300]Encumbrance Factor: [/b] {}[/color]".format(encumbrance_factor),halign='right',text_size=(500,None),shorten=True)
+        encumbrance.bind(size=encumbrance.setter('text_size'))
+        self.list.add_widget(encumbrance)
+
+        self.shell.add_widget(self)
+
+    def show_items_on_ground(self,cell):
+        self.selected_items=[]
+        self.selectionindex={}
+        letters='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-='
+        letterpos=0
+        self.list=BoxLayout(orientation='vertical',size_hint=(1,None))
+        self.list.size[1]=len(cell.contents)*30+60
+        self.add_widget(self.list)
+        with self.canvas.before:
+            Color(0.7,0.7,0.7)
+            self.graphics=Rectangle(size=(10000,10000),pos_hint=self.pos_hint)
+
+        weaponlabel=Label(markup=True,text="[color=333300]  Weapons:[/color]",halign='left',text_size=(500,None),shorten=True)
+        weaponlabel.bind(size=weaponlabel.setter('text_size'))
+        self.list.add_widget(weaponlabel)
+        weapons=0
+        for i in cell.contents:
+            if hasattr(i,'sortingtype') and i.sortingtype=='weapon':
+                new=InventoryItem(i,size_hint=(1,None),letter=letters[letterpos],height=30)
+                self.selectionindex[letters[letterpos]]=new
+                self.list.add_widget(new)
+                letterpos+=1
+                weapons+=1
+        if weapons==0:
+            self.list.remove_widget(weaponlabel)
+
+        armorlabel=Label(markup=True,text="[color=333300]  Armor:[/color]",halign='left',text_size=(500,None),shorten=True)
+        armorlabel.bind(size=armorlabel.setter('text_size'))
+        self.list.add_widget(armorlabel)
+        armor=0
+        for i in cell.contents:
+            if hasattr(i,'sortingtype') and i.sortingtype=='armor':
+                new=InventoryItem(i,size_hint=(1,None),letter=letters[letterpos],height=30)
+                self.selectionindex[letters[letterpos]]=new
+                self.list.add_widget(new)
+                letterpos+=1
+                armor+=1
+        if armor==0:
+            self.list.remove_widget(armorlabel)
+
+        misclabel=Label(markup=True,text="[color=333300]  Miscellaneous:[/color]",halign='left',text_size=(500,None),shorten=True)
+        misclabel.bind(size=misclabel.setter('text_size'))
+        self.list.add_widget(misclabel)
+        misc=0
+        for i in cell.contents:
+            if hasattr(i,'sortingtype') and i.sortingtype=='misc':
+                new=InventoryItem(i,size_hint=(1,None),letter=letters[letterpos],height=30)
+                self.selectionindex[letters[letterpos]]=new
+                self.list.add_widget(new)
+                letterpos+=1
+                misc+=1
+        if misc==0:
+            self.list.remove_widget(misclabel)
+
+
+        self.shell.add_widget(self)
+
+    def select(self,index):
+        for i in self.selectionindex:
+            if index==i:
+                if self.selectionindex[i] not in self.selected_items:
+                    self.selected_items.append(self.selectionindex[i])
+                    self.selectionindex[i].highlight()
+                else:
+                    self.selected_items.remove(self.selectionindex[i])
+                    self.selectionindex[i].unhighlight()
+
+    def inspect(self,index):
+        if self.inspection_open==True:
+            self.shell.remove_widget(self.inspectionscreen)
+            self.inspection_open=False
+        ok=False
+        for i in self.selectionindex:
+            if index==i:
+                self.inspectionscreen=ItemDescription(self.selectionindex[i].item,self.shell.player)
+                ok=True
+        if ok==True:
+            self.shell.add_widget(self.inspectionscreen)
+            self.inspection_open=True
+
+
+
+    def pickup_selected(self,cell):
+        pickedup=0
+        for i in self.selected_items:
+            self.shell.player.inventory_add(i.item)
+            cell.contents.remove(i.item)
+            messages.append("You pick up the {}".format(i.item.name))
+            pickedup+=1
+        if pickedup>0:
+            self.shell.turn+=1
+        self.close()
+
+    def drop_selected(self,cell):
+        dropped_items=0
+        for i in self.selected_items:
+            if hasattr(i.item,'equipped') and i.item.equipped is not None:
+                if i.item.wield is not 'grasp':
+                    self.shell.log.addtext('You must unequip your {} before dropping it'.format(i.item.name))
+                else:
+                    self.shell.player.unequip(i.item,log=False)
+                    self.shell.player.inventory.remove(i.item)
+                    cell.contents.append(i.item)
+                    self.shell.log.addtext('You drop the {}'.format(i.item.name))
+                    dropped_items+=1
+            else:
+                self.shell.player.inventory.remove(i.item)
+                cell.contents.append(i.item)
+                self.shell.log.addtext('You drop the {}'.format(i.item.name))
+                dropped_items+=1
+        if dropped_items>0:
+            self.shell.turn+=1
+        self.close()
+
+    def equip_selected(self):
+        for i in self.selected_items:
+            if not hasattr(i.item,'wield'):
+                self.shell.log.addtext('{} cannot be wielded as a weapon or armor'.format(i.item.name))
+            if hasattr(i.item,'equipped') and i.item.equipped!=None:
+                self.shell.log.addtext('The {} is already equipped!'.format(i.item.name))
+            if hasattr(i.item,'equipped') and i.item.equipped==None:
+                self.shell.player.equip(i.item)
+                if i.item.equipped!=None:
+                    self.shell.turn+=1
+                else:
+                    self.shell.log.addtext('You have no body parts available which can wield the {}'.format(i.item.name))
+        self.close()
+
+    def unequip_selected(self):
+        for i in self.selected_items:
+            if not hasattr(i.item,'wield'):
+                self.shell.log.addtext('{} cannot be wielded as a weapon or armor'.format(i.item.name))
+            if hasattr(i.item,'equipped') and i.item.equipped==None:
+                self.shell.log.addtext('The {} is not equipped!'.format(i.item.name))
+            if hasattr(i.item,'equipped') and i.item.equipped!=None:
+                self.shell.player.unequip(i.item)
+                if i.item.equipped==None:
+                    if i.item.wield=='grasp':
+                        messages.append('You put away the {}'.format(i.item.name))
+                        self.shell.turn+=1
+                    else:
+                        messages.append('You remove the {}'.format(i.item.name))
+                        self.shell.turn+=1
+
+        self.close()
+
+
+
+    def close(self):
+        if self.inspection_open==True:
+            self.shell.remove_widget(self.inspectionscreen)
+            self.inspection_open==False
+        self.list.canvas.clear()
+        self.shell.remove_widget(self)
+        self.clear_widgets()
+
+
 
 
 #The intention is that the Cell class will serve as a container for all creatures and items to be displayed on the screen.

@@ -28,13 +28,18 @@ import BaseClasses as B
 class Bone(Item):
     #length is bone length in meters
     #radius is bone radius in meters
-    def __init__(self,length=0.5,radius=0.03,in_radius=0,material=Bone_Material,name='bone',plural=False,quality=1,**kwargs):
+    def __init__(self,length=0.5,radius=0.03,in_radius=0,material=Bone_Material,name='bone',plural=False,quality=1,threshold=0,**kwargs):
         super().__init__(**kwargs)
+        self.base_descriptor='A bone from some creature or another'
         self.plural=plural
         self.material=material(quality=quality)
+        self.names=['bone']
+        self.knowledge_level['truename']=1
         if isinstance(self.material,Bone_Material):
+            self.truename=name
             self.name=name
         else:
+            self.truename=self.material.name+" "+name
             self.name=self.material.name+" "+name
         self.length=length
         self.radius=radius
@@ -45,6 +50,7 @@ class Bone(Item):
         self.curvature=0
         self.attacktype=['bludgeon']
         self.function=1
+        self.threshold=threshold
         self.recalc()
 
 
@@ -57,13 +63,18 @@ class Flesh(Item):
     #length is limb length in meters
     #in_radius is the inner radius of the flesh
     #out_radius is the radius of the skin
-    def __init__(self,length=0.5,in_radius=0.03,out_radius=0.05,material=Flesh_Material,name='flesh',plural=False,quality=1,**kwargs):
+    def __init__(self,length=0.5,in_radius=0.03,out_radius=0.05,material=Flesh_Material,name='flesh',plural=False,quality=1,threshold=0,**kwargs):
         super().__init__(**kwargs)
+        self.base_descriptor='Flesh carved from some creature or another'
         self.plural=plural
         self.material=material(quality=quality)
+        self.names=['flesh']
+        self.knowledge_level['truename']=1
         if isinstance(self.material,Flesh_Material):
             self.name=name
+            self.truename=name
         else:
+            self.truename=self.material.name+' '+name
             self.name=self.material.name+' '+name
         self.length=length
         self.radius=out_radius
@@ -73,6 +84,7 @@ class Flesh(Item):
         self.wield='grasp'
         self.curvature=0
         self.attacktype=None
+        self.threshold=threshold
         self.function=1
         self.recalc()
 
@@ -83,7 +95,6 @@ class Flesh(Item):
 ############################################Weapons#########################################
 #TODO: Blade edge should wear with use, especially upon striking hard targets. Needs to be sharpenable as well.
 
-#TODO: Stab attacks still require implementation. Need to be sure that both stab and slash attacks can be used.
 
 class LongSword(Item):
     #length is blade length in meters
@@ -93,9 +104,12 @@ class LongSword(Item):
     #thickness is blade thickness in meters
     def __init__(self,length=1,edge=0.00001,tip=0.0000001,width=0.035,thickness=0.007,material=Iron,quality=1):
         super().__init__()
+        self.names=['weapon','sword','long sword']
+        self.base_descriptor='A straight, double-edged sword with a long blade. A well-balanced and versatile weapon for cutting and thrusting'
+        self.sortingtype='weapon'
         self.material=material(quality=quality)
         self.plural=False
-        self.name=self.material.name+' long sword'
+        self.truename=self.material.name+' long sword'
         self.length=length
         self.edge=edge
         self.tip=tip
@@ -110,15 +124,15 @@ class LongSword(Item):
         self.attacks=[Slash_1H,Stab_1H]
         self.recalc()
         self.damagetype.append('blunt')
+        self.generate_descriptions()
 
     def recalc(self):
         self.material_import()
         self.mass=self.density*(self.length*self.width*self.thickness)
         self.movemass=self.mass
-        self.centermass=self.length*0.1
+        self.centermass=self.length*0.2
         self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
         self.r=self.width
-
 
 class Gladius(Item):
     #length is blade length in meters
@@ -127,24 +141,36 @@ class Gladius(Item):
     #width is blade width in meters
     #thickness is blade thickness in meters
     def __init__(self,length=0.6,edge=0.00001,tip=0.0000001,width=0.035,thickness=0.007,material=Iron,quality=1):
+        super().__init__()
+        self.names=['weapon','sword','gladius']
+        self.base_descriptor='A two-edged short sword balanced for cutting, chopping, or thrusting'
+        self.sortingtype='weapon'
         self.material=material(quality=quality)
+        self.plural=False
+        self.truename=self.material.name+' gladius'
         self.length=length
         self.edge=edge
         self.tip=tip
         self.width=width
         self.thickness=thickness
+        self.radius=self.thickness
         self.parry=True
-        self.mass=self.material.density*(self.length*self.width*self.thickness)
         self.wield='grasp'
-        self.centermass=length*0.2
         self.curvature=0
         self.attacktype=['stab','slash']
-        self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
-        self.damagetype=self.material.damagetype
-        self.damage={'bruise':0,'crack':0,'dent':0,'bend':0,'deform':0,'break':0,'cut':0,'shatter':0,'crush':0,'burn':0,'pierce':0}
+        self.function=1
+        self.attacks=[Slash_1H,Stab_1H]
+        self.recalc()
         self.damagetype.append('blunt')
-        self.movemass=self.mass
+        self.generate_descriptions()
 
+        def recalc(self):
+            self.material_import()
+            self.mass=self.density*(self.length*self.width*self.thickness)
+            self.movemass=self.mass
+            self.centermass=self.length*0.3
+            self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
+            self.r=self.width
 
 class Knife(Item):
     #length is blade length in meters
@@ -153,24 +179,37 @@ class Knife(Item):
     #width is blade width in meters
     #thickness is blade thickness in meters
     def __init__(self,length=0.3,edge=0.000005,tip=0.000000025,width=0.035,thickness=0.01,material=Iron,quality=1):
+        super().__init__()
+        self.names=['weapon','dagger']
+        self.base_descriptor='A short, bladed weapon with a very sharp point. Suitable for throwing, slashing, or stabbing'
+        self.sortingtype='weapon'
         self.material=material(quality=quality)
+        self.plural=False
+        self.truename=self.material.name+' dagger'
         self.length=length
         self.edge=edge
         self.tip=tip
         self.width=width
         self.thickness=thickness
+        self.radius=self.thickness
         self.parry=True
-        self.mass=self.material.density*(self.length*self.width*self.thickness)
         self.wield='grasp'
-        self.centermass=length*0.4
         self.curvature=0
         self.attacktype=['stab','slash']
-        self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
-        self.damagetype=self.material.damagetype
-        self.damage={'bruise':0,'crack':0,'dent':0,'bend':0,'deform':0,'break':0,'cut':0,'shatter':0,'crush':0,'burn':0,'pierce':0}
+        self.function=1
+        self.attacks=[Slash_1H,Stab_1H]
+        self.recalc()
         self.damagetype.append('blunt')
-        self.movemass=self.mass
+        self.generate_descriptions()
 
+
+    def recalc(self):
+        self.material_import()
+        self.mass=self.density*(self.length*self.width*self.thickness)
+        self.movemass=self.mass
+        self.centermass=self.length*0.4
+        self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
+        self.r=self.width
 
 class Saber(Item):
     #length is blade length in meters
@@ -179,24 +218,36 @@ class Saber(Item):
     #width is blade width in meters
     #thickness is blade thickness in meters
     def __init__(self,length=1,edge=0.000005,tip=0.0000002,width=0.035,thickness=0.006,material=Iron,quality=1):
+        super().__init__()
+        self.names=['weapon','sword','saber']
+        self.base_descriptor='A curved, single-edge sword optimized for cutting'
+        self.sortingtype='weapon'
         self.material=material(quality=quality)
+        self.plural=False
+        self.truename=self.material.name+' saber'
         self.length=length
         self.edge=edge
         self.tip=tip
         self.width=width
         self.thickness=thickness
+        self.radius=self.thickness
         self.parry=True
-        self.mass=self.material.density*(self.length*self.width*self.thickness)
         self.wield='grasp'
-        self.centermass=length*0.3
         self.curvature=0.2
         self.attacktype=['stab','slash']
-        self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
-        self.damagetype=self.material.damagetype
-        self.damage={'bruise':0,'crack':0,'dent':0,'bend':0,'deform':0,'break':0,'cut':0,'shatter':0,'crush':0,'burn':0,'pierce':0}
+        self.function=1
+        self.attacks=[Slash_1H,Stab_1H]
+        self.recalc()
         self.damagetype.append('blunt')
-        self.movemass=self.mass
+        self.generate_descriptions()
 
+    def recalc(self):
+        self.material_import()
+        self.mass=self.density*(self.length*self.width*self.thickness)
+        self.movemass=self.mass
+        self.centermass=self.length*0.3
+        self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
+        self.r=self.width
 
 class Claymore(Item):
     #length is blade length in meters
@@ -205,42 +256,57 @@ class Claymore(Item):
     #width is blade width in meters
     #thickness is blade thickness in meters
     def __init__(self,length=1.3,edge=0.00001,tip=0.0000001,width=0.04,thickness=0.008,material=Iron,quality=1):
+        super().__init__()
+        self.names=['weapon','sword','claymore']
+        self.base_descriptor='A broad, heavy longsword suitable only for those strong enough to effectively wield it'
+        self.sortingtype='weapon'
         self.material=material(quality=quality)
+        self.plural=False
+        self.truename=self.material.name+' claymore'
         self.length=length
         self.edge=edge
         self.tip=tip
         self.width=width
         self.thickness=thickness
+        self.radius=self.thickness
         self.parry=True
-        self.mass=self.material.density*(self.length*self.width*self.thickness)
         self.wield='grasp'
-        self.centermass=length*0.1
         self.curvature=0
         self.attacktype=['stab','slash']
-        self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
-        self.damagetype=self.material.damagetype
-        self.damage={'bruise':0,'crack':0,'dent':0,'bend':0,'deform':0,'break':0,'cut':0,'shatter':0,'crush':0,'burn':0,'pierce':0}
+        self.function=1
+        self.attacks=[Slash_1H,Stab_1H]
+        self.recalc()
         self.damagetype.append('blunt')
-        self.movemass=self.mass
+        self.generate_descriptions()
 
+    def recalc(self):
+        self.material_import()
+        self.mass=self.density*(self.length*self.width*self.thickness)
+        self.movemass=self.mass
+        self.centermass=self.length*0.2
+        self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
+        self.r=self.width
 
 class Mace(Item):
     #length is length of mace in meters
     #head is head radius in meters
-    def __init__(self,length=0.8,head=0.055,material=Iron,quality=1):
+    def __init__(self,length=0.8,head=0.06,material=Iron,quality=1):
         super().__init__()
+        self.names=['weapon','club','mace']
+        self.base_descriptor='A heavy, blunt weapon for delivering powerful blows'
+        self.sortingtype='weapon'
         self.material=material(quality=quality)
         self.length=length
         self.head=head
         self.parry=True
-        self.name=self.material.name+' mace'
+        self.truename=self.material.name+' mace'
         self.wield='grasp'
         self.curvature=0.5
         self.attacktype=['bludgeon']
         self.function=1
-        self.damage={'bruise':0,'crack':0,'dent':0,'bend':0,'deform':0,'break':0,'cut':0,'shatter':0,'crush':0,'burn':0,'pierce':0}
         self.attacks=[Bludgeon_1H]
         self.recalc()
+        self.generate_descriptions()
 
     def recalc(self):
         self.material_import()
@@ -253,12 +319,13 @@ class Mace(Item):
         self.r=0.015
         self.movemass=self.mass
 
-
 class FlangedMace(Item):
     #length is length of mace in meters
     #head is head radius in meters
     #contactarea is the contact area of a flange or spike in square meters
     def __init__(self,length=0.8,head=0.06,contactarea=.0008,material=Iron,quality=1):
+        self.names=['weapon','club','flanged mace']
+        self.sortingtype='weapon'
         self.material=material(quality=quality)
         self.length=length
         self.head=head
@@ -270,28 +337,46 @@ class FlangedMace(Item):
         self.attacktype=['bludgeon']
         self.I=self.mass*self.centermass**2
         self.damagetype=self.material.damagetype
-        self.damage={'bruise':0,'crack':0,'dent':0,'bend':0,'deform':0,'break':0,'cut':0,'shatter':0,'crush':0,'burn':0,'pierce':0}
         self.damagetype.append('blunt')
         self.movemass=self.mass
 
 class WarHammer(Item):
     #length is length of war hammer in meters
-    #headsize is the volume of the head in cubic meters
-    #contactarea is the contact area of the spike in square meters
-    def __init__(self,length=1.1,headsize=0.001,contactarea=.00005,material=Iron,quality=1):
+    #headvolume is the volume of the head of the warhammer
+    #headsize is the area of the head in square meters
+    #tip is the contact area of the spike in square meters
+    #contactarea is the contact area of the hammer in square meters
+    def __init__(self,length=1.1,headvolume=.0002,headsize=0.0005,tip=0.00005,material=Iron,quality=1):
+        super().__init__()
+        self.names=['weapon','club','war hammer']
+        self.base_descriptor='A long, heavy hammer with a head for bashing attacks and a spike for piercing through armor'
+        self.sortingtype='weapon'
         self.material=material(quality=quality)
         self.length=length
+        self.headvolume=headvolume
         self.headsize=headsize
-        self.contactarea=contactarea
+        self.tip=tip
         self.parry=True
-        self.mass=self.material.density* self.headsize
+        self.truename=self.material.name+' war hammer'
         self.wield='grasp'
-        self.centermass=length*0.8
+        self.curvature=0
+        self.function=1
+        self.attacks=[Bludgeon_1H,Swing_Pierce_1H]
         self.attacktype=['bludgeon']
+        self.recalc()
+        self.generate_descriptions()
+
+    def recalc(self):
+        self.material_import()
+        self.mass=self.density*(self.length*3.14*0.005**2+self.headvolume)
+        self.centermass=self.length*0.85
         self.I=self.mass*self.centermass**2
-        self.damage={'bruise':0,'crack':0,'dent':0,'bend':0,'deform':0,'break':0,'cut':0,'shatter':0,'crush':0,'burn':0,'pierce':0}
-        self.damagetype=self.material.damagetype
+        self.contactarea=self.headsize
+        self.radius=self.headsize**0.5
+        self.thickness=0.02
+        self.r=0.015
         self.movemass=self.mass
+        #print('warhammer mass, I',self.mass,self.I)
 
 class Spear(Item):
     #length is spear length in meters
@@ -299,9 +384,12 @@ class Spear(Item):
     #thickness is shaft thickness in meters
     def __init__(self,length=2,tip=0.000000025,thickness=0.01,material=Iron,quality=1):
         super().__init__()
+        self.names=['weapon','polearm','spear']
+        self.base_descriptor='A long pole weapon with a sharp tip for piercing attacks.'
+        self.sortingtype='weapon'
         self.material=material(quality=quality)
         self.plural=False
-        self.name=self.material.name+' spear'
+        self.truename=self.material.name+' spear'
         self.length=length
         self.tip=tip
         self.thickness=thickness
@@ -314,6 +402,7 @@ class Spear(Item):
         self.attacks=[Stab_1H]
         self.recalc()
         self.damagetype.append('blunt')
+        self.generate_descriptions()
 
     def recalc(self):
         self.material_import()
@@ -322,17 +411,40 @@ class Spear(Item):
         self.centermass=self.length*0.5
         self.I=(1/12)*self.mass*self.length**2
         self.r=self.thickness
-        print(self.mass)
-
+        #print(self.mass)
 
 class Axe(Item):
-    def __init__(self):
-        pass
+    def __init__(self,length=0.8,edge=0.00004,width=0.2,thickness=0.01,material=Iron,quality=1):
+        super().__init__()
+        self.names=['weapon','axe']
+        self.base_descriptor='A heavy, broad-headed bladed weapon. Somewhat clumsier than a sword but capable of delivering considerably more force.'
+        self.sortingtype='weapon'
+        self.material=material(quality=quality)
+        self.plural=False
+        self.truename=self.material.name+' axe'
+        self.length=length
+        self.edge=edge
+        self.width=width
+        self.thickness=thickness
+        self.radius=self.thickness
+        self.parry=True
+        self.wield='grasp'
+        self.curvature=0
+        self.attacktype=['slash']
+        self.function=1
+        self.attacks=[Slash_1H]
+        self.recalc()
+        self.damagetype.append('blunt')
+        self.generate_descriptions()
 
-
-
-
-
+    def recalc(self):
+        self.material_import()
+        self.mass=self.density*(self.length*(3.14*0.005**2+self.width*self.thickness*0.2))
+        self.movemass=self.mass
+        self.centermass=self.length*0.8
+        self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
+        self.r=self.width
+        print(self.name,self.mass)
 
 
 ############################################Armor####################################################################
@@ -340,23 +452,33 @@ class Axe(Item):
 class Chest(Item):
     #length is bone length in meters
     #radius is bone radius in meters
-    def __init__(self,length=0.9,radius=0.102,in_radius=0.1,material=Iron,plural=False,quality=1):
+    def __init__(self,length=0.9,thickness='default',in_radius=0.1,material=Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1):
         super().__init__()
+        self.sortingtype='armor'
         self.plural=plural
         self.material=material(quality=quality)
-        self.name=self.material.name+' plate armor'
-        self.length=length
-        self.radius=radius
-        self.in_radius=in_radius
+        if self.material.mode=='ductile' or self.material.mode=='brittle':
+            self.names=['armor','chestpiece','plate armor']
+            self.truename=self.material.name+' plate armor'
+            self.base_descriptor='Armor which covers the torso. Offers excellent protection for those with the strength to wear it'
+        else:
+            self.names=['armor','chestpiece','vest']
+            self.truename=self.material.name+' vest'
+            self.base_descriptor='A thick vest for covering the torso. Effective at softening blows without significantly reducing mobility'
+        if thickness=='default':
+            thickness=self.material.default_thickness*thickness_factor
+        self.length=length*scale_factor
+        self.radius=scale_factor*in_radius+thickness
+        self.in_radius=in_radius*scale_factor
         self.cross_section_range=[3.14*(self.radius**2-in_radius**2),self.length*2*(self.radius-in_radius)]
         self.parry=False
         self.wield='chest'
         self.curvature=0
         self.attacktype=[]
         self.coverage=0.95
-        self.damage={'bruise':0,'crack':0,'dent':0,'bend':0,'deform':0,'break':0,'cut':0,'shatter':0,'crush':0,'burn':0,'pierce':0}
         self.function=1
         self.recalc()
+        self.generate_descriptions()
 
     def recalc(self):
         self.material_import()
@@ -370,60 +492,90 @@ class Chest(Item):
 class Glove(Item):
     #length is bone length in meters
     #radius is bone radius in meters
-    def __init__(self,length=0.4,radius=0.025,in_radius=0.022,material=Iron,plural=False,quality=1):
+    def __init__(self,length=0.4,thickness='default',in_radius=0.022,material=Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1):
         super().__init__()
+        self.sortingtype='armor'
         self.plural=plural
         self.material=material(quality=quality)
-        self.name=self.material.name+' gauntlet'
-        self.length=length
-        self.radius=radius
-        self.in_radius=in_radius
+        if self.material.mode=='ductile' or self.material.mode=='brittle':
+            self.names=['armor','hand armor','gauntlet']
+            self.base_descriptor='Heavy glove for protecting the hand from injury'
+            self.truename=self.material.name+' gauntlet'
+        else:
+            self.names=['armor','hand armor','glove']
+            self.base_descriptor='Offers protection for the hand and fingers without reducing dexterity'
+            self.truename=self.material.name+' glove'
+        if thickness=='default':
+            thickness=self.material.default_thickness*1.5*thickness_factor
+        self.length=length*scale_factor
+        self.radius=scale_factor*in_radius+thickness
+        self.in_radius=in_radius*scale_factor
         self.cross_section_range=[3.14*(self.radius**2-in_radius**2),self.length*2*(self.radius-in_radius)]
         self.parry=False
         self.wield='glove'
         self.curvature=0.2
         self.attacktype=[]
         self.coverage=0.95
-        self.damage={'bruise':0,'crack':0,'dent':0,'bend':0,'deform':0,'break':0,'cut':0,'shatter':0,'crush':0,'burn':0,'pierce':0}
         self.function=1
         self.recalc()
+        self.generate_descriptions()
 
     def recalc(self):
         super().recalc()
         self.r=self.length/2
 
 class Legging(Item):
-    def __init__(self,length=0.8,radius=0.087,in_radius=0.085,material=Iron,plural=False,quality=1):
+    def __init__(self,length=0.8,thickness='default',in_radius=0.085,material=Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1):
         super().__init__()
+        self.sortingtype='armor'
         self.plural=plural
         self.material=material(quality=quality)
-        self.name=self.material.name+' greave'
-        self.length=length
-        self.radius=radius
-        self.in_radius=in_radius
+        if self.material.mode=='ductile' or self.material.mode=='brittle':
+            self.names=['armor','leg armor','greave']
+            self.truename=self.material.name+' greave'
+            self.base_descriptor='Heavy armor for the leg designed to deflect and absorb shock.'
+        else:
+            self.names=['armor','leg armor','legging']
+            self.truename=self.material.name+' legging'
+            self.base_descriptor='Flexible armor for the leg. Absorbs impact without hampering movement.'
+        if thickness=='default':
+            thickness=self.material.default_thickness*thickness_factor
+        self.length=length*scale_factor
+        self.radius=scale_factor*in_radius+thickness
+        self.in_radius=in_radius*scale_factor
         self.cross_section_range=[3.14*(self.radius**2-in_radius**2),self.length*2*(self.radius-in_radius)]
         self.parry=False
         self.wield='legging'
         self.curvature=0.1
         self.attacktype=[]
         self.coverage=0.75
-        self.damage={'bruise':0,'crack':0,'dent':0,'bend':0,'deform':0,'break':0,'cut':0,'shatter':0,'crush':0,'burn':0,'pierce':0}
         self.function=1
         self.recalc()
+        self.generate_descriptions()
 
     def recalc(self):
         super().recalc()
         self.r=self.radius
 
 class Armlet(Item):
-    def __init__(self,length=0.375,radius=0.0548,in_radius=0.052,material=Iron,plural=False,quality=1):
+    def __init__(self,length=0.375,thickness='default',in_radius=0.052,material=Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1):
         super().__init__()
+        self.sortingtype='armor'
         self.plural=plural
         self.material=material(quality=quality)
-        self.name=self.material.name+' armlet'
-        self.length=length
-        self.radius=radius
-        self.in_radius=in_radius
+        if self.material.mode=='ductile' or self.material.mode=='brittle':
+            self.names=['armor','arm guard','vambrace']
+            self.truename=self.material.name+' vambrace'
+            self.base_descriptor='Stiff and typically heavy plated armor for protecting the arm.'
+        else:
+            self.names=['armor','arm guard','bracer']
+            self.truename=self.material.name+' bracer'
+            self.base_descriptor='Lightweight arm protection. Softens blows without slowing the movement of the arm.'
+        if thickness=='default':
+            thickness=self.material.default_thickness*1.1*thickness_factor
+        self.length=length*scale_factor
+        self.radius=scale_factor*in_radius+thickness
+        self.in_radius=in_radius*scale_factor
         self.cross_section_range=[3.14*(self.radius**2-in_radius**2),self.length*2*(self.radius-in_radius)]
         self.thickness=self.radius-in_radius
         self.r=self.radius
@@ -432,9 +584,9 @@ class Armlet(Item):
         self.curvature=0.1
         self.attacktype=[]
         self.coverage=0.75
-        self.damage={'bruise':0,'crack':0,'dent':0,'bend':0,'deform':0,'break':0,'cut':0,'shatter':0,'crush':0,'burn':0,'pierce':0}
         self.function=1
         self.recalc()
+        self.generate_descriptions()
 
     def recalc(self):
         super().recalc()
@@ -445,72 +597,100 @@ class Armlet(Item):
 class Boot(Item):
     #length is bone length in meters
     #radius is bone radius in meters
-    def __init__(self,length=0.35,radius=0.038,in_radius=0.035,material=Iron,plural=False,quality=1):
+    def __init__(self,length=0.35,thickness='default',in_radius=0.035,material=Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1):
         super().__init__()
+        self.names=['armor','footwear','boot']
+        self.base_descriptor='Footwear worn for protection of the foot and ankle'
+        self.sortingtype='armor'
         self.plural=plural
         self.material=material(quality=quality)
-        self.name=self.material.name+' boot'
-        self.length=length
-        self.radius=radius
-        self.in_radius=in_radius
+        self.truename=self.material.name+' boot'
+        if thickness=='default':
+            thickness=self.material.default_thickness*1.5*thickness_factor
+        self.length=length*scale_factor
+        self.radius=scale_factor*in_radius+thickness
+        self.in_radius=in_radius*scale_factor
         self.cross_section_range=[3.14*(self.radius**2-in_radius**2),self.length*2*(self.radius-in_radius)]
         self.parry=False
         self.wield='boot'
         self.curvature=0.2
         self.attacktype=[]
-        self.coverage=0.95
-        self.damage={'bruise':0,'crack':0,'dent':0,'bend':0,'deform':0,'break':0,'cut':0,'shatter':0,'crush':0,'burn':0,'pierce':0}
+        self.coverage=1
         self.function=1
         self.recalc()
+        self.generate_descriptions()
 
     def recalc(self):
         super().recalc()
         self.r=self.length
 
 class Helm(Item):
-    def __init__(self,length=0.1,radius=0.082,in_radius=0.08,material=Iron,plural=False,quality=1):
+    def __init__(self,length=0.1,thickness='default',in_radius=0.08,material=Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1):
         super().__init__()
+        self.sortingtype='armor'
         self.plural=plural
         self.material=material(quality=quality)
-        self.name=self.material.name+' helm'
-        self.length=length
-        self.radius=radius
-        self.in_radius=in_radius
+        if self.material.mode=='brittle' or self.material.mode=='ductile':
+            self.names=['armor','hat','helm']
+            self.truename=self.material.name+' helm'
+            self.base_descriptor='Provides protection for the top and sides of the head without impeding vision or hearing'
+        else:
+            self.names=['armor','hat','cap']
+            self.truename=self.material.name+' cap'
+            self.base_descriptor='A thick hat for protecting the top and sides of the head'
+        if thickness=='default':
+            thickness=self.material.default_thickness*thickness_factor
+        self.length=length*scale_factor
+        self.radius=scale_factor*in_radius+thickness
+        self.in_radius=in_radius*scale_factor
         self.cross_section_range=[3.14*(self.radius**2-in_radius**2),self.length*2*(self.radius-in_radius)]
         self.parry=False
         self.wield='helmet'
         self.curvature=0
         self.attacktype=[]
         self.coverage=0.55
-        self.damage={'bruise':0,'crack':0,'dent':0,'bend':0,'deform':0,'break':0,'cut':0,'shatter':0,'crush':0,'burn':0,'pierce':0}
         self.function=1
         self.recalc()
+        self.generate_descriptions()
 
     def recalc(self):
         super().recalc()
         self.r=self.length
 
 class GreatHelm(Item):
-    def __init__(self,length=0.2,radius=0.082,in_radius=0.08,material=Iron,plural=False,quality=1):
+    def __init__(self,length=0.2,thickness='default',in_radius=0.08,material=Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1):
         super().__init__()
+        self.sortingtype='armor'
         self.plural=plural
         self.material=material(quality=quality)
-        self.name=self.material.name+' greathelm'
-        self.length=length
-        self.radius=radius
-        self.in_radius=in_radius
+        if self.material.mode=='brittle' or self.material.mode=='ductile':
+            self.names=['armor','hat','greathelm']
+            self.truename=self.material.name+' greathelm'
+            self.base_descriptor='A heavy helmet completely enclosing the face and protecting the neck. Offers excellent protection, but impedes vision and hearing'
+            self.vision_blocking=0.6
+            self.sound_blocking=0.5
+            self.smell_blocking=0.8
+        else:
+            self.names=['armor','hat','hood']
+            self.truename=self.material.name+' hood'
+            self.base_descriptor='Thick covering for the head and neck. Provides considerable protection, but reduces ability to see and hear'
+            self.vision_blocking=0.5
+            self.sound_blocking=0.4
+            self.smell_blocking=0.1
+        if thickness=='default':
+            thickness=self.material.default_thickness*thickness_factor
+        self.length=length*scale_factor
+        self.radius=scale_factor*in_radius+thickness
+        self.in_radius=in_radius*scale_factor
         self.cross_section_range=[3.14*(self.radius**2-in_radius**2),self.length*2*(self.radius-in_radius)]
         self.parry=False
         self.wield='helmet'
-        self.vision_blocking=0.6
-        self.sound_blocking=0.5
-        self.smell_blocking=0.8
         self.curvature=0
         self.attacktype=[]
         self.coverage=1
-        self.damage={'bruise':0,'crack':0,'dent':0,'bend':0,'deform':0,'break':0,'cut':0,'shatter':0,'crush':0,'burn':0,'pierce':0}
         self.function=1
         self.recalc()
+        self.generate_descriptions()
 
     def recalc(self):
         super().recalc()
@@ -519,10 +699,13 @@ class GreatHelm(Item):
 class Shield(Item):
     def __init__(self,length=0.02,radius=0.36,in_radius=0,material=Iron,plural=False,quality=1):
         super().__init__()
+        self.names=['armor','shield']
+        self.base_descriptor='A large, heavy shield for absorbing and deflecting blows'
+        self.sortingtype='armor'
         self.image='c:/Project/shield.png'
         self.plural=plural
         self.material=material(quality=quality)
-        self.name=self.material.name+' shield'
+        self.truename=self.material.name+' shield'
         self.length=length
         self.radius=radius
         self.in_radius=in_radius
@@ -532,12 +715,12 @@ class Shield(Item):
         self.wield='grasp'
         self.curvature=0
         self.coverage=0.95
-        self.damage={'bruise':0,'crack':0,'dent':0,'bend':0,'deform':0,'break':0,'cut':0,'shatter':0,'crush':0,'burn':0,'pierce':0}
         self.function=1
         self.material.youngs=self.material.youngs/100
         self.defaultmaterial=material
         self.attacks=[Shield_Bash]
         self.recalc()
+        self.generate_descriptions()
 
     def recalc(self):
         if isinstance(self.material,self.defaultmaterial):
@@ -549,6 +732,7 @@ class Shield(Item):
         self.thickness=self.length
         self.r=self.radius
         self.mass=0.25*self.material.density*(self.length*(self.radius**2-self.in_radius**2))*3.14
+        self.movemass=self.mass
         self.centermass=self.length*0.5
         self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
         self.contactarea=3.14*self.radius**2
@@ -556,11 +740,14 @@ class Shield(Item):
 class Buckler(Item):
     def __init__(self,length=0.02,radius=0.1,in_radius=0,material=Iron,plural=False,quality=1):
         super().__init__()
+        self.names=['armor','shield','buckler']
+        self.base_descriptor='A small shield ideal for dueling which can be quickly moved to wherever it is needed most'
+        self.sortingtype='armor'
         self.image='c:/Project/shield.png'
         self.plural=plural
         self.material=material(quality=quality)
         self.defaultmaterial=material
-        self.name=self.material.name+' buckler'
+        self.truename=self.material.name+' buckler'
         self.length=length
         self.radius=radius
         self.in_radius=in_radius
@@ -571,11 +758,11 @@ class Buckler(Item):
         self.centermass=length*0.5
         self.curvature=0
         self.coverage=0.95
-        self.damage={'bruise':0,'crack':0,'dent':0,'bend':0,'deform':0,'break':0,'cut':0,'shatter':0,'crush':0,'burn':0,'pierce':0}
         self.function=1
         self.material.youngs=self.material.youngs/100
         self.attacks=[Shield_Bash]
         self.recalc()
+        self.generate_descriptions()
 
     def recalc(self):
         if isinstance(self.material,self.defaultmaterial):
@@ -587,6 +774,14 @@ class Buckler(Item):
         self.thickness=self.length
         self.r=self.radius
         self.mass=0.25*self.material.density*(self.length*(self.radius**2-self.in_radius**2))*3.14
+        self.movemass=self.mass
         self.centermass=self.length*0.5
         self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
         self.contactarea=3.14*self.radius**2
+
+
+
+class ExperimentalMace(Mace):
+    def __init__(self,material=Iron,quality=1):
+        super().__init__(material=material,quality=quality)
+        self.attacks=[Experimental_Bash]

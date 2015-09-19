@@ -1,6 +1,6 @@
 __author__ = 'Alan'
 
-from Shell import *
+import Shell
 import cProfile
 import pstats
 
@@ -13,7 +13,8 @@ import pstats
 
 
 
-class ActualGame(App):
+
+class ActualGame(Shell.App):
     def on_start(self):
         self.profile=cProfile.Profile()
         self.profile.enable()
@@ -24,7 +25,7 @@ class ActualGame(App):
 
 
     def build(self):
-        return shell
+        return Shell.shell
 
 if __name__=='__main__':
     ActualGame().run()
