@@ -8,6 +8,7 @@ from Attacks import *
 
 
 import BaseClasses as B
+import Enchantments
 
 
 
@@ -53,12 +54,6 @@ class Bone(Item):
         self.threshold=threshold
         self.recalc()
 
-
-
-
-
-
-
 class Flesh(Item):
     #length is limb length in meters
     #in_radius is the inner radius of the flesh
@@ -88,6 +83,35 @@ class Flesh(Item):
         self.function=1
         self.recalc()
 
+class Hair(Item):
+    #length is limb length in meters
+    #in_radius is the inner radius of the flesh
+    #out_radius is the radius of the skin
+    def __init__(self,length=0.5,in_radius=0.03,out_radius=0.05,material=Hair_Material,name='hair',plural=False,quality=1,threshold=0,**kwargs):
+        super().__init__(painfactor=0,**kwargs)
+        self.base_descriptor='Hair from some creature or another'
+        self.coverage=0.1
+        self.plural=plural
+        self.material=material(quality=quality)
+        self.names=['hair']
+        self.knowledge_level['truename']=1
+        if isinstance(self.material,Hair_Material) or isinstance(self.material,Fur):
+            self.name=name
+            self.truename=name
+        else:
+            self.name=name
+            self.truename=''.join((self.material.name,' ',self.name))
+        self.length=length
+        self.radius=out_radius
+        self.in_radius=in_radius
+        self.cross_section_range=[3.14*(self.radius**2-in_radius**2),self.length*2*(self.radius-in_radius)]
+        self.parry=False
+        self.wield='grasp'
+        self.curvature=0
+        self.attacktype=None
+        self.threshold=threshold
+        self.function=1
+        self.recalc()
 
 
 
@@ -102,8 +126,8 @@ class LongSword(Item):
     #tip is tip surface area in square meters
     #width is blade width in meters
     #thickness is blade thickness in meters
-    def __init__(self,length=1,edge=0.00001,tip=0.0000001,width=0.035,thickness=0.007,material=Iron,quality=1):
-        super().__init__()
+    def __init__(self,length=1,edge=0.00001,tip=0.0000001,width=0.035,thickness=0.007,material=Iron,quality=1,**kwargs):
+        super().__init__(**kwargs)
         self.names=['weapon','sword','long sword']
         self.base_descriptor='A straight, double-edged sword with a long blade. A well-balanced and versatile weapon for cutting and thrusting'
         self.sortingtype='weapon'
@@ -121,7 +145,7 @@ class LongSword(Item):
         self.curvature=0
         self.attacktype=['stab','slash']
         self.function=1
-        self.attacks=[Slash_1H,Stab_1H]
+        self.attacks=[Slash_1H,Stab_1H,Slash_2H,Stab_2H]
         self.recalc()
         self.damagetype.append('blunt')
         self.generate_descriptions()
@@ -133,6 +157,10 @@ class LongSword(Item):
         self.centermass=self.length*0.2
         self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
         self.r=self.width
+        if self.base_thickness==0:
+            self.base_thickness=self.thickness
+        if self.base_radius==0:
+            self.base_radius=self.radius
 
 class Gladius(Item):
     #length is blade length in meters
@@ -140,8 +168,8 @@ class Gladius(Item):
     #tip is tip surface area in square meters
     #width is blade width in meters
     #thickness is blade thickness in meters
-    def __init__(self,length=0.6,edge=0.00001,tip=0.0000001,width=0.035,thickness=0.007,material=Iron,quality=1):
-        super().__init__()
+    def __init__(self,length=0.6,edge=0.00001,tip=0.0000001,width=0.035,thickness=0.007,material=Iron,quality=1,**kwargs):
+        super().__init__(**kwargs)
         self.names=['weapon','sword','gladius']
         self.base_descriptor='A two-edged short sword balanced for cutting, chopping, or thrusting'
         self.sortingtype='weapon'
@@ -159,18 +187,22 @@ class Gladius(Item):
         self.curvature=0
         self.attacktype=['stab','slash']
         self.function=1
-        self.attacks=[Slash_1H,Stab_1H]
+        self.attacks=[Slash_1H,Stab_1H],Slash_2H,Stab_2H
         self.recalc()
         self.damagetype.append('blunt')
         self.generate_descriptions()
 
-        def recalc(self):
-            self.material_import()
-            self.mass=self.density*(self.length*self.width*self.thickness)
-            self.movemass=self.mass
-            self.centermass=self.length*0.3
-            self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
-            self.r=self.width
+    def recalc(self):
+        self.material_import()
+        self.mass=self.density*(self.length*self.width*self.thickness)
+        self.movemass=self.mass
+        self.centermass=self.length*0.3
+        self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
+        self.r=self.width
+        if self.base_thickness==0:
+            self.base_thickness=self.thickness
+        if self.base_radius==0:
+            self.base_radius=self.radius
 
 class Knife(Item):
     #length is blade length in meters
@@ -178,8 +210,8 @@ class Knife(Item):
     #tip is tip surface area in square meters
     #width is blade width in meters
     #thickness is blade thickness in meters
-    def __init__(self,length=0.3,edge=0.000005,tip=0.000000025,width=0.035,thickness=0.01,material=Iron,quality=1):
-        super().__init__()
+    def __init__(self,length=0.3,edge=0.000005,tip=0.000000025,width=0.035,thickness=0.01,material=Iron,quality=1,**kwargs):
+        super().__init__(**kwargs)
         self.names=['weapon','dagger']
         self.base_descriptor='A short, bladed weapon with a very sharp point. Suitable for throwing, slashing, or stabbing'
         self.sortingtype='weapon'
@@ -197,7 +229,7 @@ class Knife(Item):
         self.curvature=0
         self.attacktype=['stab','slash']
         self.function=1
-        self.attacks=[Slash_1H,Stab_1H]
+        self.attacks=[Slash_1H,Stab_1H,Slash_2H,Stab_2H]
         self.recalc()
         self.damagetype.append('blunt')
         self.generate_descriptions()
@@ -210,6 +242,10 @@ class Knife(Item):
         self.centermass=self.length*0.4
         self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
         self.r=self.width
+        if self.base_thickness==0:
+            self.base_thickness=self.thickness
+        if self.base_radius==0:
+            self.base_radius=self.radius
 
 class Saber(Item):
     #length is blade length in meters
@@ -217,8 +253,8 @@ class Saber(Item):
     #tip is tip surface area in square meters
     #width is blade width in meters
     #thickness is blade thickness in meters
-    def __init__(self,length=1,edge=0.000005,tip=0.0000002,width=0.035,thickness=0.006,material=Iron,quality=1):
-        super().__init__()
+    def __init__(self,length=1,edge=0.000005,tip=0.0000002,width=0.035,thickness=0.006,material=Iron,quality=1,**kwargs):
+        super().__init__(**kwargs)
         self.names=['weapon','sword','saber']
         self.base_descriptor='A curved, single-edge sword optimized for cutting'
         self.sortingtype='weapon'
@@ -236,7 +272,7 @@ class Saber(Item):
         self.curvature=0.2
         self.attacktype=['stab','slash']
         self.function=1
-        self.attacks=[Slash_1H,Stab_1H]
+        self.attacks=[Slash_1H,Stab_1H,Stab_2H,Slash_2H]
         self.recalc()
         self.damagetype.append('blunt')
         self.generate_descriptions()
@@ -248,6 +284,10 @@ class Saber(Item):
         self.centermass=self.length*0.3
         self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
         self.r=self.width
+        if self.base_thickness==0:
+            self.base_thickness=self.thickness
+        if self.base_radius==0:
+            self.base_radius=self.radius
 
 class Claymore(Item):
     #length is blade length in meters
@@ -255,8 +295,8 @@ class Claymore(Item):
     #tip is tip surface area in square meters
     #width is blade width in meters
     #thickness is blade thickness in meters
-    def __init__(self,length=1.3,edge=0.00001,tip=0.0000001,width=0.04,thickness=0.008,material=Iron,quality=1):
-        super().__init__()
+    def __init__(self,length=1.3,edge=0.00001,tip=0.0000001,width=0.04,thickness=0.008,material=Iron,quality=1,**kwargs):
+        super().__init__(**kwargs)
         self.names=['weapon','sword','claymore']
         self.base_descriptor='A broad, heavy longsword suitable only for those strong enough to effectively wield it'
         self.sortingtype='weapon'
@@ -274,7 +314,7 @@ class Claymore(Item):
         self.curvature=0
         self.attacktype=['stab','slash']
         self.function=1
-        self.attacks=[Slash_1H,Stab_1H]
+        self.attacks=[Slash_1H,Stab_1H,Slash_2H,Stab_2H]
         self.recalc()
         self.damagetype.append('blunt')
         self.generate_descriptions()
@@ -286,12 +326,16 @@ class Claymore(Item):
         self.centermass=self.length*0.2
         self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
         self.r=self.width
+        if self.base_thickness==0:
+            self.base_thickness=self.thickness
+        if self.base_radius==0:
+            self.base_radius=self.radius
 
 class Mace(Item):
     #length is length of mace in meters
     #head is head radius in meters
-    def __init__(self,length=0.8,head=0.06,material=Iron,quality=1):
-        super().__init__()
+    def __init__(self,length=0.8,head=0.06,material=Iron,quality=1,**kwargs):
+        super().__init__(**kwargs)
         self.names=['weapon','club','mace']
         self.base_descriptor='A heavy, blunt weapon for delivering powerful blows'
         self.sortingtype='weapon'
@@ -304,7 +348,7 @@ class Mace(Item):
         self.curvature=0.5
         self.attacktype=['bludgeon']
         self.function=1
-        self.attacks=[Bludgeon_1H]
+        self.attacks=[Bludgeon_1H,Bludgeon_2H]
         self.recalc()
         self.generate_descriptions()
 
@@ -313,17 +357,22 @@ class Mace(Item):
         self.mass=self.density*(self.length*3.14*0.005**2+1.33*3.14*self.head**3)
         self.centermass=self.length*0.8
         self.I=self.mass*self.centermass**2
-        self.contactarea=0.5*(1-self.curvature)*3.14*self.head**2
+        self.contactarea=0.25*(1-self.curvature)*3.14*self.head**2
         self.radius=self.head
         self.thickness=0.02
         self.r=0.015
         self.movemass=self.mass
+        if self.base_thickness==0:
+            self.base_thickness=self.thickness
+        if self.base_radius==0:
+            self.base_radius=self.radius
 
 class FlangedMace(Item):
     #length is length of mace in meters
     #head is head radius in meters
     #contactarea is the contact area of a flange or spike in square meters
-    def __init__(self,length=0.8,head=0.06,contactarea=.0008,material=Iron,quality=1):
+    def __init__(self,length=0.8,head=0.06,contactarea=.0008,material=Iron,quality=1,**kwargs):
+        super().__init__(**kwargs)
         self.names=['weapon','club','flanged mace']
         self.sortingtype='weapon'
         self.material=material(quality=quality)
@@ -346,8 +395,8 @@ class WarHammer(Item):
     #headsize is the area of the head in square meters
     #tip is the contact area of the spike in square meters
     #contactarea is the contact area of the hammer in square meters
-    def __init__(self,length=1.1,headvolume=.0002,headsize=0.0005,tip=0.00005,material=Iron,quality=1):
-        super().__init__()
+    def __init__(self,length=1.1,headvolume=.0002,headsize=0.0005,tip=0.00005,material=Iron,quality=1,**kwargs):
+        super().__init__(**kwargs)
         self.names=['weapon','club','war hammer']
         self.base_descriptor='A long, heavy hammer with a head for bashing attacks and a spike for piercing through armor'
         self.sortingtype='weapon'
@@ -361,7 +410,7 @@ class WarHammer(Item):
         self.wield='grasp'
         self.curvature=0
         self.function=1
-        self.attacks=[Bludgeon_1H,Swing_Pierce_1H]
+        self.attacks=[Bludgeon_1H,Swing_Pierce_1H,Bludgeon_2H,Swing_Pierce_2H]
         self.attacktype=['bludgeon']
         self.recalc()
         self.generate_descriptions()
@@ -376,14 +425,18 @@ class WarHammer(Item):
         self.thickness=0.02
         self.r=0.015
         self.movemass=self.mass
+        if self.base_thickness==0:
+            self.base_thickness=self.thickness
+        if self.base_radius==0:
+            self.base_radius=self.radius
         #print('warhammer mass, I',self.mass,self.I)
 
 class Spear(Item):
     #length is spear length in meters
     #tip is tip surface area in square meters
     #thickness is shaft thickness in meters
-    def __init__(self,length=2,tip=0.000000025,thickness=0.01,material=Iron,quality=1):
-        super().__init__()
+    def __init__(self,length=2,tip=0.000000025,thickness=0.01,material=Iron,quality=1,**kwargs):
+        super().__init__(**kwargs)
         self.names=['weapon','polearm','spear']
         self.base_descriptor='A long pole weapon with a sharp tip for piercing attacks.'
         self.sortingtype='weapon'
@@ -399,7 +452,7 @@ class Spear(Item):
         self.curvature=0
         self.attacktype=['stab','slash']
         self.function=1
-        self.attacks=[Stab_1H]
+        self.attacks=[Stab_1H,Stab_2H]
         self.recalc()
         self.damagetype.append('blunt')
         self.generate_descriptions()
@@ -411,11 +464,15 @@ class Spear(Item):
         self.centermass=self.length*0.5
         self.I=(1/12)*self.mass*self.length**2
         self.r=self.thickness
+        if self.base_thickness==0:
+            self.base_thickness=self.thickness
+        if self.base_radius==0:
+            self.base_radius=self.radius
         #print(self.mass)
 
 class Axe(Item):
-    def __init__(self,length=0.8,edge=0.00004,width=0.2,thickness=0.01,material=Iron,quality=1):
-        super().__init__()
+    def __init__(self,length=0.8,edge=0.00004,width=0.2,thickness=0.01,material=Iron,quality=1,**kwargs):
+        super().__init__(**kwargs)
         self.names=['weapon','axe']
         self.base_descriptor='A heavy, broad-headed bladed weapon. Somewhat clumsier than a sword but capable of delivering considerably more force.'
         self.sortingtype='weapon'
@@ -432,7 +489,7 @@ class Axe(Item):
         self.curvature=0
         self.attacktype=['slash']
         self.function=1
-        self.attacks=[Slash_1H]
+        self.attacks=[Slash_1H,Slash_2H]
         self.recalc()
         self.damagetype.append('blunt')
         self.generate_descriptions()
@@ -444,7 +501,45 @@ class Axe(Item):
         self.centermass=self.length*0.8
         self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
         self.r=self.width
-        print(self.name,self.mass)
+        if self.base_thickness==0:
+            self.base_thickness=self.thickness
+        if self.base_radius==0:
+            self.base_radius=self.radius
+
+class QuarterStaff(Item):
+    def __init__(self,length=2,thickness=0.02,material=Wood,quality=1,**kwargs):
+        super().__init__(**kwargs)
+        self.names=['weapon','polearm','quarterstaff']
+        self.base_descriptor='A long staff capable of delivering quick blows while keeping adversaries at range.'
+        self.sortingtype='weapon'
+        self.material=material(quality=quality)
+        self.plural=False
+        self.truename=self.material.name+' quarterstaff'
+        self.length=length
+        self.thickness=thickness
+        self.radius=self.thickness
+        self.parry=True
+        self.wield='grasp'
+        self.curvature=0
+        self.attacktype=['stab','slash']
+        self.function=1
+        self.attacks=[Strike_1H,Blunt_Thrust_1H,Strike_2H,Blunt_Thrust_2H]
+        self.recalc()
+        self.generate_descriptions()
+
+    def recalc(self):
+        self.material_import()
+        self.mass=self.density*(3.14*self.length*self.thickness**2)
+        self.movemass=self.mass
+        self.centermass=0.01
+        self.I=(1/12)*self.mass*self.length**2
+        self.r=self.thickness
+        if self.base_thickness==0:
+            self.base_thickness=self.thickness
+        if self.base_radius==0:
+            self.base_radius=self.radius
+
+
 
 
 ############################################Armor####################################################################
@@ -452,8 +547,8 @@ class Axe(Item):
 class Chest(Item):
     #length is bone length in meters
     #radius is bone radius in meters
-    def __init__(self,length=0.9,thickness='default',in_radius=0.1,material=Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1):
-        super().__init__()
+    def __init__(self,length=0.9,thickness='default',in_radius=0.1,material=Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1,**kwargs):
+        super().__init__(**kwargs)
         self.sortingtype='armor'
         self.plural=plural
         self.material=material(quality=quality)
@@ -467,6 +562,7 @@ class Chest(Item):
             self.base_descriptor='A thick vest for covering the torso. Effective at softening blows without significantly reducing mobility'
         if thickness=='default':
             thickness=self.material.default_thickness*thickness_factor
+        self.default_thickness=self.material.default_thickness
         self.length=length*scale_factor
         self.radius=scale_factor*in_radius+thickness
         self.in_radius=in_radius*scale_factor
@@ -488,12 +584,16 @@ class Chest(Item):
         self.r=self.radius
         self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
         self.movemass=self.mass
+        if self.base_thickness==0:
+            self.base_thickness=self.thickness
+        if self.base_radius==0:
+            self.base_radius=self.radius
 
 class Glove(Item):
     #length is bone length in meters
     #radius is bone radius in meters
-    def __init__(self,length=0.4,thickness='default',in_radius=0.022,material=Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1):
-        super().__init__()
+    def __init__(self,length=0.4,thickness='default',in_radius=0.022,material=Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1,**kwargs):
+        super().__init__(**kwargs)
         self.sortingtype='armor'
         self.plural=plural
         self.material=material(quality=quality)
@@ -506,7 +606,8 @@ class Glove(Item):
             self.base_descriptor='Offers protection for the hand and fingers without reducing dexterity'
             self.truename=self.material.name+' glove'
         if thickness=='default':
-            thickness=self.material.default_thickness*1.5*thickness_factor
+            thickness=self.material.default_thickness*2*thickness_factor
+        self.default_thickness=self.material.default_thickness*2
         self.length=length*scale_factor
         self.radius=scale_factor*in_radius+thickness
         self.in_radius=in_radius*scale_factor
@@ -525,8 +626,8 @@ class Glove(Item):
         self.r=self.length/2
 
 class Legging(Item):
-    def __init__(self,length=0.8,thickness='default',in_radius=0.085,material=Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1):
-        super().__init__()
+    def __init__(self,length=0.8,thickness='default',in_radius=0.085,material=Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1,**kwargs):
+        super().__init__(**kwargs)
         self.sortingtype='armor'
         self.plural=plural
         self.material=material(quality=quality)
@@ -540,6 +641,7 @@ class Legging(Item):
             self.base_descriptor='Flexible armor for the leg. Absorbs impact without hampering movement.'
         if thickness=='default':
             thickness=self.material.default_thickness*thickness_factor
+        self.default_thickness=self.material.default_thickness
         self.length=length*scale_factor
         self.radius=scale_factor*in_radius+thickness
         self.in_radius=in_radius*scale_factor
@@ -558,8 +660,8 @@ class Legging(Item):
         self.r=self.radius
 
 class Armlet(Item):
-    def __init__(self,length=0.375,thickness='default',in_radius=0.052,material=Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1):
-        super().__init__()
+    def __init__(self,length=0.375,thickness='default',in_radius=0.052,material=Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1,**kwargs):
+        super().__init__(**kwargs)
         self.sortingtype='armor'
         self.plural=plural
         self.material=material(quality=quality)
@@ -573,6 +675,7 @@ class Armlet(Item):
             self.base_descriptor='Lightweight arm protection. Softens blows without slowing the movement of the arm.'
         if thickness=='default':
             thickness=self.material.default_thickness*1.1*thickness_factor
+        self.default_thickness=self.material.default_thickness*1.1
         self.length=length*scale_factor
         self.radius=scale_factor*in_radius+thickness
         self.in_radius=in_radius*scale_factor
@@ -597,8 +700,8 @@ class Armlet(Item):
 class Boot(Item):
     #length is bone length in meters
     #radius is bone radius in meters
-    def __init__(self,length=0.35,thickness='default',in_radius=0.035,material=Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1):
-        super().__init__()
+    def __init__(self,length=0.35,thickness='default',in_radius=0.035,material=Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1,**kwargs):
+        super().__init__(**kwargs)
         self.names=['armor','footwear','boot']
         self.base_descriptor='Footwear worn for protection of the foot and ankle'
         self.sortingtype='armor'
@@ -606,7 +709,8 @@ class Boot(Item):
         self.material=material(quality=quality)
         self.truename=self.material.name+' boot'
         if thickness=='default':
-            thickness=self.material.default_thickness*1.5*thickness_factor
+            thickness=self.material.default_thickness*2*thickness_factor
+        self.default_thickness=self.material.default_thickness*2
         self.length=length*scale_factor
         self.radius=scale_factor*in_radius+thickness
         self.in_radius=in_radius*scale_factor
@@ -625,8 +729,8 @@ class Boot(Item):
         self.r=self.length
 
 class Helm(Item):
-    def __init__(self,length=0.1,thickness='default',in_radius=0.08,material=Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1):
-        super().__init__()
+    def __init__(self,length=0.1,thickness='default',in_radius=0.08,material=Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1,**kwargs):
+        super().__init__(**kwargs)
         self.sortingtype='armor'
         self.plural=plural
         self.material=material(quality=quality)
@@ -640,6 +744,7 @@ class Helm(Item):
             self.base_descriptor='A thick hat for protecting the top and sides of the head'
         if thickness=='default':
             thickness=self.material.default_thickness*thickness_factor
+        self.default_thickness=self.material.default_thickness
         self.length=length*scale_factor
         self.radius=scale_factor*in_radius+thickness
         self.in_radius=in_radius*scale_factor
@@ -658,8 +763,8 @@ class Helm(Item):
         self.r=self.length
 
 class GreatHelm(Item):
-    def __init__(self,length=0.2,thickness='default',in_radius=0.08,material=Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1):
-        super().__init__()
+    def __init__(self,length=0.2,thickness='default',in_radius=0.08,material=Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1,**kwargs):
+        super().__init__(**kwargs)
         self.sortingtype='armor'
         self.plural=plural
         self.material=material(quality=quality)
@@ -679,6 +784,7 @@ class GreatHelm(Item):
             self.smell_blocking=0.1
         if thickness=='default':
             thickness=self.material.default_thickness*thickness_factor
+        self.default_thickness=self.material.default_thickness
         self.length=length*scale_factor
         self.radius=scale_factor*in_radius+thickness
         self.in_radius=in_radius*scale_factor
@@ -697,8 +803,8 @@ class GreatHelm(Item):
         self.r=self.length
 
 class Shield(Item):
-    def __init__(self,length=0.02,radius=0.36,in_radius=0,material=Iron,plural=False,quality=1):
-        super().__init__()
+    def __init__(self,length=0.02,radius=0.36,in_radius=0,material=Iron,plural=False,quality=1,**kwargs):
+        super().__init__(**kwargs)
         self.names=['armor','shield']
         self.base_descriptor='A large, heavy shield for absorbing and deflecting blows'
         self.sortingtype='armor'
@@ -706,6 +812,7 @@ class Shield(Item):
         self.plural=plural
         self.material=material(quality=quality)
         self.truename=self.material.name+' shield'
+        self.default_thickness=0.02
         self.length=length
         self.radius=radius
         self.in_radius=in_radius
@@ -718,7 +825,7 @@ class Shield(Item):
         self.function=1
         self.material.youngs=self.material.youngs/100
         self.defaultmaterial=material
-        self.attacks=[Shield_Bash]
+        self.attacks=[Shield_Bash,Shield_Bash_2H]
         self.recalc()
         self.generate_descriptions()
 
@@ -736,10 +843,14 @@ class Shield(Item):
         self.centermass=self.length*0.5
         self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
         self.contactarea=3.14*self.radius**2
+        if self.base_thickness==0:
+            self.base_thickness=self.thickness
+        if self.base_radius==0:
+            self.base_radius=self.radius
 
 class Buckler(Item):
-    def __init__(self,length=0.02,radius=0.1,in_radius=0,material=Iron,plural=False,quality=1):
-        super().__init__()
+    def __init__(self,length=0.02,radius=0.1,in_radius=0,material=Iron,plural=False,quality=1,**kwargs):
+        super().__init__(**kwargs)
         self.names=['armor','shield','buckler']
         self.base_descriptor='A small shield ideal for dueling which can be quickly moved to wherever it is needed most'
         self.sortingtype='armor'
@@ -747,6 +858,7 @@ class Buckler(Item):
         self.plural=plural
         self.material=material(quality=quality)
         self.defaultmaterial=material
+        self.default_thickness=0.02
         self.truename=self.material.name+' buckler'
         self.length=length
         self.radius=radius
@@ -760,7 +872,7 @@ class Buckler(Item):
         self.coverage=0.95
         self.function=1
         self.material.youngs=self.material.youngs/100
-        self.attacks=[Shield_Bash]
+        self.attacks=[Shield_Bash,Shield_Bash_2H]
         self.recalc()
         self.generate_descriptions()
 
@@ -778,6 +890,10 @@ class Buckler(Item):
         self.centermass=self.length*0.5
         self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
         self.contactarea=3.14*self.radius**2
+        if self.base_thickness==0:
+            self.base_thickness=self.thickness
+        if self.base_radius==0:
+            self.base_radius=self.radius
 
 
 

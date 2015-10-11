@@ -25,6 +25,7 @@ import random
 class Bone_Material(Material):
     def __init__(self,thickness=1,quality=1,**kwargs):
         super().__init__(**kwargs)
+        self.color=(0.8,0.8,0.8,1)
         self.poisson=0.31
         self.basicname='bone'
         self.name='bone'
@@ -124,7 +125,9 @@ class Bone_Material(Material):
 class Flesh_Material(Material):
     def __init__(self,thickness=1,quality=1,**kwargs):
         super().__init__(**kwargs)
+        self.color=(0.86,0.66,0.52,1)
         self.poisson=0.45
+        self.acid_resistance=4
         self.fluid='blood'
         self.default_thickness=0.02
         self.basicname='flesh'
@@ -194,9 +197,40 @@ class Flesh_Material(Material):
             attack.contact=False
 '''
 
+class Slime(Material):
+    def __init__(self,thickness=1,quality=1,**kwargs):
+        super().__init__(**kwargs)
+        self.color=(0.30,0.59,0.30,1)
+        self.poisson=0.45
+        self.acid_resistance=20
+        self.fluid='slime'
+        self.default_thickness=0.02
+        self.basicname='slime'
+        self.name='slime'
+        self.maxquality=20
+        self.quality=min(quality,self.maxquality)
+        self.thickness=thickness
+        self.density=1200
+        self.youngs=0.03
+        self.fracture_energy=0.2*self.quality
+        self.tensile_strength=1.4*self.quality
+        self.mode='soft'
+        self.fracture_toughness=(self.youngs*self.fracture_energy)**0.5
+        self.shear=0.01
+        self.shear_strength=0.6*self.quality
+        self.electric_conduction=True
+        self.heat_conduction=False
+        self.dissipationfactor=1.5
+        self.maxedge=0.01
+        self.damagetype=['bruise','cut','crush']
+        self.magic_affinity=8
+        self.identification_difficulty=5
+
 class Iron(Material):
     def __init__(self,thickness=1,quality=1,**kwargs):
         super().__init__(**kwargs)
+        self.color=(0.64,0.64,0.64,1)
+        self.wetdamage='rust'
         self.poisson=0.3
         self.default_thickness=0.002
         self.basicname='metal'
@@ -290,6 +324,9 @@ class Iron(Material):
 class Steel(Material):
     def __init__(self,thickness=1,quality=1,**kwargs):
         super().__init__(**kwargs)
+        self.color=(0.64,0.64,0.64,1)
+        self.acid_reaction='embrittle'
+        self.wetdamage='rust'
         self.poisson=0.3
         self.default_thickness=0.002
         self.basicname='metal'
@@ -316,7 +353,9 @@ class Steel(Material):
 class Copper(Material):
     def __init__(self,thickness=1,quality=1,**kwargs):
         super().__init__(**kwargs)
+        self.color=(0.96,0.56,0.2,1)
         self.poisson=0.34
+        self.acid_resistance=8
         self.default_thickness=0.002
         self.basicname='metal'
         self.name='copper'
@@ -342,7 +381,10 @@ class Copper(Material):
 class Bronze(Material):
     def __init__(self,thickness=1,quality=1,**kwargs):
         super().__init__(**kwargs)
+        self.color=(0.96,0.56,0.2,1)
         self.poisson=0.34
+        self.acid_reaction='embrittle'
+        self.acid_resistance=8
         self.default_thickness=0.002
         self.basicname='metal'
         self.name='bronze'
@@ -368,7 +410,10 @@ class Bronze(Material):
 class Brass(Material):
     def __init__(self,thickness=1,quality=1,**kwargs):
         super().__init__(**kwargs)
+        self.color=(0.96,0.56,0.2,1)
         self.poisson=0.36
+        self.acid_reaction='embrittle'
+        self.acid_resistance=6
         self.default_thickness=0.002
         self.basicname='metal'
         self.name='brass'
@@ -394,7 +439,9 @@ class Brass(Material):
 class Titanium(Material):
     def __init__(self,thickness=1,quality=1,**kwargs):
         super().__init__(**kwargs)
+        self.color=(0.7,0.7,0.7,1)
         self.poisson=0.3
+        self.acid_resistance=9
         self.default_thickness=0.002
         self.basicname='metal'
         self.name='titanium'
@@ -405,14 +452,14 @@ class Titanium(Material):
         self.youngs=114
         self.fracture_energy=11.3*self.quality
         self.tensile_strength=1060*self.quality
-        self.mode='brittle'
+        self.mode='ductile'
         self.fracture_toughness=(self.youngs*self.fracture_energy)**0.5
         self.shear=44
         self.shear_strength=711*self.quality
         self.electric_conduction=True
         self.heat_conduction=True
         self.dissipationfactor=1
-        self.maxedge=(5*10^-8)/self.quality
+        self.maxedge=(5*10^-7)/self.quality
         self.damagetype=['crack','break','shatter','crush','cut']
         self.magic_affinity=2
         self.identification_difficulty=17
@@ -420,7 +467,9 @@ class Titanium(Material):
 class Silver(Material):
     def __init__(self,thickness=1,quality=1,**kwargs):
         super().__init__(**kwargs)
+        self.color=(0.7,0.7,0.7,1)
         self.poisson=0.37
+        self.acid_resistance=12
         self.default_thickness=0.002
         self.basicname='metal'
         self.name='silver'
@@ -446,7 +495,10 @@ class Silver(Material):
 class Aluminum(Material):
     def __init__(self,thickness=1,quality=1,**kwargs):
         super().__init__(**kwargs)
+        self.color=(0.7,0.7,0.7,1)
         self.poisson=0.35
+        self.acid_resistance=6
+        self.acid_reaction='embrittle'
         self.default_thickness=0.002
         self.basicname='metal'
         self.name='aluminum'
@@ -473,7 +525,10 @@ class Duraluminum(Material):
     #Copper Aluminum alloy
     def __init__(self,thickness=1,quality=1,**kwargs):
         super().__init__(**kwargs)
+        self.color=(0.7,0.7,0.7,1)
         self.poisson=0.35
+        self.acid_resistance=5
+        self.acid_reaction='embrittle'
         self.default_thickness=0.002
         self.basicname='metal'
         self.name='duraluminum'
@@ -500,7 +555,10 @@ class Zicral(Material):
     #Zinc Aluminum alloy
     def __init__(self,thickness=1,quality=1,**kwargs):
         super().__init__(**kwargs)
+        self.color=(0.7,0.7,0.7,1)
         self.poisson=0.35
+        self.acid_resistance=4
+        self.acid_reaction='embrittle'
         self.default_thickness=0.002
         self.basicname='metal'
         self.name='zicral'
@@ -526,7 +584,9 @@ class Zicral(Material):
 class Wood(Material):
     def __init__(self,thickness=1,quality=1,**kwargs):
         super().__init__(**kwargs)
+        self.color=(0.69,0.42,0.19,1)
         self.poisson=0.2
+        self.acid_resistance=9
         self.default_thickness=0.005
         self.basicname='wood'
         self.name='wood'
@@ -554,11 +614,13 @@ class Wood(Material):
 class Leather(Material):
     def __init__(self,thickness=1,quality=1,**kwargs):
         super().__init__(**kwargs)
+        self.color=(0.47,0.29,.05,1)
         self.poisson=0.35
+        self.acid_resistance=10
         self.default_thickness=0.01
         self.basicname='leather'
         self.name='leather'
-        self.maxquality=2
+        self.maxquality=4
         self.quality=min(quality,self.maxquality)
         self.thickness=thickness
         self.density=860
@@ -580,23 +642,26 @@ class Leather(Material):
 class Cotton(Material):
     #Cotton's material properties depend strongly on how it is woven. Tight weaves result in much higher youngs and shear moduli and higher density.
     #Maximal youngs modulus is about 7. Maximal density is about 820.
-    def __init__(self,thickness=1,quality=1,**kwargs):
+    def __init__(self,thickness=1,quality=1,weave=1,**kwargs):
         super().__init__(**kwargs)
+        self.color=(0.9,0.9,0.9,1)
         self.poisson=0.4
+        self.weave=weave
+        self.acid_resistance=6
         self.default_thickness=0.01
         self.basicname='fabric'
         self.name='cotton'
         self.maxquality=2
         self.quality=min(quality,self.maxquality)
         self.thickness=thickness
-        self.density=820
-        self.youngs=0.007
+        self.density=820*weave/(weave+1)
+        self.youngs=7*weave/(weave+10)#0.007
         self.fracture_energy=10*self.quality
-        self.tensile_strength=400*self.quality
+        self.tensile_strength=400*self.quality*weave/(weave+5)
         self.mode='fabric'
         self.fracture_toughness=(self.youngs*self.fracture_energy)**0.5
-        self.shear=0.0023
-        self.shear_strength=0.6*self.tensile_strength
+        self.shear=2.62*weave/(weave+20)#0.0023
+        self.shear_strength=0.2*self.tensile_strength
         self.electric_conduction=False
         self.heat_conduction=False
         self.dissipationfactor=1
@@ -607,23 +672,26 @@ class Cotton(Material):
 
 class Wool(Material):
     #See note on Cotton. Much to do here in terms of weave
-    def __init__(self,thickness=1,quality=1,**kwargs):
+    def __init__(self,thickness=1,quality=1,weave=1,**kwargs):
         super().__init__(**kwargs)
+        self.color=(0.98,0.96,0.92,1)
         self.poisson=0.4
+        self.weave=weave
+        self.acid_resistance=10
         self.default_thickness=0.015
         self.basicname='fabric'
         self.name='wool'
         self.maxquality=2
         self.quality=min(quality,self.maxquality)
         self.thickness=thickness
-        self.density=1310
-        self.youngs=0.0007   #3.5 for fiber
+        self.density=1310*weave/(weave+1)
+        self.youngs=3.5*weave/(weave+10) #0.0007   #3.5 for fiber
         self.fracture_energy=30*self.quality
-        self.tensile_strength=150*self.quality
+        self.tensile_strength=150*self.quality*weave/(weave+5)
         self.mode='fabric'
         self.fracture_toughness=(self.youngs*self.fracture_energy)**0.5
-        self.shear=0.00023   #1.31 for fiber
-        self.shear_strength=0.6*self.tensile_strength
+        self.shear=1.31*weave/(weave+20) #0.00023   #1.31 for fiber
+        self.shear_strength=0.2*self.tensile_strength
         self.electric_conduction=False
         self.heat_conduction=False
         self.dissipationfactor=1
@@ -632,25 +700,46 @@ class Wool(Material):
         self.magic_affinity=7
         self.identification_difficulty=12
 
+class Hair_Material(Wool):
+    def __init__(self,thickness=1,quality=1,weave=0.5,**kwargs):
+        super().__init__(thickness,quality,weave=weave,**kwargs)
+        self.basicname='hair'
+        self.name='hair'
+        self.acid_resistance=5
+        self.density=400
+        self.identification_difficulty=5
+
+class Fur(Wool):
+    def __init__(self,thickness=1,quality=1,weave=0.25,**kwargs):
+        super().__init__(thickness,quality,weave=weave,**kwargs)
+        self.basicname='hair'
+        self.name='fur'
+        self.acid_resistance=5
+        self.density=300
+        self.identification_difficulty=5
+
 class Silk(Material):
     #See note on Cotton. Much to do here in terms of weave
-    def __init__(self,thickness=1,quality=1,**kwargs):
+    def __init__(self,thickness=1,quality=1,weave=1,**kwargs):
         super().__init__(**kwargs)
+        self.color=(0.96,0.95,1,1)
         self.poisson=0.4
-        self.default_thickness=0.003
+        self.weave=weave
+        self.acid_resistance=9
+        self.default_thickness=0.01
         self.basicname='fabric'
         self.name='silk'
         self.maxquality=1.2
         self.quality=min(quality,self.maxquality)
         self.thickness=thickness
-        self.density=1310
-        self.youngs=0.01  #100 for individual thread
+        self.density=1310*weave/(weave+0.75)
+        self.youngs=100*weave/(weave+5)#0.01  #100 for individual thread
         self.fracture_energy=60*self.quality
-        self.tensile_strength=500*self.quality
+        self.tensile_strength=500*self.quality*weave/(weave+3)
         self.mode='fabric'
         self.fracture_toughness=(self.youngs*self.fracture_energy)**0.5
-        self.shear=0.0033  #3.81 for individual thread
-        self.shear_strength=0.6*self.tensile_strength
+        self.shear=3.81*weave/(weave+10)#0.0033  #3.81 for individual thread
+        self.shear_strength=0.2*self.tensile_strength
         self.electric_conduction=False
         self.heat_conduction=False
         self.dissipationfactor=1
@@ -661,23 +750,26 @@ class Silk(Material):
 
 class Spider_Silk(Material):
     #See note on Cotton. Much to do here in terms of weave
-    def __init__(self,thickness=1,quality=1,**kwargs):
+    def __init__(self,thickness=1,quality=1,weave=1,**kwargs):
         super().__init__(**kwargs)
+        self.color=(0.96,0.95,1,1)
         self.poisson=0.4
-        self.default_thickness=0.001
+        self.weave=weave
+        self.acid_resistance=11
+        self.default_thickness=0.01
         self.basicname='fabric'
         self.name='spider silk'
         self.maxquality=1.2
         self.quality=min(quality,self.maxquality)
         self.thickness=thickness
-        self.density=1097
-        self.youngs=0.0127  #12.7 for individual thread
+        self.density=1097*weave/(weave+0.75)
+        self.youngs=12.7*weave/(weave+5)#0.0127  #12.7 for individual thread
         self.fracture_energy=160*self.quality
-        self.tensile_strength=1300*self.quality
+        self.tensile_strength=1300*self.quality*weave/(weave+3)
         self.mode='fabric'
         self.fracture_toughness=(self.youngs*self.fracture_energy)**0.5
-        self.shear=0.004  #2.38 for pure fiber
-        self.shear_strength=0.6*self.tensile_strength
+        self.shear=2.38*weave/(weave+10)#0.004  #2.38 for pure fiber
+        self.shear_strength=0.2*self.tensile_strength
         self.electric_conduction=False
         self.heat_conduction=False
         self.dissipationfactor=1
@@ -688,23 +780,26 @@ class Spider_Silk(Material):
 
 class Basalt_Fiber(Material):
     #See note on Cotton. Much to do here in terms of weave
-    def __init__(self,thickness=1,quality=1,**kwargs):
+    def __init__(self,thickness=1,quality=1,weave=1,**kwargs):
         super().__init__(**kwargs)
+        self.color=(0.98,0.96,0.92,1)
         self.poisson=0.4
+        self.weave=weave
+        self.acid_resistance=13
         self.default_thickness=0.005
         self.basicname='fabric'
         self.name='basalt fiber'
         self.maxquality=1.2
         self.quality=min(quality,self.maxquality)
         self.thickness=thickness
-        self.density=2650
-        self.youngs=0.01  #100 for individual thread
+        self.density=2650*weave/(weave+1)
+        self.youngs=100*weave/(weave+10)#0.01  #100 for individual thread
         self.fracture_energy=50*self.quality
-        self.tensile_strength=4000*self.quality
+        self.tensile_strength=4000*self.quality*weave/(weave+5)
         self.mode='fabric'
         self.fracture_toughness=(self.youngs*self.fracture_energy)**0.5
-        self.shear=0.0033
-        self.shear_strength=0.6*self.tensile_strength
+        self.shear=33*weave/(weave+20)#0.0033
+        self.shear_strength=0.2*self.tensile_strength
         self.electric_conduction=False
         self.heat_conduction=False
         self.dissipationfactor=1

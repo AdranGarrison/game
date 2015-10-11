@@ -46,8 +46,6 @@ self.attacktype is the type of attack the limb grants. It depends upon current e
 
 buildfromtorso=False
 
-
-
 class Finger(Limb):
     
     
@@ -56,7 +54,7 @@ class Finger(Limb):
         self.painfactor=0.5
         self.owner=owner
         self.owner.limbs.append(self)
-        self.sizefactor=2
+        self.sizefactor=1
         self.length=length*scale
         self.radius=radius*scale
         self.natural=natural
@@ -80,13 +78,12 @@ class Finger(Limb):
         self.attacks=self.defaultattacks
         self.armortype='glove'
 
-
     def equip(self,item):
-        if item.wield=='ring':
+        if item.wield=='ring' and self.can_equip(item)[0]==True:
             if self.equipment['ring'] is not None:
                 self.unequip('ring')
             self.equipment['ring']=item
-            item.equipped=self
+            item.equipped.append(self)
             if item.mass:
                 self.movemass+=item.mass
             self.owner.equipped_items.append(item)
@@ -103,10 +100,56 @@ class Finger(Limb):
     def on_stats(self,*args):
         pass
 
+class Claw(Limb):
+    def __init__(self,stats,name='claw',scale=1,length=0.1,radius=0.01,tip=0.00005,natural=True,owner=None,**kwargs):
+        super().__init__(stats,**kwargs)
+        self.painfactor=0.5
+        self.owner=owner
+        self.tip=tip
+        self.owner.limbs.append(self)
+        self.sizefactor=1
+        self.length=length*scale
+        self.radius=radius*scale
+        self.natural=natural
+        self.name=name
+        self.grasp=False
+        self.support=False
+        self.ability=1
+        self.stats=stats
+        self.primaryequip=['ring']
+        self.equiptype=['ring']
+        self.equipment={'ring':None}
+        self.armor=None
+        self.scars=[]
+        self.descriptor='This is a claw of {}.'.format(self.owner.indefinitename)
+        self.attacktype=None
+        self.attachpoint=None
+        self.layers=[Bone(length=self.length,radius=self.radius,name=self.name,quality=2)]
+        self.mass_calc()
+        self.youngscalc()
+        self.defaultattacks=[]
+        self.attacks=self.defaultattacks
+        self.armortype=None
+
+    def equip(self,item):
+        if item.wield=='ring' and self.can_equip(item)[0]==True:
+            if self.equipment['ring'] is not None:
+                self.unequip('ring')
+            self.equipment['ring']=item
+            item.equipped.append(self)
+            if item.mass:
+                self.movemass+=item.mass
+            self.owner.equipped_items.append(item)
+
+        self.youngscalc()
+
+    def on_limbs(self,*args):
+        pass
+
+    def on_stats(self,*args):
+        pass
 
 class Hand(Limb):
-    
-    
     def __init__(self,stats,name='hand',scale=1,length=0.1,radius=0.022,natural=True,owner=None,**kwargs):
         super().__init__(stats,**kwargs)
         self.sizefactor=10
@@ -149,20 +192,13 @@ class Hand(Limb):
         self.attacks=self.defaultattacks
         self.armortype='glove'
 
-
-
     def equip(self,item):
-        if item.wield=='glove':
+        if item.wield=='glove' and self.can_equip(item)[0]==True:
             if self.equipment['glove'] is not None:
                 self.unequip('glove')
             self.equipment['glove']=item
             self.armor=self.equipment['glove']
-#TODO: size of items should determine when it can be equipped. This bit of code does so, but I don't feel like implementing it everywhere right now
-#            if self.radius<0.5*item.radius:
-#                print("{} is too big!".format(item.name))
-#            if self.radius>2*item.radius:
-#                print("{} is too small!".format(item.name))
-            item.equipped=self
+            item.equipped.append(self)
             if item.mass:
                 self.movemass+=item.mass
             for i in self.limbs:
@@ -171,12 +207,12 @@ class Hand(Limb):
             self.owner.equipped_items.append(item)
 
         if self.grasp==True:
-            if item.wield=='grasp':
+            if item.wield=='grasp' and self.can_equip(item)[0]==True:
                 if self.equipment['grasp'] is not None:
                     self.unequip('grasp')
 
                 self.equipment['grasp']=item
-                item.equipped=self
+                item.equipped.append(self)
                 if item.mass:
                     self.movemass+=item.mass
 
@@ -185,8 +221,6 @@ class Hand(Limb):
                     self.attacks.append(i(item,self))
                 self.owner.equipped_items.append(item)
         self.youngscalc()
-
-
 
     def on_wounds(self,*args):
         self.ability=max(self.ability,0)
@@ -208,7 +242,6 @@ class Hand(Limb):
                 self.equipment['grasp']=None
                 self.attacktype=None
 
-
     def on_limbs(self,*args):
         pass
 
@@ -218,10 +251,23 @@ class Hand(Limb):
                 i.stats=self.stats
 
     def dex_calc(self):
+        self.defaultattacks=[Punch(self)]
+        claws=[]
         self.dexterity=self.ability
         if self.ability>0:
             for i in self.limbs:
-                self.dexterity+=i.ability
+                if isinstance(i,Finger):
+                    self.dexterity+=i.ability
+                if isinstance(i,Claw):
+                    print('claw here')
+                    self.dexterity+=i.ability/3
+                    claws.append(i)
+        if claws!=[]:
+            self.defaultattacks=[Scratch(random.choice(claws),self)]
+        if self.equipment['grasp'] is None:
+            self.attacks=self.defaultattacks
+
+
         if self.dexterity<=0:
             self.grasp=False
             if self.equipment['grasp'] is not None:
@@ -229,23 +275,21 @@ class Hand(Limb):
         else:
             self.grasp=True
 
-
 class Arm(Limb):
-    
-    
     def __init__(self,stats,name='',scale=1,length=0.75,boneradius=0.013,natural=True,owner=None,**kwargs):
         super().__init__(stats,**kwargs)
         self.sizefactor=50
         self.owner=owner
         self.owner.limbs.append(self)
         self.natural=natural
-        self.name=name+' arm'
+        self.name=name+'arm'
         self.length=length*scale
         self.grasp=False
         self.support=False
         self.ability=1
         self.stats=stats
-        self.radius=(self.stats['s']/10000)**0.5+boneradius*scale
+        boneradius=boneradius*scale
+        self.radius=(self.stats['s']/10000)**0.5+boneradius
         self.primaryequip=['armlet','bracelet']
         self.equiptype=['armlet','bracelet']
         self.equipment={'armlet':None,'bracelet':None}
@@ -267,31 +311,27 @@ class Arm(Limb):
         self.attacks=self.defaultattacks
         self.armortype='armlet'
 
-
     def equip(self,item):
-        if item.wield=='armlet':
+        if item.wield=='armlet' and self.can_equip(item)[0]==True:
             if self.equipment['armlet'] is not None:
                 self.unequip('armlet')
             self.equipment['armlet']=item
-            item.equipped=self
+            item.equipped.append(self)
             self.armor=self.equipment['armlet']
             if item.mass:
                 self.movemass+=item.mass
             self.owner.equipped_items.append(item)
 
-        if item.wield=='bracelet':
+        if item.wield=='bracelet' and self.can_equip(item)[0]==True:
             if self.equipment['bracelet'] is not None:
                 self.unequip('bracelet')
             self.equipment['bracelet']=item
-            item.equipped=self
+            item.equipped.append(self)
             if item.mass:
                 self.movemass+=item.mass
             self.owner.equipped_items.append(item)
 
         self.youngscalc()
-
-
-
 
     def on_limbs(self,*args):
         pass
@@ -312,10 +352,8 @@ class Arm(Limb):
                 i.updateability()
         super().recover(turns=turns)
 
-
 class Torso(Limb):
-    
-    
+
     def __init__(self,stats,name,scale=1,length=0.9,radius=0.1,natural=True,owner=None,**kwargs):
         super().__init__(stats,**kwargs)
         self.sizefactor=40
@@ -366,13 +404,12 @@ class Torso(Limb):
         self.attacks=self.defaultattacks
         self.armortype='chest'
 
-
     def equip(self,item):
-        if item.wield=='chest':
+        if item.wield=='chest' and self.can_equip(item)[0]==True:
             if self.equipment['chest'] is not None:
                 self.unequip('chest')
             self.equipment['chest']=item
-            item.equipped=self
+            item.equipped.append(self)
             self.armor=self.equipment['chest']
             if item.mass:
                 self.movemass+=item.mass
@@ -380,14 +417,9 @@ class Torso(Limb):
 
         self.youngscalc()
 
-
-
-
     def on_wounds(self,*args):
         self.ability=1
         self.descriptor='This is a torso of {}.'.format(self.owner.indefinitename)
-
-
 
     def on_limbs(self,*args):
         pass
@@ -397,14 +429,13 @@ class Torso(Limb):
             if i.natural==True:
                 i.stats=self.stats
 
-
 class Toe(Limb):
     
     
     def __init__(self,stats,name='toe',scale=1,length=0.05,radius=0.005,natural=True,owner=None,**kwargs):
         super().__init__(stats,**kwargs)
         self.painfactor=0.5
-        self.sizefactor=2
+        self.sizefactor=1
         self.owner=owner
         self.owner.limbs.append(self)
         self.natural=natural
@@ -455,10 +486,7 @@ class Toe(Limb):
             if i.natural==True:
                 i.stats=self.stats
 
-
 class Foot(Limb):
-    
-    
     def __init__(self,stats,name='foot',scale=1,length=0.22,radius=0.035,natural=True,owner=None,**kwargs):
         super().__init__(stats,**kwargs)
         self.length=length*scale
@@ -500,14 +528,13 @@ class Foot(Limb):
         self.attacks=self.defaultattacks
         self.armortype='boot'
 
-
     def equip(self,item):
-        if item.wield=='boot':
+        if item.wield=='boot' and self.can_equip(item)[0]==True:
             if self.equipment['boot'] is not None:
                 self.unequip('boot')
             self.equipment['boot']=item
             self.armor=self.equipment['boot']
-            item.equipped=self
+            item.equipped.append(self)
             if item.mass:
                 self.movemass+=item.mass
             for i in self.limbs:
@@ -515,9 +542,6 @@ class Foot(Limb):
                     i.equip(item)
             self.owner.equipped_items.append(item)
         self.youngscalc()
-
-
-
 
     def on_wounds(self,*args):
         self.ability=1
@@ -542,7 +566,6 @@ class Foot(Limb):
             self.descriptor+=' Injuries have left it impossible to walk on.'
             self.attacktype=None
 
-
     def on_limbs(self,*args):
         pass
 
@@ -552,10 +575,13 @@ class Foot(Limb):
                 i.stats=self.stats
 
     def balance_calc(self):
+        claws=[]
         self.balance=self.ability
         if self.balance>=0:
             for i in self.limbs:
                 self.balance+=i.ability
+                if isinstance(i,Claw):
+                    claws.append(i)
         if self.balance<=0:
             self.support=False
         elif self.attachpoint is None:
@@ -566,11 +592,16 @@ class Foot(Limb):
             self.balance=0
         else:
             self.support=True
+        if claws!=[]:
+            self.defaultattacks=[Scratch(random.choice(claws),self)]
+            self.attacks=self.defaultattacks
+        else:
+            self.defaultattacks=[Kick(self)]
+
+
 
 
 class Leg(Limb):
-    
-    
     def __init__(self,stats,name='',scale=1,length=0.8,boneradius=0.018,natural=True,owner=None,**kwargs):
         super().__init__(stats,**kwargs)
         self.painfactor=0.8
@@ -579,12 +610,13 @@ class Leg(Limb):
         self.owner=owner
         self.owner.limbs.append(self)
         self.natural=natural
-        self.name=name+' leg'
+        self.name=name+'leg'
         self.grasp=False
         self.support=False
         self.ability=1
         self.stats=stats
-        self.radius=(self.stats['s']/3500)**0.5+boneradius*scale
+        boneradius=boneradius*scale
+        self.radius=(self.stats['s']/3500)**0.5+boneradius
         self.primaryequip=['legging']
         self.equiptype=['legging']
         self.equipment={'legging':None}
@@ -607,26 +639,22 @@ class Leg(Limb):
         self.armortype='legging'
 
     def equip(self,item):
-        if item.wield=='legging':
+        if item.wield=='legging' and self.can_equip(item)[0]==True:
             if self.equipment['legging'] is not None:
                 self.unequip('legging')
             self.equipment['legging']=item
             self.armor=self.equipment['legging']
-            item.equipped=self
+            item.equipped.append(self)
             if item.mass:
                 self.movemass+=item.mass
             self.owner.equipped_items.append(item)
 
         self.youngscalc()
 
-
-
     def on_wounds(self,*args):
         self.ability=1
 
         self.ability=max(self.ability,0)
-
-
 
     def on_limbs(self,*args):
         pass
@@ -635,7 +663,6 @@ class Leg(Limb):
         for i in self.limbs:
             if i.natural==True:
                 i.stats=self.stats
-
 
 class Ear(Limb):
     
@@ -649,7 +676,7 @@ class Ear(Limb):
         self.owner.limbs.append(self)
         self.sizefactor=1
         self.natural=natural
-        self.name=name+' ear'
+        self.name=name+'ear'
         self.hear=True
         self.hearing=1
         self.ability=1
@@ -684,7 +711,6 @@ class Ear(Limb):
 
     def on_stats(self,*args):
         pass
-
 
 class Nose(Limb):
     
@@ -734,10 +760,7 @@ class Nose(Limb):
     def on_stats(self,*args):
         pass
 
-
 class Eye(Limb):
-    
-    
     def __init__(self,stats,name='',scale=1,length=None,radius=0.013,natural=True,owner=None,**kwargs):
         super().__init__(stats,**kwargs)
         self.painfactor=2
@@ -747,7 +770,7 @@ class Eye(Limb):
         self.owner.limbs.append(self)
         self.sizefactor=1
         self.natural=natural
-        self.name=name+' eye'
+        self.name=name+'eye'
         self.grasp=False
         self.support=False
         self.sight=True
@@ -786,15 +809,14 @@ class Eye(Limb):
     def on_stats(self,*args):
         pass
 
-
 class Teeth(Limb):
-    
-    
-    def __init__(self,stats,name='teeth',scale=1,length=0.12,radius=0.005,natural=True,owner=None,**kwargs):
+
+    def __init__(self,stats,name='teeth',scale=1,length=0.12,radius=0.005,natural=True,owner=None,biting_surface=0.0006,**kwargs):
         super().__init__(stats,**kwargs)
         self.sizefactor=1
         self.owner=owner
         self.is_teeth=True
+        self.biting_surface=biting_surface
         self.owner.limbs.append(self)
         self.natural=natural
         self.name=name
@@ -844,7 +866,6 @@ class Teeth(Limb):
         for i in self.limbs:
             if i.natural==True:
                 i.stats=self.stats
-
 
 class Jaw(Limb):
     
@@ -902,7 +923,6 @@ class Jaw(Limb):
         for i in self.limbs:
             if i.natural==True:
                 i.stats=self.stats
-
 
 class Head(Limb):
     
@@ -966,12 +986,12 @@ class Head(Limb):
 
 
     def equip(self,item):
-        if item.wield=='helmet':
+        if item.wield=='helmet' and self.can_equip(item)[0]==True:
             if self.equipment['helmet'] is not None:
                 self.unequip('helmet')
             self.equipment['helmet']=item
             self.armor=self.equipment['helmet']
-            item.equipped=self
+            item.equipped.append(self)
             if item.mass:
                 self.movemass+=item.mass
             for i in self.limbs:
@@ -1000,7 +1020,6 @@ class Head(Limb):
         for i in self.limbs:
             if i.natural==True:
                 i.stats=self.stats
-
 
 class Neck(Limb):
     
@@ -1048,11 +1067,11 @@ class Neck(Limb):
 
 
     def equip(self,item):
-        if item.wield=='necklace':
+        if item.wield=='necklace' and self.can_equip(item)[0]==True:
             if self.equipment['necklace'] is not None:
                 self.unequip('necklace')
             self.equipment['necklace']=item
-            item.equipped=self
+            item.equipped.append(self)
             if item.mass:
                 self.movemass+=item.mass
             self.owner.equipped_items.append(item)
@@ -1073,7 +1092,6 @@ class Neck(Limb):
         for i in self.limbs:
             if i.natural==True:
                 i.stats=self.stats
-
 
 class Abdomen(Limb):
     
@@ -1180,10 +1198,7 @@ class Abdomen(Limb):
                 i.updateability()
         super().recover(turns=turns)
 
-
 class Upper_Torso(Limb):
-    
-    
     def __init__(self,stats,name='chest',scale=1,length=0.5,radius=0.1,natural=True,owner=None,**kwargs):
         super().__init__(stats,**kwargs)
         self.sizefactor=20
@@ -1205,7 +1220,8 @@ class Upper_Torso(Limb):
 
         self.heart=Flesh(length=0.1,in_radius=0,out_radius=0.05,name='heart',quality=2,painfactor=5,threshold=0.5)
         self.lungs=Flesh(length=self.length,in_radius=0,out_radius=self.radius*0.74,name='lungs',plural=True,threshold=0.2)
-
+        self.ribs=Bone(length=self.length,radius=self.radius*0.9,in_radius=self.radius*0.74,name='ribs',plural=True,quality=0.9)
+        self.ribs.coverage=0.8
 
 
         self.owner.vitals.append(self.heart)
@@ -1217,7 +1233,7 @@ class Upper_Torso(Limb):
         self.attacktype=None
         self.attachpoint=None
         self.layers=[self.heart,self.lungs,
-                     Bone(length=self.length,radius=self.radius*0.9,in_radius=self.radius*0.74,name='ribs',plural=True,quality=0.9),
+                     self.ribs,
                      Flesh(length=self.length,in_radius=self.radius*0.9,out_radius=self.radius)]
         self.mass_calc()
         self.youngscalc()
@@ -1225,13 +1241,12 @@ class Upper_Torso(Limb):
         self.attacks=self.defaultattacks
         self.armortype='chest'
 
-
     def equip(self,item):
-        if item.wield=='chest':
+        if item.wield=='chest' and self.can_equip(item)[0]==True:
             if self.equipment['chest'] is not None:
                 self.unequip('chest')
             self.equipment['chest']=item
-            item.equipped=self
+            item.equipped.append(self)
             self.armor=self.equipment['chest']
             for i in self.limbs:
                 if isinstance(i,Abdomen):
@@ -1242,14 +1257,9 @@ class Upper_Torso(Limb):
 
         self.youngscalc()
 
-
-
-
     def on_wounds(self,*args):
         self.ability=1
         self.descriptor='This is a torso of {}.'.format(self.owner.indefinitename)
-
-
 
     def on_limbs(self,*args):
         pass
@@ -1281,10 +1291,7 @@ class Upper_Torso(Limb):
         self.youngscalc()
         super().damageresolve(attack,attacker,reactionforce=reactionforce)
 
-
 class Wing(Limb):
-
-
     def __init__(self,stats,name='wing',scale=1,length=0.06,radius=0.2,natural=True,owner=None,**kwargs):
         super().__init__(stats,**kwargs)
         self.length=length*scale
@@ -1319,8 +1326,6 @@ class Wing(Limb):
 
     def equip(self,item):
         self.youngscalc()
-
-
 
 
     def on_wounds(self,*args):
@@ -1373,3 +1378,326 @@ class Wing(Limb):
             self.balance=0
         else:
             self.support=True
+
+class Tentacle(Limb):
+    def __init__(self,stats,name='tentacle',scale=1,length=0.75,radius=0.06,natural=True,owner=None,**kwargs):
+        super().__init__(stats,**kwargs)
+        self.sizefactor=50
+        self.owner=owner
+        self.owner.limbs.append(self)
+        self.natural=natural
+        self.name=name
+        self.length=length*scale
+        self.grasp=True
+        self.support=True
+        self.ability=1
+        self.stats=stats
+        self.radius=(self.stats['s']/10000)**0.5+radius*scale
+        self.primaryequip=['grasp','bracelet']
+        self.equiptype=['grasp','bracelet']
+        self.equipment={'grasp':None,'bracelet':None}
+        self.armor=None
+
+        self.scars=[]
+        self.descriptor='This is a tentacle of {}.'.format(self.owner.indefinitename)
+        self.attacktype=None
+        self.attachpoint=None
+        self.layers=[Flesh(length=self.length,in_radius=0,out_radius=self.radius)]
+        self.mass_calc()
+        self.youngscalc()
+        self.balance_calc()
+        self.dex_calc()
+        self.defaultattacks=[Strike_1H(self)]
+        self.attacks=self.defaultattacks
+        self.armortype=None
+
+    def equip(self,item):
+        if self.grasp==True:
+            if item.wield=='grasp' and self.can_equip(item)[0]==True:
+                if self.equipment['grasp'] is not None:
+                    self.unequip('grasp')
+
+                self.equipment['grasp']=item
+                item.equipped.append(self)
+                if item.mass:
+                    self.movemass+=item.mass
+
+                self.attacks=[]
+                for i in item.attacks:
+                    self.attacks.append(i(item,self))
+                self.owner.equipped_items.append(item)
+
+        if item.wield=='bracelet' and self.can_equip(item)[0]==True:
+            if self.equipment['bracelet'] is not None:
+                self.unequip('bracelet')
+            self.equipment['bracelet']=item
+            item.equipped.append(self)
+            if item.mass:
+                self.movemass+=item.mass
+            self.owner.equipped_items.append(item)
+
+        self.youngscalc()
+
+    def on_limbs(self,*args):
+        pass
+
+    def on_stats(self,*args):
+        for i in self.limbs:
+            if i.natural==True:
+                i.stats=self.stats
+
+    def recover(self,turns=1,**kwargs):
+        if self.ability<=0:
+            for i in self.limbs:
+                i.inoperable=True
+                i.updateability()
+        else:
+            for i in self.limbs:
+                i.inoperable=False
+                i.updateability()
+        super().recover(turns=turns)
+
+    def balance_calc(self):
+        self.balance=self.ability
+        if self.balance<=0:
+            self.support=False
+        else:
+            self.support=True
+
+    def dex_calc(self):
+        self.dexterity=self.ability*4
+        if self.dexterity<=0:
+            self.grasp=False
+            if self.equipment['grasp'] is not None:
+                self.unequip('grasp',drop=True)
+        else:
+            self.grasp=True
+
+class Blob_Body(Limb):
+    def __init__(self,stats,name='body',scale=1,length=0.5,radius=0.5,natural=True,owner=None,material=Slime,**kwargs):
+        super().__init__(stats,**kwargs)
+        self.sizefactor=50
+        self.owner=owner
+        self.owner.limbs.append(self)
+        self.natural=natural
+        self.name=name
+        self.length=length*scale
+        self.grasp=False
+        self.support=False
+        self.ability=1
+        self.stats=stats
+        self.radius=radius*scale
+        self.primaryequip=[]
+        self.equiptype=[]
+        self.equipment={}
+        self.armor=None
+
+        self.scars=[]
+        self.descriptor='This is the body of {}.'.format(self.owner.indefinitename)
+        self.attacktype=None
+        self.attachpoint=None
+        self.layers=[Flesh(length=self.length,in_radius=0,out_radius=self.radius,material=material,name='body')]
+        self.mass_calc()
+        self.youngscalc()
+        self.defaultattacks=[]
+        self.attacks=self.defaultattacks
+        self.armortype=None
+
+    def equip(self,item):
+        self.youngscalc()
+
+    def on_limbs(self,*args):
+        pass
+
+    def on_stats(self,*args):
+        for i in self.limbs:
+            if i.natural==True:
+                i.stats=self.stats
+
+    def recalculate_from_mass(self,mass):
+        volume=mass/self.layers[0].density
+        r=(volume/3.14)**(1/3)
+        damage=self.layers[0].damage.copy()
+        self.layers=[Flesh(length=r,in_radius=0,out_radius=r,material=type(self.layers[0].material),name='body')]
+        self.layers[0].damage=damage
+        self.layers[0].functioncheck()
+
+class Pseudopod(Limb):
+    def __init__(self,stats,name='pseudopod',scale=1,length=0.1,radius=0.1,natural=True,owner=None,material=Slime,**kwargs):
+        super().__init__(stats,**kwargs)
+        self.sizefactor=10
+        self.owner=owner
+        self.owner.limbs.append(self)
+        self.natural=natural
+        self.name=name
+        self.length=length*scale
+        self.grasp=False
+        self.support=True
+        self.ability=1
+        self.stats=stats
+        self.radius=radius*scale
+        self.dexterity=0.5
+        self.primaryequip=[]
+        self.equiptype=[]
+        self.equipment={}
+        self.armor=None
+
+        self.scars=[]
+        self.descriptor='This is a pseudopod of {}.'.format(self.owner.indefinitename)
+        self.attacktype=None
+        self.attachpoint=None
+        self.layers=[Flesh(length=self.length,in_radius=0,out_radius=self.radius,material=material)]
+        self.mass_calc()
+        self.youngscalc()
+        self.balance_calc()
+        self.defaultattacks=[Touch(self)]
+        self.attacks=self.defaultattacks
+        self.armortype=None
+
+    def equip(self,item):
+
+        self.youngscalc()
+
+    def on_limbs(self,*args):
+        pass
+
+    def on_stats(self,*args):
+        for i in self.limbs:
+            if i.natural==True:
+                i.stats=self.stats
+
+    def balance_calc(self):
+        self.balance=self.ability/2
+        if self.balance<=0:
+            self.support=False
+        else:
+            self.support=True
+
+    def dex_calc(self):
+        self.dexterity=0.5*self.ability
+
+    def recalculate_from_mass(self,mass):
+        volume=mass/self.layers[0].density
+        r=(volume/3.14)**(1/3)
+        damage=self.layers[0].damage.copy()
+        self.layers=[Flesh(length=r,in_radius=0,out_radius=r,material=type(self.layers[0].material))]
+        self.layers[0].damage=damage
+        self.layers[0].functioncheck()
+
+class Snout(Limb):
+    def __init__(self,stats,name='snout',scale=1,length=0.15,radius=0.03,natural=True,owner=None,**kwargs):
+        super().__init__(stats,**kwargs)
+        self.radius=radius*scale
+        self.length=length*scale
+        self.owner=owner
+        self.owner.limbs.append(self)
+        self.sizefactor=5
+        self.natural=natural
+        self.name=name
+        self.smell=True
+        self.smell_sense=1
+        self.smell_acuity=100
+        self.ability=1
+        self.stats=stats
+        self.equiptype=['helmet']
+        self.equipment={'helmet':None}
+        self.armor=self.equipment['helmet']
+        self.armortype='helmet'
+        self.scars=[]
+        self.descriptor='This is a snout of {}.'.format(self.owner.indefinitename)
+        self.attacktype=None
+        self.attachpoint=None
+        self.layers=[Bone(length=self.length,in_radius=0.1*self.radius,out_radius=0.8*self.radius),
+                     Flesh(length=self.length,in_radius=0.8*self.radius,out_radius=0.9*self.radius),
+                     Hair(length=self.length,in_radius=0.9*self.radius,out_radius=self.radius,material=Fur,name='fur')]
+        self.mass_calc()
+        self.youngscalc()
+        self.defaultattacks=[]
+        self.attacks=self.defaultattacks
+
+    def equip(self,item):
+        if item.wield=='helmet':
+            self.equipment['helmet']=item
+            self.armor=self.equipment['helmet']
+
+        self.youngscalc()
+
+    def on_wounds(self,*args):
+        self.ability=1
+        self.ability=max(self.ability,0)
+
+    def on_limbs(self,*args):
+        pass
+
+    def on_stats(self,*args):
+        pass
+
+class Balancing_Tail(Limb):
+    def __init__(self,stats,name='tail',scale=1,length=0.25,radius=0.01,natural=True,owner=None,**kwargs):
+        super().__init__(stats,**kwargs)
+        self.sizefactor=3
+        self.owner=owner
+        self.owner.limbs.append(self)
+        self.natural=natural
+        self.name=name
+        self.length=length*scale
+        self.grasp=False
+        self.support=False
+        self.ability=1
+        self.stats=stats
+        self.radius=radius*scale
+        self.primaryequip=[]
+        self.equiptype=[]
+        self.equipment={}
+        self.armor=None
+
+        self.scars=[]
+        self.descriptor='This is a tail of {}.'.format(self.owner.indefinitename)
+        self.attacktype=None
+        self.attachpoint=None
+        self.layers=[Bone(length=self.length,in_radius=0,out_radius=0.8*self.radius,quality=0.3),Flesh(length=self.length,in_radius=0.8*self.radius,out_radius=self.radius)]
+        self.mass_calc()
+        self.youngscalc()
+        self.balance_calc()
+        self.defaultattacks=[]
+        self.attacks=self.defaultattacks
+        self.armortype=None
+
+    def equip(self,item):
+        if self.grasp==True:
+            if item.wield=='grasp' and self.can_equip(item)[0]==True:
+                if self.equipment['grasp'] is not None:
+                    self.unequip('grasp')
+
+                self.equipment['grasp']=item
+                item.equipped.append(self)
+                if item.mass:
+                    self.movemass+=item.mass
+
+                self.attacks=[]
+                for i in item.attacks:
+                    self.attacks.append(i(item,self))
+                self.owner.equipped_items.append(item)
+
+        if item.wield=='bracelet' and self.can_equip(item)[0]==True:
+            if self.equipment['bracelet'] is not None:
+                self.unequip('bracelet')
+            self.equipment['bracelet']=item
+            item.equipped.append(self)
+            if item.mass:
+                self.movemass+=item.mass
+            self.owner.equipped_items.append(item)
+
+        self.youngscalc()
+
+    def on_limbs(self,*args):
+        pass
+
+    def on_stats(self,*args):
+        for i in self.limbs:
+            if i.natural==True:
+                i.stats=self.stats
+
+    def balance_calc(self):
+        self.balance=self.ability
+

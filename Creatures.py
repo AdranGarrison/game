@@ -9,6 +9,7 @@ from Materials import *
 from Limbs import *
 import Shell as S
 import NameGen
+import Fluids
 
 
 import random
@@ -63,7 +64,7 @@ def humanoid_assembler(creature,stats,name,scale=1):
     creature.abdomen.attachpoint=creature.torso
 
     #Left arm and associates
-    creature.leftarm=Arm(stats,'left',owner=creature,scale=scale)
+    creature.leftarm=Arm(stats,'left ',owner=creature,scale=scale)
     creature.torso.limbs.append(creature.leftarm)
     creature.leftarm.attachpoint=creature.torso
 
@@ -92,7 +93,7 @@ def humanoid_assembler(creature,stats,name,scale=1):
     creature.lefthand.limbs.append(creature.leftlittle)
 
     #Right arm, inc.
-    creature.rightarm=Arm(stats,'right',owner=creature,scale=scale)
+    creature.rightarm=Arm(stats,'right ',owner=creature,scale=scale)
     creature.torso.limbs.append(creature.rightarm)
     creature.rightarm.attachpoint=creature.torso
 
@@ -121,7 +122,7 @@ def humanoid_assembler(creature,stats,name,scale=1):
     creature.righthand.limbs.append(creature.rightlittle)
 
     #Left leg and friends
-    creature.leftleg=Leg(stats,'left',owner=creature,scale=scale)
+    creature.leftleg=Leg(stats,'left ',owner=creature,scale=scale)
     creature.abdomen.limbs.append(creature.leftleg)
     creature.leftleg.attachpoint=creature.abdomen
 
@@ -150,7 +151,7 @@ def humanoid_assembler(creature,stats,name,scale=1):
     creature.leftlittletoe.attachpoint=creature.leftfoot
     
     #The law offices of right leg
-    creature.rightleg=Leg(stats,'right',owner=creature,scale=scale)
+    creature.rightleg=Leg(stats,'right ',owner=creature,scale=scale)
     creature.abdomen.limbs.append(creature.rightleg)
     creature.rightleg.attachpoint=creature.abdomen
 
@@ -191,19 +192,19 @@ def humanoid_assembler(creature,stats,name,scale=1):
     creature.head.limbs.append(creature.nose)
     creature.nose.attachpoint=creature.head
     
-    creature.righteye=Eye(stats,'right',owner=creature,scale=scale)
+    creature.righteye=Eye(stats,'right ',owner=creature,scale=scale)
     creature.head.limbs.append(creature.righteye)
     creature.righteye.attachpoint=creature.head
     
-    creature.lefteye=Eye(stats,'left',owner=creature,scale=scale)
+    creature.lefteye=Eye(stats,'left ',owner=creature,scale=scale)
     creature.head.limbs.append(creature.lefteye)
     creature.lefteye.attachpoint=creature.head
     
-    creature.rightear=Ear(stats,'right',owner=creature,scale=scale)
+    creature.rightear=Ear(stats,'right ',owner=creature,scale=scale)
     creature.head.limbs.append(creature.rightear)
     creature.rightear.attachpoint=creature.head
     
-    creature.leftear=Ear(stats,'left',owner=creature,scale=scale)
+    creature.leftear=Ear(stats,'left ',owner=creature,scale=scale)
     creature.head.limbs.append(creature.leftear)
     creature.leftear.attachpoint=creature.head
 
@@ -227,6 +228,7 @@ def humanoid_assembler(creature,stats,name,scale=1):
 class Human(Creature):
     def __init__(self,color=(1,1,1,1),name='the human',job='',named=False,hostile=True,player=False,stats='random'):
         super().__init__()
+        self.basicname='human'
         if stats=='random':
             self.stats= {'s': int(random.triangular(low=5, high=25, mode=15)),
                          't': int(random.triangular(low=5, high=25, mode=15)),
@@ -262,6 +264,11 @@ class Human(Creature):
         self.mass_calc()
         self.updateattacks()
 
+        for i in self.limbs:
+            for j in i.layers:
+                if isinstance(j.material,Flesh_Material):
+                    j.fluid=Fluids.Blood(self)
+
         self.classification.append('humanoid')
         self.classification.append('intelligent')
         self.classification.append('living')
@@ -271,10 +278,460 @@ class Human(Creature):
         if hostile==True:
             self.hostile.append('player')
 
+class Giant(Creature):
+    def __init__(self,color=(1,1,1,1),name='the giant',job='',named=False,hostile=True,player=False,stats='random'):
+        super().__init__()
+        self.basicname='giant'
+        if stats=='random':
+            self.stats= {'s': int(random.triangular(low=45, high=200, mode=125)),
+                         't': int(random.triangular(low=3, high=18, mode=10)),
+                         'p': int(random.triangular(low=3, high=17, mode=9)),
+                         'w': int(random.triangular(low=5, high=25, mode=15)),
+                         'l': int(random.triangular(low=5, high=25, mode=15))}
+        else:
+            self.stats=stats
+        self.stats['str']=self.stats['s']
+        self.stats['tec']=self.stats['t']
+        self.stats['per']=self.stats['p']
+        self.stats['wil']=self.stats['w']
+        self.stats['luc']=self.stats['l']
+        self.level=1
+        self.exp=[0,100]
+        self.focus=[int(20*(self.stats['p']**0.7+self.level**0.3)),int(20*(self.stats['p']**0.7+self.level**0.3))]
+        self.stamina=[int(10*(2*self.stats['s']**2+self.level**2)**0.5),int(10*(2*self.stats['s']**2+self.level**2)**0.5)]
+        self.maxstamina=int(10*(2*self.stats['s']**2+self.level**2)**0.5)
+        self.image='C:/Project/Untitled.jpg'
+        self.location=[None,None]
+        self.passable=False
+        self.color=color
+        self.name=name+job
+        self.indefinitename=name.replace('the ', 'a ',1)
+        self.targetable=True
+        self.player=player
+        self.limbs=[]
+        self.vitals=[]
+        self.attacks=[]
+        #self.body=Torso(self.stats,'torso',owner=self)
+        humanoid_assembler(self,self.stats,self.name,scale=3)
+        self.mass_calc()
+        self.updateattacks()
+
+        for i in self.limbs:
+            for j in i.layers:
+                if isinstance(j.material,Flesh_Material):
+                    j.fluid=Fluids.Blood(self)
+
+        self.classification.append('humanoid')
+        self.classification.append('intelligent')
+        self.classification.append('living')
+        self.classification.append('giant')
+        if self.player==True:
+            self.classification.append('player')
+        if hostile==True:
+            self.hostile.append('player')
+
+class Goblin(Creature):
+    def __init__(self,color=(1,1,1,1),name='the goblin',job='',named=False,hostile=True,player=False,stats='random'):
+        super().__init__()
+        self.basicname='goblin'
+        if stats=='random':
+            self.stats= {'s': int(random.triangular(low=7, high=20, mode=10)),
+                         't': int(random.triangular(low=3, high=12, mode=9)),
+                         'p': int(random.triangular(low=5, high=22, mode=14)),
+                         'w': int(random.triangular(low=5, high=25, mode=15)),
+                         'l': int(random.triangular(low=3, high=15, mode=10))}
+        else:
+            self.stats=stats
+        self.stats['str']=self.stats['s']
+        self.stats['tec']=self.stats['t']
+        self.stats['per']=self.stats['p']
+        self.stats['wil']=self.stats['w']
+        self.stats['luc']=self.stats['l']
+        self.level=1
+        self.exp=[0,100]
+        self.focus=[int(20*(self.stats['p']**0.7+self.level**0.3)),int(20*(self.stats['p']**0.7+self.level**0.3))]
+        self.stamina=[int(10*(2*self.stats['s']**2+self.level**2)**0.5),int(10*(2*self.stats['s']**2+self.level**2)**0.5)]
+        self.maxstamina=int(10*(2*self.stats['s']**2+self.level**2)**0.5)
+        self.image='C:/Project/Untitled.jpg'
+        self.location=[None,None]
+        self.passable=False
+        self.color=color
+        self.name=name+job
+        self.indefinitename=name.replace('the ', 'a ',1)
+        self.targetable=True
+        self.player=player
+        self.limbs=[]
+        self.vitals=[]
+        self.attacks=[]
+        #self.body=Torso(self.stats,'torso',owner=self)
+        humanoid_assembler(self,self.stats,self.name,scale=0.7)
+        self.mass_calc()
+        self.updateattacks()
+
+        for i in self.limbs:
+            for j in i.layers:
+                if isinstance(j.material,Flesh_Material):
+                    j.fluid=Fluids.Blood(self)
+
+        self.classification.append('humanoid')
+        self.classification.append('intelligent')
+        self.classification.append('living')
+        self.classification.append('gobline')
+        self.classification.append('evil')
+        self.classification.append('chaos')
+
+        self.hostile.append('human')
+        if self.player==True:
+            self.classification.append('player')
+        if hostile==True:
+            self.hostile.append('player')
+
+class Halfling(Creature):
+    def __init__(self,color=(1,1,1,1),name='the halfling',job='',named=False,hostile=True,player=False,stats='random'):
+        super().__init__()
+        self.basicname='halfling'
+        if stats=='random':
+            self.stats= {'s': int(random.triangular(low=7, high=16, mode=11)),
+                         't': int(random.triangular(low=10, high=35, mode=17)),
+                         'p': int(random.triangular(low=9, high=32, mode=16)),
+                         'w': int(random.triangular(low=5, high=20, mode=12)),
+                         'l': int(random.triangular(low=10, high=40, mode=17))}
+        else:
+            self.stats=stats
+        self.stats['str']=self.stats['s']
+        self.stats['tec']=self.stats['t']
+        self.stats['per']=self.stats['p']
+        self.stats['wil']=self.stats['w']
+        self.stats['luc']=self.stats['l']
+        self.level=1
+        self.exp=[0,100]
+        self.focus=[int(20*(self.stats['p']**0.7+self.level**0.3)),int(20*(self.stats['p']**0.7+self.level**0.3))]
+        self.stamina=[int(10*(2*self.stats['s']**2+self.level**2)**0.5),int(10*(2*self.stats['s']**2+self.level**2)**0.5)]
+        self.maxstamina=int(10*(2*self.stats['s']**2+self.level**2)**0.5)
+        self.image='C:/Project/Untitled.jpg'
+        self.location=[None,None]
+        self.passable=False
+        self.color=color
+        self.name=name+job
+        self.indefinitename=name.replace('the ', 'a ',1)
+        self.targetable=True
+        self.player=player
+        self.limbs=[]
+        self.vitals=[]
+        self.attacks=[]
+        self.disabled_attack_types=[Bite]
+        #self.body=Torso(self.stats,'torso',owner=self)
+        humanoid_assembler(self,self.stats,self.name,scale=0.6)
+        self.mass_calc()
+        self.updateattacks()
+
+        for i in self.limbs:
+            for j in i.layers:
+                if isinstance(j.material,Flesh_Material):
+                    j.fluid=Fluids.Blood(self)
+
+        self.classification.append('humanoid')
+        self.classification.append('intelligent')
+        self.classification.append('living')
+        self.classification.append('hobbit')
+        if self.player==True:
+            self.classification.append('player')
+        if hostile==True:
+            self.hostile.append('player')
+
+class Fairy(Creature):
+    def __init__(self,color=(1,1,1,1),name='the human',job='',named=False,hostile=True,player=False,stats='random'):
+        super().__init__()
+        self.basicname='fairy'
+        if stats=='random':
+            self.stats= {'s': int(random.triangular(low=1, high=4, mode=2)),
+                         't': int(random.triangular(low=5, high=20, mode=12)),
+                         'p': int(random.triangular(low=9, high=40, mode=20)),
+                         'w': int(random.triangular(low=7, high=32, mode=18)),
+                         'l': int(random.triangular(low=10, high=45, mode=21))}
+        else:
+            self.stats=stats
+        self.stats['str']=self.stats['s']
+        self.stats['tec']=self.stats['t']
+        self.stats['per']=self.stats['p']
+        self.stats['wil']=self.stats['w']
+        self.stats['luc']=self.stats['l']
+        self.level=1
+        self.exp=[0,100]
+        self.focus=[int(20*(self.stats['p']**0.7+self.level**0.3)),int(20*(self.stats['p']**0.7+self.level**0.3))]
+        self.stamina=[int(10*(2*self.stats['s']**2+self.level**2)**0.5),int(10*(2*self.stats['s']**2+self.level**2)**0.5)]
+        self.maxstamina=int(10*(2*self.stats['s']**2+self.level**2)**0.5)
+        self.image='C:/Project/Untitled.jpg'
+        self.location=[None,None]
+        self.passable=False
+        self.color=color
+        self.name=name+job
+        self.indefinitename=name.replace('the ', 'a ',1)
+        self.targetable=True
+        self.player=player
+        self.limbs=[]
+        self.vitals=[]
+        self.attacks=[]
+        self.disabled_attack_types=[Bite]
+        #self.body=Torso(self.stats,'torso',owner=self)
+        humanoid_assembler(self,self.stats,self.name,scale=0.15)
+
+        self.leftwing=Wing(self.stats,'left wing',owner=self,scale=0.1)
+        self.torso.limbs.append(self.leftwing)
+        self.leftwing.attachpoint=self.torso
+
+        self.rightwing=Wing(self.stats,'right wing',owner=self,scale=0.1)
+        self.torso.limbs.append(self.rightwing)
+        self.rightwing.attachpoint=self.torso
+
+        self.mass_calc()
+        print(self.mass,self.movemass)
+        self.updateattacks()
+
+        for i in self.limbs:
+            for j in i.layers:
+                if isinstance(j.material,Flesh_Material):
+                    j.fluid=Fluids.Blood(self)
+
+        self.classification.append('humanoid')
+        self.classification.append('intelligent')
+        self.classification.append('living')
+        self.classification.append('fairy')
+        if self.player==True:
+            self.classification.append('player')
+        if hostile==True:
+            self.hostile.append('player')
+
+
+class Wolf(Creature):
+    def __init__(self,color=(1,1,1,1),name='the wolf',job='',named=False,hostile=True,player=False,stats='random'):
+        super().__init__()
+        self.basicname='wolf'
+        if stats=='random':
+            self.stats= {'s': int(random.triangular(low=5, high=15, mode=10)),
+                         't': int(random.triangular(low=5, high=8, mode=7)),
+                         'p': int(random.triangular(low=15, high=25, mode=15)),
+                         'w': int(random.triangular(low=10, high=15, mode=12)),
+                         'l': int(random.triangular(low=5, high=25, mode=15))}
+        else:
+            self.stats=stats
+        self.stats['str']=self.stats['s']
+        self.stats['tec']=self.stats['t']
+        self.stats['per']=self.stats['p']
+        self.stats['wil']=self.stats['w']
+        self.stats['luc']=self.stats['l']
+        self.level=1
+        self.exp=[0,100]
+        self.focus=[int(20*(self.stats['p']**0.7+self.level**0.3)),int(20*(self.stats['p']**0.7+self.level**0.3))]
+        self.stamina=[int(10*(2*self.stats['s']**2+self.level**2)**0.5),int(10*(2*self.stats['s']**2+self.level**2)**0.5)]
+        self.maxstamina=int(10*(2*self.stats['s']**2+self.level**2)**0.5)
+        self.image='C:/Project/Untitled.jpg'
+        self.location=[None,None]
+        self.passable=False
+        self.color=color
+        self.name=name+job
+        self.indefinitename=name.replace('the ', 'a ',1)
+        self.targetable=True
+        self.player=player
+        self.limbs=[]
+        self.vitals=[]
+        self.attacks=[]
+        self.disabled_attack_types=[Kick]
+
+        #Creating the body of the wolf.
+
+        self.body=Upper_Torso(self.stats,name='body',length=0.3,radius=0.07,owner=self)               #main body
+        self.body.add_outer_layer(Hair,Fur,0.05,name='fur')
+
+        #all the legs
+        self.front_right_leg=Leg(self.stats,name='front right ',length=0.3,boneradius=0.008,owner=self)
+        self.front_left_leg=Leg(self.stats,name='front left ',length=0.3,boneradius=0.008,owner=self)
+        self.hind_right_leg=Leg(self.stats,name='right hind ',length=0.3,boneradius=0.008,owner=self)
+        self.hind_left_leg=Leg(self.stats,name='left hind ',length=0.3,boneradius=0.008,owner=self)
+        self.flank=Abdomen(self.stats,name='flank',length=0.2,radius=0.06,owner=self)
+        self.flank.add_outer_layer(Hair,Fur,0.04,name='fur')
+        self.hind_right_leg.add_outer_layer(Hair,Fur,0.03,name='fur')
+        self.hind_left_leg.add_outer_layer(Hair,Fur,0.03,name='fur')
+        self.hind_left_leg.join_to(self.flank)
+        self.hind_right_leg.join_to(self.flank)
+        self.flank.join_to(self.body)
+        for i in (self.front_left_leg,self.front_right_leg):
+            i.add_outer_layer(Hair,Fur,0.03,name='fur')
+            i.attachpoint=self.body
+            self.body.limbs.append(i)
+        self.neck=Neck(self.stats,owner=self)                                       #neck
+        self.neck.add_outer_layer(Hair,Fur,0.05,name='fur')
+        self.neck.attachpoint=self.body
+        self.body.limbs.append(self.neck)
+        self.head=Head(self.stats,length=0.1,radius=0.04,owner=self)                #head
+        self.head.add_outer_layer(Hair,Fur,0.03,name='fur')
+        self.head.join_to(self.neck)
+        self.muzzle=Snout(self.stats,name='muzzle',length=0.15,radius=0.04,owner=self)
+        self.lefteye=Eye(self.stats,name='left ',owner=self)
+        self.righteye=Eye(self.stats,name='right ',owner=self)
+        self.leftear=Ear(self.stats,name='left ',radius=0.03,owner=self)
+        self.leftear.add_outer_layer(Hair,Fur,0.005,name='fur')
+        self.rightear=Ear(self.stats,name='right ',radius=0.03,owner=self)
+        self.rightear.add_outer_layer(Hair,Fur,0.005,name='fur')
+        self.jaw=Jaw(self.stats,length=0.3,radius=0.015,owner=self)
+        self.jaw.add_outer_layer(Hair,Fur,0.01,name='fur')
+        self.jaw.stats['s']*=2
+        self.jaw.stats['str']*=2
+        for i in (self.muzzle,self.lefteye,self.righteye,self.leftear,self.rightear,self.jaw):
+            i.join_to(self.head)
+        self.upper_teeth=Teeth(self.stats,name='upper teeth',length=0.18,radius=0.01,owner=self)
+        self.upper_teeth.join_to(self.muzzle)
+        self.lower_teeth=Teeth(self.stats,name='lower teeth',length=0.18,radius=0.01,owner=self,biting_surface=0.00005)
+        self.lower_teeth.join_to(self.jaw)
+        self.front_right_paw=Foot(self.stats,name='front right paw',length=0.05,radius=0.02,owner=self)
+        self.front_left_paw=Foot(self.stats,name='front left paw',length=0.05,radius=0.02,owner=self)
+        self.hind_right_paw=Foot(self.stats,name='hind right paw',length=0.05,radius=0.02,owner=self)
+        self.hind_left_paw=Foot(self.stats,name='hind left paw',length=0.05,radius=0.02,owner=self)
+        for i in (self.front_right_paw,self.front_left_paw,self.hind_right_paw,self.hind_left_paw):
+            i.add_outer_layer(Hair,Fur,0.01,name='fur')
+            for j in ('first','second','third','fourth'):
+                newclaw=Claw(self.stats,name='{} claw, {}'.format(j,i.name),length=0.01,radius=0.001,owner=self)
+                newclaw.join_to(i)
+        self.front_right_paw.join_to(self.front_right_leg)
+        self.front_left_paw.join_to(self.front_left_leg)
+        self.hind_left_paw.join_to(self.hind_left_leg)
+        self.hind_right_paw.join_to(self.hind_right_leg)
+        self.tail=Balancing_Tail(self.stats,length=0.3,radius=0.02,owner=self)
+        self.tail.add_outer_layer(Hair,Fur,0.06,name='fur')
+        self.tail.join_to(self.flank)
+
+
+
+
+        self.mass_calc()
+        self.updateattacks()
+
+        for i in self.limbs:
+            for j in i.layers:
+                if isinstance(j.material,Flesh_Material):
+                    j.fluid=Fluids.Blood(self)
+
+
+        self.classification.append('beast')
+        self.classification.append('living')
+        self.classification.append('wolf')
+        if self.player==True:
+            self.classification.append('player')
+        if hostile==True:
+            self.hostile.append('player')
+
+
+class Blob(Creature):
+    def __init__(self,color=(1,1,1,1),name='the blob',job='',named=False,hostile=True,player=False,stats='random',mass=500,material=Slime):
+        super().__init__()
+        self.basicname='blob'
+        if stats=='random':
+            self.stats= {'s': int(random.triangular(low=5, high=20, mode=10)),
+                         't': int(random.triangular(low=1, high=10, mode=5)),
+                         'p': int(random.triangular(low=1, high=5, mode=3)),
+                         'w': int(random.triangular(low=1, high=1, mode=1)),
+                         'l': int(random.triangular(low=5, high=25, mode=15))}
+        else:
+            self.stats=stats
+        self.stats['str']=self.stats['s']
+        self.stats['tec']=self.stats['t']
+        self.stats['per']=self.stats['p']
+        self.stats['wil']=self.stats['w']
+        self.stats['luc']=self.stats['l']
+        self.level=1
+        self.exp=[0,100]
+        self.focus=[int(20*(self.stats['p']**0.7+self.level**0.3)),int(20*(self.stats['p']**0.7+self.level**0.3))]
+        self.stamina=[int(10*(2*self.stats['s']**2+self.level**2)**0.5),int(10*(2*self.stats['s']**2+self.level**2)**0.5)]
+        self.maxstamina=int(10*(2*self.stats['s']**2+self.level**2)**0.5)
+        self.image='C:/Project/Untitled.jpg'
+        self.location=[None,None]
+        self.passable=False
+        self.color=color
+        self.name=name+job
+        self.indefinitename=name.replace('the ', 'an ',1)
+        self.targetable=True
+        self.feels_pain=False
+        self.player=player
+        self.material=material
+        self.limbs=[]
+        self.body=Blob_Body(self.stats,owner=self,material=material)
+        self.body.recalculate_from_mass(mass)
+        self.vitals=[self.body.layers[0]]
+        self.attacks=[]
+
+        self.classification.append('magic')
+        self.classification.append('mindless')
+        self.classification.append('blob')
+        if hostile==True:
+            self.hostile.append('player')
+
+        #Variables specific to shifting creatures
+        self.rounding_loss=0
+        self.basemass=mass
+        self.mass=mass
+        self.reform()
+
+
+        self.movemass=self.mass
+        self.updateattacks()
+
+    def reform(self):
+        equipped_copy=self.equipped_items.copy()
+        available_mass=self.mass+self.rounding_loss
+        for i in equipped_copy:
+            self.unequip(i,log=False)
+        pseudopodmass=available_mass*0.5*random.random()
+        self.limbs=[self.body]
+        self.vitals=[self.body.layers[0]]
+        self.body.recalculate_from_mass(available_mass-pseudopodmass)
+        current_mass=0
+        self.targetsize=self.body.length
+
+        while current_mass<pseudopodmass:
+            newpod=Pseudopod(self.stats,owner=self,material=self.material)
+            podmass=0.3*random.random()*pseudopodmass
+            newpod.recalculate_from_mass(podmass)
+            self.targetsize+=newpod.length
+            newpod.attachpoint=self.body
+            self.body.limbs.append(newpod)
+            current_mass+=podmass
+        self.limbs.pop()
+        self.mass_calc()
+        self.rounding_loss=available_mass-self.mass
+
+        for i in self.inventory:
+            self.equip(i,log=False)
+
+        self.fluidize()
+
+    def fluidize(self):
+        for i in self.limbs:
+            for j in i.layers:
+                j.fluid=Fluids.Slime_Fluid(self)
+                j.fluid.add(j)
+
+    def on_turn(self):
+        if self.alive:
+            self.stamina[0]=self.stamina[1]
+            for i in self.limbs:
+                i.updateability
+            super().on_turn()
+            self.reform()
+
+class Acid_Blob(Blob):
+    def __init__(self,color=(1,1,1,1),name='the acid blob',job='',named=False,hostile=True,player=False,stats='random',mass=500,material=Slime):
+        super().__init__(color=color,name=name,job=job,named=named,hostile=hostile,player=player,stats=stats,mass=mass,material=material)
+
+    def fluidize(self):
+        for i in self.limbs:
+            for j in i.layers:
+                j.fluid=Fluids.Acid(self,strength=5+random.uniform(0,3))
+                j.fluid.add(j)
 
 class Amorphous_Horror(Creature):
     def __init__(self,color=(1,1,1,1),name='the amorphous horror',job='',named=False,hostile=True,player=False,stats='random',mass=500,decay=True):
         super().__init__()
+        self.basicname='amorphous horror'
         if stats=='random':
             self.stats= {'s': int(random.triangular(low=5, high=25, mode=15)),
                          't': int(random.triangular(low=5, high=25, mode=15)),
@@ -323,7 +780,7 @@ class Amorphous_Horror(Creature):
 
         self.movemass=self.mass
         self.updateattacks()
-        
+
     def reform(self):
         equipped_copy=self.equipped_items.copy()
         if self.decay==True:
@@ -336,7 +793,7 @@ class Amorphous_Horror(Creature):
         current_mass=0
         self.targetsize=0
         self.limbs=[]
-        possible_limbs=[Arm,Leg,Finger,Head,Upper_Torso,Neck,Toe,Eye,Nose,Ear,Jaw,Teeth,Hand,Abdomen,Foot,Wing]
+        possible_limbs=[Arm,Leg,Finger,Head,Upper_Torso,Neck,Toe,Eye,Nose,Ear,Jaw,Teeth,Hand,Abdomen,Foot,Wing,Tentacle]
         while current_mass<=available_mass:
             limbstats= {'s': int(random.triangular(low=5, high=25, mode=15)),
                          't': int(random.triangular(low=5, high=25, mode=15)),
@@ -360,6 +817,8 @@ class Amorphous_Horror(Creature):
                 newlimb.attachpoint=joint_location
                 joint_location.limbs.append(newlimb)
         self.limbs.pop()
+        self.mass_calc()
+        self.rounding_loss=available_mass-self.mass
         '''while current_mass>=available_mass:
             if self.limbs==[]:
                 return
@@ -378,6 +837,10 @@ class Amorphous_Horror(Creature):
             joint_location.limbs.append(i)'''
         for i in self.inventory:
             self.equip(i,log=False)
+        for i in self.limbs:
+            for j in i.layers:
+                if isinstance(j.material,Flesh_Material):
+                    j.fluid=random.choice([Fluids.Blood,Fluids.Water,Fluids.Acid])(self,strength=random.gauss(5,1))
 
     def on_turn(self):
         if self.alive:
@@ -389,13 +852,15 @@ class Amorphous_Horror(Creature):
         S.shell.dungeonmanager.current_screen.cells[self.location[0]][self.location[1]].contents.remove(self)
 
 
-class Giant(Creature):
-    def __init__(self,color=(1,1,1,1),name='the giant',job='',named=False,hostile=True,player=False,stats='random'):
+#Acidic horror is not yet implemented
+class Acidic_Horror(Creature):
+    def __init__(self,color=(1,1,1,1),name='the acidic horror',job='',named=False,hostile=True,player=False,stats='random'):
         super().__init__()
+        self.basicname='acidic horror'
         if stats=='random':
-            self.stats= {'s': int(random.triangular(low=45, high=200, mode=125)),
-                         't': int(random.triangular(low=3, high=18, mode=10)),
-                         'p': int(random.triangular(low=3, high=17, mode=9)),
+            self.stats= {'s': int(random.triangular(low=5, high=25, mode=15)),
+                         't': int(random.triangular(low=5, high=25, mode=15)),
+                         'p': int(random.triangular(low=5, high=25, mode=15)),
                          'w': int(random.triangular(low=5, high=25, mode=15)),
                          'l': int(random.triangular(low=5, high=25, mode=15))}
         else:
@@ -421,177 +886,23 @@ class Giant(Creature):
         self.limbs=[]
         self.vitals=[]
         self.attacks=[]
-        #self.body=Torso(self.stats,'torso',owner=self)
-        humanoid_assembler(self,self.stats,self.name,scale=3)
+        self.disabled_attack_types=[]
         self.mass_calc()
         self.updateattacks()
+
+        for i in self.limbs:
+            for j in i.layers:
+                if isinstance(j.material,Flesh_Material):
+                    j.fluid=Fluids.Acid(self)
 
         self.classification.append('humanoid')
         self.classification.append('intelligent')
         self.classification.append('living')
-        self.classification.append('giant')
+        self.classification.append('human')
         if self.player==True:
             self.classification.append('player')
         if hostile==True:
             self.hostile.append('player')
-
-
-class Goblin(Creature):
-    def __init__(self,color=(1,1,1,1),name='the goblin',job='',named=False,hostile=True,player=False,stats='random'):
-        super().__init__()
-        if stats=='random':
-            self.stats= {'s': int(random.triangular(low=7, high=20, mode=10)),
-                         't': int(random.triangular(low=3, high=12, mode=9)),
-                         'p': int(random.triangular(low=5, high=22, mode=14)),
-                         'w': int(random.triangular(low=5, high=25, mode=15)),
-                         'l': int(random.triangular(low=3, high=15, mode=10))}
-        else:
-            self.stats=stats
-        self.stats['str']=self.stats['s']
-        self.stats['tec']=self.stats['t']
-        self.stats['per']=self.stats['p']
-        self.stats['wil']=self.stats['w']
-        self.stats['luc']=self.stats['l']
-        self.level=1
-        self.exp=[0,100]
-        self.focus=[int(20*(self.stats['p']**0.7+self.level**0.3)),int(20*(self.stats['p']**0.7+self.level**0.3))]
-        self.stamina=[int(10*(2*self.stats['s']**2+self.level**2)**0.5),int(10*(2*self.stats['s']**2+self.level**2)**0.5)]
-        self.maxstamina=int(10*(2*self.stats['s']**2+self.level**2)**0.5)
-        self.image='C:/Project/Untitled.jpg'
-        self.location=[None,None]
-        self.passable=False
-        self.color=color
-        self.name=name+job
-        self.indefinitename=name.replace('the ', 'a ',1)
-        self.targetable=True
-        self.player=player
-        self.limbs=[]
-        self.vitals=[]
-        self.attacks=[]
-        #self.body=Torso(self.stats,'torso',owner=self)
-        humanoid_assembler(self,self.stats,self.name,scale=0.7)
-        self.mass_calc()
-        self.updateattacks()
-
-        self.classification.append('humanoid')
-        self.classification.append('intelligent')
-        self.classification.append('living')
-        self.classification.append('gobline')
-        self.classification.append('evil')
-        self.classification.append('chaos')
-
-        self.hostile.append('human')
-        if self.player==True:
-            self.classification.append('player')
-        if hostile==True:
-            self.hostile.append('player')
-
-
-class Halfling(Creature):
-    def __init__(self,color=(1,1,1,1),name='the halfling',job='',named=False,hostile=True,player=False,stats='random'):
-        super().__init__()
-        if stats=='random':
-            self.stats= {'s': int(random.triangular(low=7, high=16, mode=11)),
-                         't': int(random.triangular(low=10, high=35, mode=17)),
-                         'p': int(random.triangular(low=9, high=32, mode=16)),
-                         'w': int(random.triangular(low=5, high=20, mode=12)),
-                         'l': int(random.triangular(low=10, high=40, mode=17))}
-        else:
-            self.stats=stats
-        self.stats['str']=self.stats['s']
-        self.stats['tec']=self.stats['t']
-        self.stats['per']=self.stats['p']
-        self.stats['wil']=self.stats['w']
-        self.stats['luc']=self.stats['l']
-        self.level=1
-        self.exp=[0,100]
-        self.focus=[int(20*(self.stats['p']**0.7+self.level**0.3)),int(20*(self.stats['p']**0.7+self.level**0.3))]
-        self.stamina=[int(10*(2*self.stats['s']**2+self.level**2)**0.5),int(10*(2*self.stats['s']**2+self.level**2)**0.5)]
-        self.maxstamina=int(10*(2*self.stats['s']**2+self.level**2)**0.5)
-        self.image='C:/Project/Untitled.jpg'
-        self.location=[None,None]
-        self.passable=False
-        self.color=color
-        self.name=name+job
-        self.indefinitename=name.replace('the ', 'a ',1)
-        self.targetable=True
-        self.player=player
-        self.limbs=[]
-        self.vitals=[]
-        self.attacks=[]
-        self.disabled_attack_types=[Bite]
-        #self.body=Torso(self.stats,'torso',owner=self)
-        humanoid_assembler(self,self.stats,self.name,scale=0.6)
-        self.mass_calc()
-        self.updateattacks()
-
-        self.classification.append('humanoid')
-        self.classification.append('intelligent')
-        self.classification.append('living')
-        self.classification.append('hobbit')
-        if self.player==True:
-            self.classification.append('player')
-        if hostile==True:
-            self.hostile.append('player')
-
-
-class Fairy(Creature):
-    def __init__(self,color=(1,1,1,1),name='the human',job='',named=False,hostile=True,player=False,stats='random'):
-        super().__init__()
-        if stats=='random':
-            self.stats= {'s': int(random.triangular(low=1, high=4, mode=2)),
-                         't': int(random.triangular(low=5, high=20, mode=12)),
-                         'p': int(random.triangular(low=9, high=40, mode=20)),
-                         'w': int(random.triangular(low=7, high=32, mode=18)),
-                         'l': int(random.triangular(low=10, high=45, mode=21))}
-        else:
-            self.stats=stats
-        self.stats['str']=self.stats['s']
-        self.stats['tec']=self.stats['t']
-        self.stats['per']=self.stats['p']
-        self.stats['wil']=self.stats['w']
-        self.stats['luc']=self.stats['l']
-        self.level=1
-        self.exp=[0,100]
-        self.focus=[int(20*(self.stats['p']**0.7+self.level**0.3)),int(20*(self.stats['p']**0.7+self.level**0.3))]
-        self.stamina=[int(10*(2*self.stats['s']**2+self.level**2)**0.5),int(10*(2*self.stats['s']**2+self.level**2)**0.5)]
-        self.maxstamina=int(10*(2*self.stats['s']**2+self.level**2)**0.5)
-        self.image='C:/Project/Untitled.jpg'
-        self.location=[None,None]
-        self.passable=False
-        self.color=color
-        self.name=name+job
-        self.indefinitename=name.replace('the ', 'a ',1)
-        self.targetable=True
-        self.player=player
-        self.limbs=[]
-        self.vitals=[]
-        self.attacks=[]
-        self.disabled_attack_types=[Bite]
-        #self.body=Torso(self.stats,'torso',owner=self)
-        humanoid_assembler(self,self.stats,self.name,scale=0.15)
-
-        self.leftwing=Wing(self.stats,'left wing',owner=self,scale=0.1)
-        self.torso.limbs.append(self.leftwing)
-        self.leftwing.attachpoint=self.torso
-
-        self.rightwing=Wing(self.stats,'right wing',owner=self,scale=0.1)
-        self.torso.limbs.append(self.rightwing)
-        self.rightwing.attachpoint=self.torso
-
-        self.mass_calc()
-        print(self.mass,self.movemass)
-        self.updateattacks()
-
-        self.classification.append('humanoid')
-        self.classification.append('intelligent')
-        self.classification.append('living')
-        self.classification.append('fairy')
-        if self.player==True:
-            self.classification.append('player')
-        if hostile==True:
-            self.hostile.append('player')
-
 
 class Target_Dummy(Creature):
     def __init__(self,color=(1,1,1,1),name='the target dummy',job='',named=False,hostile=True,player=False,stats='random'):

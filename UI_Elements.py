@@ -158,7 +158,7 @@ Builder.load_string('''
 <ItemGraphic@Widget>
     canvas:
         Color:
-            rgba:1,1,1,1
+            rgba:self.color[0],self.color[1],self.color[2],self.color[3]
         Rectangle:
             id:graphics
             size:self.height*0.8,self.height*0.8
@@ -167,6 +167,7 @@ Builder.load_string('''
 
 
 <OutlinedTextBox@Label>
+    background:(0,0,0,1)
     outline:(0,0,0,1)
     text_size:self.size
     shorten:True
@@ -180,10 +181,49 @@ Builder.load_string('''
             pos:self.x,self.y
             size:self.width,self.height
         Color:
-            rgba: 0,0,0,1
+            rgba: self.background[0],self.background[1],self.background[2],self.background[3]
         Rectangle:
             pos:self.x+1,self.y+1
             size:self.width-2,self.height-2
+
+<DisplayBox@FloatLayout>
+    background:(0,0,0,1)
+    outline:(0,0,0,1)
+    canvas.before:
+        Color:
+            rgba:self.outline[0],self.outline[1],self.outline[2],self.outline[3]
+        Rectangle:
+            pos:self.x,self.y
+            size:self.width,self.height
+        Color:
+            rgba: self.background[0],self.background[1],self.background[2],self.background[3]
+        Rectangle:
+            pos:self.x+1,self.y+1
+            size:self.width-2,self.height-2
+    Label:
+        id:title
+        font_size:12
+        bold:True
+        color:.6,.6,.6,.6
+        text:root.titletext
+        text_size:self.size
+        shorten:True
+        halign:'left'
+        valign:'top'
+        markup:True
+        pos:root.x+1,root.y+root.height-self.height+1
+    Label:
+        id:information
+        text:root.info
+        text_size:self.size
+        shorten:True
+        halign:'right'
+        valign:'middle'
+        markup:True
+        pos:root.x-2,root.y-2
+
+
+
 
 
 
@@ -207,7 +247,7 @@ Builder.load_string('''
             size:0.05*self.width-2,0.05*self.height-2
             pos: self.x+11,self.y+0.95*self.height-9
         Color:
-            rgba: 1,1,1,1
+            rgba: self.item.color[0],self.item.color[1],self.item.color[2],self.item.color[3]
         Rectangle:
             size:0.05*self.width,0.05*self.height
             pos: self.x+10,self.y+0.95*self.height-10
@@ -244,11 +284,21 @@ Builder.load_string('''
             text:'[b]Damage:[/b]'
             pos:damagebox.x,damagebox.y+damagebox.height-self.height
     GridLayout:
-        id:infobox
-        cols:2
-        rows:len(root.item.info)
+        id:infobox1
+        cols:1
         pos:root.x+10,root.y+10+0.1*root.height
-        size_hint:(root.width-20)/root.width,(root.height*0.55-50)/root.height
+        size_hint:(0.5*root.width-15)/root.width,(root.height*0.55-50)/root.height
+        canvas.before:
+            Color:
+                rgba:0,0,0,1
+            Rectangle:
+                pos:self.pos
+                size:self.size
+    GridLayout:
+        id:infobox2
+        cols:1
+        pos:root.x+0.5*root.width+5,root.y+10+0.1*root.height
+        size_hint:(0.5*root.width-15)/root.width,(root.height*0.55-50)/root.height
         canvas.before:
             Color:
                 rgba:0,0,0,1
@@ -417,14 +467,28 @@ class Portrait(Widget):
             self.canvas.clear()
             self.graphics=Rectangle(source=self.source,size=self.size,pos=self.pos)
 
+#The classes below deal with inventory screens
 class OutlinedTextBox(Label):
-    def __init__(self,color=(0,0,0,1),**kwargs):
+    def __init__(self,color=(0,0,0,1),background=(0,0,0,1),**kwargs):
         self.outline=color
+        self.background=background
+        super().__init__(**kwargs)
+
+class DisplayBox(FloatLayout):
+    def __init__(self,titletext,info,color=(0,0,0,1),background=(0,0,0,1),**kwargs):
+        self.titletext=titletext
+        self.info=info
+        self.outline=color
+        self.background=background
         super().__init__(**kwargs)
 
 class ItemGraphic(Widget):
     def __init__(self,item,**kwargs):
         self.source=item.image
+        if hasattr(item,'color'):
+            self.color=item.color
+        else:
+            self.color=(1,1,1,1)
         super().__init__(**kwargs)
 
 class ItemDescription(FloatLayout):
@@ -438,13 +502,43 @@ class ItemDescription(FloatLayout):
         self.damage=item.describe_damage()
         if self.damage=='':
             self.damage='No damage'
-        for i in self.item.info:
-            self.ids['infobox'].add_widget(OutlinedTextBox(text='{}:'.format(i),color=(1,0,0,1),halign='left'))
-            self.ids['infobox'].add_widget(OutlinedTextBox(text=self.item.info[i],color=(1,0,0,1),halign='right'))
+        self.ids['infobox1'].add_widget(DisplayBox('material: ',self.item.info['material'],color=(1,0,0,1)))
+        self.ids['infobox1'].add_widget(DisplayBox('mass: ',self.item.info['mass'],color=(1,0,0,1)))
+        self.ids['infobox1'].add_widget(DisplayBox('magic: ',self.item.info['magic'],color=(1,0,0,1)))
+        self.ids['infobox1'].add_widget(DisplayBox('quality: ',self.item.info['quality'],color=(1,0,0,1)))
+        self.ids['infobox1'].add_widget(DisplayBox('equippable by player: ',self.item.info['equippable by player'],color=(1,0,0,1)))
 
+        boxes=0
+        try:
+            self.ids['infobox2'].add_widget(DisplayBox('length: ',self.item.info['length'],color=(1,0,0,1)))
+            boxes+=1
+        except: pass
+        try:
+            self.ids['infobox2'].add_widget(DisplayBox('thickness: ',self.item.info['thickness'],color=(1,0,0,1)))
+            boxes+=1
+        except: pass
+        try:
+            self.ids['infobox2'].add_widget(DisplayBox('radius: ',self.item.info['radius'],color=(1,0,0,1)))
+            boxes+=1
+        except: pass
+        try:
+            self.ids['infobox2'].add_widget(DisplayBox('edge sharpness: ',self.item.info['edge sharpness'],color=(1,0,0,1)))
+            boxes+=1
+        except: pass
+        try:
+            self.ids['infobox2'].add_widget(DisplayBox('tip sharpness: ',self.item.info['tip sharpness'],color=(1,0,0,1)))
+            boxes+=1
+        except: pass
+        try:
+            self.ids['infobox2'].add_widget(DisplayBox('moment of inertia: ',self.item.info['moment of inertia'],color=(1,0,0,1)))
+            boxes+=1
+        except: pass
 
-
-
+        while boxes<5:
+            self.ids['infobox2'].add_widget(DisplayBox('',''))
+            boxes+=1
+        #for i in self.item.info:
+         #   self.ids['infobox1'].add_widget(DisplayBox(''.join((i,': ')),self.item.info[i],color=(1,0,0,1)))
 
 class InventoryItem(GridLayout):
     def __init__(self,item,letter='playerinventory',**kwargs):
@@ -453,8 +547,9 @@ class InventoryItem(GridLayout):
         self.graphicsbox=ItemGraphic(item,size_hint=(0.1,None),height=self.height)
         mass=int(item.mass*100)/100
         text='[color=333300][b] {} [/b]({} kg) [/color]'.format(item.name,mass)
-        if hasattr(item,'equipped') and item.equipped is not None:
-            text=' '.join((text,' [color=ff33ff](equipped on {})[/color]'.format(item.equipped.name)))
+        if hasattr(item,'equipped') and item.equipped!=[]:
+            print(item.equipped)
+            text=' '.join((text,' [color=ff33ff](equipped on {})[/color]'.format(' '.join((i.name for i in item.equipped)))))
         self.text=Label(markup=True,text=text,halign='left',text_size=(500,None),shorten=True)
         if letter=='playerinventory':
             self.index=Label(markup=True, text='[b][color=333300]     {}: [/color][/b]'.format(item.inventory_index),shorten=True,size_hint=(0.1,1))
@@ -478,9 +573,6 @@ class InventoryItem(GridLayout):
 
     def inspect(self):
         pass
-
-
-        
 
 class InventorySidebar(ScrollView):
     def __init__(self,shell,**kwargs):
@@ -587,6 +679,10 @@ class InventorySidebar(ScrollView):
         weapons=0
         for i in cell.contents:
             if hasattr(i,'sortingtype') and i.sortingtype=='weapon':
+                i.touched_by_player=True
+                if self.shell.player.can_see==True:
+                    i.seen_by_player=True
+                i.generate_descriptions(self.shell.player.stats['per'])
                 new=InventoryItem(i,size_hint=(1,None),letter=letters[letterpos],height=30)
                 self.selectionindex[letters[letterpos]]=new
                 self.list.add_widget(new)
@@ -601,6 +697,10 @@ class InventorySidebar(ScrollView):
         armor=0
         for i in cell.contents:
             if hasattr(i,'sortingtype') and i.sortingtype=='armor':
+                i.touched_by_player=True
+                if self.shell.player.can_see==True:
+                    i.seen_by_player=True
+                i.generate_descriptions(self.shell.player.stats['per'])
                 new=InventoryItem(i,size_hint=(1,None),letter=letters[letterpos],height=30)
                 self.selectionindex[letters[letterpos]]=new
                 self.list.add_widget(new)
@@ -615,6 +715,10 @@ class InventorySidebar(ScrollView):
         misc=0
         for i in cell.contents:
             if hasattr(i,'sortingtype') and i.sortingtype=='misc':
+                i.touched_by_player=True
+                if self.shell.player.can_see==True:
+                    i.seen_by_player=True
+                i.generate_descriptions(self.shell.player.stats['per'])
                 new=InventoryItem(i,size_hint=(1,None),letter=letters[letterpos],height=30)
                 self.selectionindex[letters[letterpos]]=new
                 self.list.add_widget(new)
@@ -665,7 +769,7 @@ class InventorySidebar(ScrollView):
     def drop_selected(self,cell):
         dropped_items=0
         for i in self.selected_items:
-            if hasattr(i.item,'equipped') and i.item.equipped is not None:
+            if hasattr(i.item,'equipped') and i.item.equipped!=[]:
                 if i.item.wield is not 'grasp':
                     self.shell.log.addtext('You must unequip your {} before dropping it'.format(i.item.name))
                 else:
@@ -673,7 +777,7 @@ class InventorySidebar(ScrollView):
                     self.shell.player.inventory.remove(i.item)
                     cell.contents.append(i.item)
                     self.shell.log.addtext('You drop the {}'.format(i.item.name))
-                    dropped_items+=1
+                    #dropped_items+=1
             else:
                 self.shell.player.inventory.remove(i.item)
                 cell.contents.append(i.item)
@@ -687,11 +791,19 @@ class InventorySidebar(ScrollView):
         for i in self.selected_items:
             if not hasattr(i.item,'wield'):
                 self.shell.log.addtext('{} cannot be wielded as a weapon or armor'.format(i.item.name))
-            if hasattr(i.item,'equipped') and i.item.equipped!=None:
+            if hasattr(i.item,'equipped') and i.item.equipped!=[] and i.item.wield!='grasp':
                 self.shell.log.addtext('The {} is already equipped!'.format(i.item.name))
-            if hasattr(i.item,'equipped') and i.item.equipped==None:
+            elif hasattr(i.item,'equipped') and i.item.equipped!=[] and i.item.wield=='grasp':
+                wieldingnumber=len(i.item.equipped)
                 self.shell.player.equip(i.item)
-                if i.item.equipped!=None:
+                if len(i.item.equipped)>wieldingnumber:
+                    pass
+                    #self.shell.turn+=1
+                else:
+                    self.shell.log.addtext('You have no additional limbs which can grasp the {}'.format(i.item.name))
+            if hasattr(i.item,'equipped') and i.item.equipped==[]:
+                self.shell.player.equip(i.item)
+                if i.item.equipped!=[]:
                     self.shell.turn+=1
                 else:
                     self.shell.log.addtext('You have no body parts available which can wield the {}'.format(i.item.name))
@@ -701,11 +813,11 @@ class InventorySidebar(ScrollView):
         for i in self.selected_items:
             if not hasattr(i.item,'wield'):
                 self.shell.log.addtext('{} cannot be wielded as a weapon or armor'.format(i.item.name))
-            if hasattr(i.item,'equipped') and i.item.equipped==None:
+            if hasattr(i.item,'equipped') and i.item.equipped==[]:
                 self.shell.log.addtext('The {} is not equipped!'.format(i.item.name))
-            if hasattr(i.item,'equipped') and i.item.equipped!=None:
+            if hasattr(i.item,'equipped') and i.item.equipped!=[]:
                 self.shell.player.unequip(i.item)
-                if i.item.equipped==None:
+                if i.item.equipped==[]:
                     if i.item.wield=='grasp':
                         messages.append('You put away the {}'.format(i.item.name))
                         self.shell.turn+=1
@@ -725,9 +837,6 @@ class InventorySidebar(ScrollView):
         self.shell.remove_widget(self)
         self.clear_widgets()
 
-
-
-
 #The intention is that the Cell class will serve as a container for all creatures and items to be displayed on the screen.
 #I expect to be tinkering with it quite a bit to make everything work just right.
 
@@ -737,20 +846,13 @@ class Cell(Widget):
     contents=ListProperty([])
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
+        self.alignment=0
         self.size_hint=(None,None)
         self.size=(cellsize,cellsize)
         self.passable=True
         self.highlighted=False
         self.location=[None,None]
         self.immediate_neighbors=[]
-
-        '''
-        with self.canvas:
-            Color(0.5,0.5,0.5,0.3)
-            Rectangle(size=self.size,pos=self.pos)
-            Color(0.1,0.1,0.1,1)
-            Rectangle(size=(cellsize-1,cellsize-1),pos=(self.pos[0]+1,self.pos[1]+1))
-'''
 
 
     def highlight(self):
@@ -810,6 +912,9 @@ class Cell(Widget):
                 self.passable=False
 
     def on_turn(self):
+        for i in self.contents:
+            if isinstance(i,BaseClasses.Item) or isinstance(i,MapTiles.DungeonFeature) or isinstance(i,BaseClasses.Fluid):
+                i.on_turn()
         pass
 
 

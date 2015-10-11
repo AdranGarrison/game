@@ -19,6 +19,9 @@ class DungeonFeature():
         screen.cells[x][y].contents.append(self)
         self.location=[x,y]
 
+    def on_turn(self):
+        pass
+
 class DungeonFloor(DungeonFeature):
     def __init__(self,screen=None,x=None,y=None):
         super().__init__(screen,x,y)
