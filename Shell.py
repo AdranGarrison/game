@@ -9,6 +9,8 @@ from Limbs import *
 import NameGen
 import cProfile
 import Enchantments
+import pickle
+
 
 
 os.environ['KIVY_NO_FILELOG']='true'
@@ -19,7 +21,7 @@ os.environ['KIVY_NO_FILELOG']='true'
 class Sword():
     def __init__(self,color=(1,1,1,1)):
         self.name='dummysword'
-        self.image='C:/Project/sword.png'
+        self.image='./images/sword.png'
         self.location=[None,None]
         self.passable=True
         self.color=color
@@ -28,6 +30,12 @@ class Sword():
 
         pass
 
+
+def picklecopy(object):
+    try:
+        return pickle.loads(pickle.dumps(object,-1))
+    except:
+        return copy.deepcopy(object)
 
 
 
@@ -218,7 +226,9 @@ class Shell(FloatLayout):
 
                 print("ARMORED")
                 unittestone(Spear,enemy_armor=True,twohand=True)
-
+            if keycode[1]=='b' and self.shift==True:
+                for i in self.player.limbs:
+                    i.burn(1000,5)
 
             #The below bindings are for real
             if keycode[1]=='numpad7':
@@ -259,6 +269,18 @@ class Shell(FloatLayout):
                 self.inventory.show_player_inventory()
                 self.keyboard_mode='unequip'
                 return
+            elif keycode[1]=='a' and self.shift==False:
+                self.status_screen=StatusScreen(self.player)
+                self.status_screen.attack_screen()
+                self.add_widget(self.status_screen)
+                self.keyboard_mode='status screen'
+                return
+            elif keycode[1]=='s' and self.shift==False:
+                self.status_screen=StatusScreen(self.player)
+                self.status_screen.creature_status()
+                self.add_widget(self.status_screen)
+                self.keyboard_mode='status screen'
+                return
 
         if self.keyboard_mode=='inventory sidebar':
             if keycode[1]=='escape':
@@ -269,6 +291,19 @@ class Shell(FloatLayout):
                     self.inventory.inspect(keycode[1])
                 elif self.shift==True:
                     self.inventory.inspect(keycode[1].upper())
+            elif keycode[1]==',':
+                if self.inventory.showing=='inventory':
+                    self.inventory.close()
+                    self.inventory.show_items_on_ground(self.dungeonmanager.current_screen.cells[self.player.location[0]][self.player.location[1]])
+                elif self.inventory.showing=='ground':
+                    self.inventory.close()
+                    self.inventory.show_player_inventory()
+            elif keycode[1]=='enter':
+                if self.inventory.inspected_item is not None:
+                    self.inventory.inspect('enter')
+
+        if self.keyboard_mode=='close inspect':
+            self.inventory.inspectionscreen.open_submenu(keycode[1])
 
         if self.keyboard_mode=='item pickup':
             if keycode[1]=='escape':
@@ -322,6 +357,12 @@ class Shell(FloatLayout):
                 self.inventory.unequip_selected()
                 self.keyboard_mode='play'
 
+        if self.keyboard_mode=='status screen':
+            self.status_screen.keyboard_input(keycode[1],shift=self.shift)
+
+        if self.keyboard_mode=='pass':
+            pass
+
     def on_key_up(self,keyboard,keycode):
         if keycode[0]==303 or keycode[0]==304:
             self.shift=False
@@ -330,6 +371,9 @@ class Shell(FloatLayout):
         print('Uhhhh... guys... the keyboard just closed')
         self.keyboard.unbind(on_key_down=self.on_keyboard_down)
         self.keyboard=None
+
+    def on_keyboard_down(self,**kwargs):
+        pass
 
     #This function handles movement of objects from cell to cell and calls for bump attacks
     def move(self,target,distance,teleport=False,mobile=True,*args,**kwargs):
@@ -399,6 +443,8 @@ class Shell(FloatLayout):
 
         initialinventory.append(Mace(material=Steel,id=True))
         initialinventory.append(LongSword(material=Steel,id=True))
+        initialinventory.append(WarHammer(material=Steel,id=True))
+        initialinventory.append(Axe(material=Steel,id=True))
         initialinventory.append(Glove(material=Steel,id=True))
         initialinventory.append(Glove(material=Steel,id=True))
         initialinventory.append(Chest(material=Steel,id=True))
@@ -471,6 +517,8 @@ class Shell(FloatLayout):
 
         adversary.inventory.extend(adversary.equipped_items)
 
+        for i in adversary.inventory: i.randomize(1)
+
         '''
         for i in adversary.limbs:
             i.change_material(Flesh_Material,Wood)
@@ -513,6 +561,11 @@ class Shell(FloatLayout):
 
         for i in self.player.inventory:
             Enchantments.Acidic(i)
+            Enchantments.Burning(i)
+
+
+
+
 
 
 

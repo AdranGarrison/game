@@ -247,7 +247,7 @@ class Human(Creature):
         self.focus=[int(20*(self.stats['p']**0.7+self.level**0.3)),int(20*(self.stats['p']**0.7+self.level**0.3))]
         self.stamina=[int(10*(2*self.stats['s']**2+self.level**2)**0.5),int(10*(2*self.stats['s']**2+self.level**2)**0.5)]
         self.maxstamina=int(10*(2*self.stats['s']**2+self.level**2)**0.5)
-        self.image='C:/Project/Untitled.jpg'
+        self.image='./images/Untitled.jpg'
         self.location=[None,None]
         self.passable=False
         self.color=color
@@ -300,7 +300,7 @@ class Giant(Creature):
         self.focus=[int(20*(self.stats['p']**0.7+self.level**0.3)),int(20*(self.stats['p']**0.7+self.level**0.3))]
         self.stamina=[int(10*(2*self.stats['s']**2+self.level**2)**0.5),int(10*(2*self.stats['s']**2+self.level**2)**0.5)]
         self.maxstamina=int(10*(2*self.stats['s']**2+self.level**2)**0.5)
-        self.image='C:/Project/Untitled.jpg'
+        self.image='./images/Untitled.jpg'
         self.location=[None,None]
         self.passable=False
         self.color=color
@@ -352,7 +352,7 @@ class Goblin(Creature):
         self.focus=[int(20*(self.stats['p']**0.7+self.level**0.3)),int(20*(self.stats['p']**0.7+self.level**0.3))]
         self.stamina=[int(10*(2*self.stats['s']**2+self.level**2)**0.5),int(10*(2*self.stats['s']**2+self.level**2)**0.5)]
         self.maxstamina=int(10*(2*self.stats['s']**2+self.level**2)**0.5)
-        self.image='C:/Project/Untitled.jpg'
+        self.image='./images/Untitled.jpg'
         self.location=[None,None]
         self.passable=False
         self.color=color
@@ -408,7 +408,7 @@ class Halfling(Creature):
         self.focus=[int(20*(self.stats['p']**0.7+self.level**0.3)),int(20*(self.stats['p']**0.7+self.level**0.3))]
         self.stamina=[int(10*(2*self.stats['s']**2+self.level**2)**0.5),int(10*(2*self.stats['s']**2+self.level**2)**0.5)]
         self.maxstamina=int(10*(2*self.stats['s']**2+self.level**2)**0.5)
-        self.image='C:/Project/Untitled.jpg'
+        self.image='./images/Untitled.jpg'
         self.location=[None,None]
         self.passable=False
         self.color=color
@@ -461,7 +461,7 @@ class Fairy(Creature):
         self.focus=[int(20*(self.stats['p']**0.7+self.level**0.3)),int(20*(self.stats['p']**0.7+self.level**0.3))]
         self.stamina=[int(10*(2*self.stats['s']**2+self.level**2)**0.5),int(10*(2*self.stats['s']**2+self.level**2)**0.5)]
         self.maxstamina=int(10*(2*self.stats['s']**2+self.level**2)**0.5)
-        self.image='C:/Project/Untitled.jpg'
+        self.image='./images/Untitled.jpg'
         self.location=[None,None]
         self.passable=False
         self.color=color
@@ -525,7 +525,7 @@ class Wolf(Creature):
         self.focus=[int(20*(self.stats['p']**0.7+self.level**0.3)),int(20*(self.stats['p']**0.7+self.level**0.3))]
         self.stamina=[int(10*(2*self.stats['s']**2+self.level**2)**0.5),int(10*(2*self.stats['s']**2+self.level**2)**0.5)]
         self.maxstamina=int(10*(2*self.stats['s']**2+self.level**2)**0.5)
-        self.image='C:/Project/Untitled.jpg'
+        self.image='./images/Untitled.jpg'
         self.location=[None,None]
         self.passable=False
         self.color=color
@@ -566,14 +566,14 @@ class Wolf(Creature):
         self.head=Head(self.stats,length=0.1,radius=0.04,owner=self)                #head
         self.head.add_outer_layer(Hair,Fur,0.03,name='fur')
         self.head.join_to(self.neck)
-        self.muzzle=Snout(self.stats,name='muzzle',length=0.15,radius=0.04,owner=self)
+        self.muzzle=Snout(self.stats,name='muzzle',length=0.2,radius=0.04,owner=self)
         self.lefteye=Eye(self.stats,name='left ',owner=self)
         self.righteye=Eye(self.stats,name='right ',owner=self)
         self.leftear=Ear(self.stats,name='left ',radius=0.03,owner=self)
         self.leftear.add_outer_layer(Hair,Fur,0.005,name='fur')
         self.rightear=Ear(self.stats,name='right ',radius=0.03,owner=self)
         self.rightear.add_outer_layer(Hair,Fur,0.005,name='fur')
-        self.jaw=Jaw(self.stats,length=0.3,radius=0.015,owner=self)
+        self.jaw=Jaw(copy.deepcopy(self.stats),length=0.4,radius=0.015,owner=self)
         self.jaw.add_outer_layer(Hair,Fur,0.01,name='fur')
         self.jaw.stats['s']*=2
         self.jaw.stats['str']*=2
@@ -600,6 +600,10 @@ class Wolf(Creature):
         self.tail.add_outer_layer(Hair,Fur,0.06,name='fur')
         self.tail.join_to(self.flank)
 
+        self.hind_left_paw.can_attack=False
+        self.hind_right_paw.can_attack=False
+
+
 
 
 
@@ -615,6 +619,7 @@ class Wolf(Creature):
         self.classification.append('beast')
         self.classification.append('living')
         self.classification.append('wolf')
+        self.hostile.append('humanoid')
         if self.player==True:
             self.classification.append('player')
         if hostile==True:
@@ -643,7 +648,7 @@ class Blob(Creature):
         self.focus=[int(20*(self.stats['p']**0.7+self.level**0.3)),int(20*(self.stats['p']**0.7+self.level**0.3))]
         self.stamina=[int(10*(2*self.stats['s']**2+self.level**2)**0.5),int(10*(2*self.stats['s']**2+self.level**2)**0.5)]
         self.maxstamina=int(10*(2*self.stats['s']**2+self.level**2)**0.5)
-        self.image='C:/Project/Untitled.jpg'
+        self.image='./images/Untitled.jpg'
         self.location=[None,None]
         self.passable=False
         self.color=color
@@ -750,7 +755,7 @@ class Amorphous_Horror(Creature):
         self.focus=[int(20*(self.stats['p']**0.7+self.level**0.3)),int(20*(self.stats['p']**0.7+self.level**0.3))]
         self.stamina=[int(10*(2*self.stats['s']**2+self.level**2)**0.5),int(10*(2*self.stats['s']**2+self.level**2)**0.5)]
         self.maxstamina=int(10*(2*self.stats['s']**2+self.level**2)**0.5)
-        self.image='C:/Project/Untitled.jpg'
+        self.image='./images/Untitled.jpg'
         self.location=[None,None]
         self.passable=False
         self.color=color
@@ -875,7 +880,7 @@ class Acidic_Horror(Creature):
         self.focus=[int(20*(self.stats['p']**0.7+self.level**0.3)),int(20*(self.stats['p']**0.7+self.level**0.3))]
         self.stamina=[int(10*(2*self.stats['s']**2+self.level**2)**0.5),int(10*(2*self.stats['s']**2+self.level**2)**0.5)]
         self.maxstamina=int(10*(2*self.stats['s']**2+self.level**2)**0.5)
-        self.image='C:/Project/Untitled.jpg'
+        self.image='./images/Untitled.jpg'
         self.location=[None,None]
         self.passable=False
         self.color=color
@@ -925,7 +930,7 @@ class Target_Dummy(Creature):
         self.focus=[int(20*(self.stats['p']**0.7+self.level**0.3)),int(20*(self.stats['p']**0.7+self.level**0.3))]
         self.stamina=[int(10*(2*self.stats['s']**2+self.level**2)**0.5),int(10*(2*self.stats['s']**2+self.level**2)**0.5)]
         self.maxstamina=int(10*(2*self.stats['s']**2+self.level**2)**0.5)
-        self.image='C:/Project/Untitled.jpg'
+        self.image='./images/Untitled.jpg'
         self.location=[None,None]
         self.passable=False
         self.color=color

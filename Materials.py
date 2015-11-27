@@ -29,6 +29,7 @@ class Bone_Material(Material):
         self.poisson=0.31
         self.basicname='bone'
         self.name='bone'
+        self.heat_reaction='burn'
         self.maxquality=1.1
         self.default_thickness=0.02
         self.quality=min(quality,self.maxquality)
@@ -42,7 +43,7 @@ class Bone_Material(Material):
         self.shear=3.3
         self.shear_strength=5*self.quality
         self.electric_conduction=True
-        self.heat_conduction=True
+        self.heat_conduction=0.5
         self.dissipationfactor=4
         self.maxedge=(10**-4)/self.quality
         self.damagetype=['crack','break','crush','cut','shatter','sever']
@@ -122,6 +123,35 @@ class Bone_Material(Material):
 
 '''
 
+class Keratin(Material):
+    def __init__(self,thickness=1,quality=1,**kwargs):
+        super().__init__(**kwargs)
+        self.color=(0.8,0.8,0.8,1)
+        self.poisson=0.31
+        self.basicname='bone'
+        self.name='bone'
+        self.heat_reaction='burn'
+        self.burn_temp=300
+        self.maxquality=5
+        self.default_thickness=0.02
+        self.quality=min(quality,self.maxquality)
+        self.thickness=thickness
+        self.density=1500
+        self.youngs=1.5
+        self.fracture_energy=20*self.quality
+        self.tensile_strength=45*self.quality
+        self.mode='brittle'
+        self.fracture_toughness=(self.youngs*self.fracture_energy)**0.5
+        self.shear=0.8
+        self.shear_strength=15*self.quality
+        self.electric_conduction=True
+        self.heat_conduction=0.0005
+        self.dissipationfactor=4
+        self.maxedge=(10**-7)/self.quality
+        self.damagetype=['crack','break','crush','cut','shatter','sever']
+        self.magic_affinity=7
+        self.identification_difficulty=5
+
 class Flesh_Material(Material):
     def __init__(self,thickness=1,quality=1,**kwargs):
         super().__init__(**kwargs)
@@ -129,6 +159,8 @@ class Flesh_Material(Material):
         self.poisson=0.45
         self.acid_resistance=4
         self.fluid='blood'
+        self.heat_reaction='burn'
+        self.burn_temp=90
         self.default_thickness=0.02
         self.basicname='flesh'
         self.name='flesh'
@@ -144,7 +176,8 @@ class Flesh_Material(Material):
         self.shear=0.02
         self.shear_strength=0.6*self.quality
         self.electric_conduction=True
-        self.heat_conduction=False
+        self.heat_conduction=0.25
+        self.burn_resistance=80
         self.dissipationfactor=1.5
         self.maxedge=0.01
         self.damagetype=['bruise','cut','crush']
@@ -219,7 +252,10 @@ class Slime(Material):
         self.shear=0.01
         self.shear_strength=0.6*self.quality
         self.electric_conduction=True
-        self.heat_conduction=False
+        self.heat_reaction='burn'
+        self.burn_temp=800
+        self.heat_conduction=0.25
+        self.burn_resistance=100
         self.dissipationfactor=1.5
         self.maxedge=0.01
         self.damagetype=['bruise','cut','crush']
@@ -247,7 +283,8 @@ class Iron(Material):
         self.shear=48
         self.shear_strength=304*self.quality
         self.electric_conduction=True
-        self.heat_conduction=True
+        self.heat_conduction=79
+        self.burn_temp=1500
         self.dissipationfactor=8
         self.maxedge=(10**-7)/self.quality
         self.damagetype=['crack','break','shatter','crush','cut']
@@ -343,7 +380,8 @@ class Steel(Material):
         self.shear=80
         self.shear_strength=0.6*self.tensile_strength
         self.electric_conduction=True
-        self.heat_conduction=True
+        self.heat_conduction=50
+        self.burn_temp=1500
         self.dissipationfactor=1
         self.maxedge=(5*10**-8)/self.quality
         self.damagetype=['dent','crush','bend','cut']
@@ -371,7 +409,8 @@ class Copper(Material):
         self.shear=44
         self.shear_strength=178*self.quality
         self.electric_conduction=True
-        self.heat_conduction=True
+        self.heat_conduction=385
+        self.burn_temp=1085
         self.dissipationfactor=1
         self.maxedge=(1.5*10**-7)/self.quality
         self.damagetype=['dent','crush','bend','cut']
@@ -400,7 +439,8 @@ class Bronze(Material):
         self.shear=43
         self.shear_strength=297*self.quality
         self.electric_conduction=True
-        self.heat_conduction=True
+        self.heat_conduction=40
+        self.burn_temp=650
         self.dissipationfactor=1
         self.maxedge=(10**-7)/self.quality
         self.damagetype=['dent','crush','bend','cut']
@@ -429,7 +469,8 @@ class Brass(Material):
         self.shear=39
         self.shear_strength=273*self.quality
         self.electric_conduction=True
-        self.heat_conduction=True
+        self.heat_conduction=100
+        self.burn_temp=900
         self.dissipationfactor=1
         self.maxedge=(10**-7)/self.quality
         self.damagetype=['dent','crush','bend','cut']
@@ -457,7 +498,9 @@ class Titanium(Material):
         self.shear=44
         self.shear_strength=711*self.quality
         self.electric_conduction=True
-        self.heat_conduction=True
+        self.heat_reaction='ignite'
+        self.burn_temp=1200
+        self.heat_conduction=5.8
         self.dissipationfactor=1
         self.maxedge=(5*10^-7)/self.quality
         self.damagetype=['crack','break','shatter','crush','cut']
@@ -485,7 +528,8 @@ class Silver(Material):
         self.shear=30
         self.shear_strength=self.tensile_strength*0.65
         self.electric_conduction=True
-        self.heat_conduction=True
+        self.heat_conduction=400
+        self.burn_temp=900
         self.dissipationfactor=1
         self.maxedge=(2*10**-7)/self.quality
         self.damagetype=['dent','crush','bend','cut']
@@ -514,7 +558,8 @@ class Aluminum(Material):
         self.shear=25
         self.shear_strength=self.tensile_strength*0.65
         self.electric_conduction=True
-        self.heat_conduction=True
+        self.heat_conduction=210
+        self.burn_temp=500
         self.dissipationfactor=1
         self.maxedge=(2*10**-7)/self.quality
         self.damagetype=['dent','crush','bend','cut']
@@ -544,7 +589,8 @@ class Duraluminum(Material):
         self.shear=27.5
         self.shear_strength=100*self.quality
         self.electric_conduction=True
-        self.heat_conduction=True
+        self.heat_conduction=225
+        self.burn_temp=630
         self.dissipationfactor=1
         self.maxedge=(1.5*10**-7)/self.quality
         self.damagetype=['dent','crush','bend','cut']
@@ -552,7 +598,7 @@ class Duraluminum(Material):
         self.identification_difficulty=18
 
 class Zicral(Material):
-    #Zinc Aluminum alloy
+    #Zinc Aluminum alloy also called ergal
     def __init__(self,thickness=1,quality=1,**kwargs):
         super().__init__(**kwargs)
         self.color=(0.7,0.7,0.7,1)
@@ -574,7 +620,8 @@ class Zicral(Material):
         self.shear=26.8
         self.shear_strength=100*self.quality
         self.electric_conduction=True
-        self.heat_conduction=True
+        self.heat_conduction=130
+        self.burn_temp=550
         self.dissipationfactor=1
         self.maxedge=(10**-7)/self.quality
         self.damagetype=['crack','break','shatter','crush','cut']
@@ -602,7 +649,9 @@ class Wood(Material):
         self.shear=2
         self.shear_strength=10*self.quality
         self.electric_conduction=False
-        self.heat_conduction=False
+        self.heat_reaction='ignite'
+        self.heat_conduction=0.1
+        self.burn_temp=200
         self.dissipationfactor=1
         self.maxedge=(10**-4)/self.quality
         self.damagetype=['dent','crack','break','crush','cut']
@@ -632,7 +681,9 @@ class Leather(Material):
         self.shear=0.1
         self.shear_strength=0.6*self.tensile_strength
         self.electric_conduction=False
-        self.heat_conduction=False
+        self.heat_reaction='ignite'
+        self.heat_conduction=0.14
+        self.burn_temp=200
         self.dissipationfactor=1
         self.maxedge=0.01
         self.damagetype=['pierce','cut']
@@ -663,7 +714,9 @@ class Cotton(Material):
         self.shear=2.62*weave/(weave+20)#0.0023
         self.shear_strength=0.2*self.tensile_strength
         self.electric_conduction=False
-        self.heat_conduction=False
+        self.heat_reaction='ignite'
+        self.heat_conduction=0.05
+        self.burn_temp=400
         self.dissipationfactor=1
         self.maxedge=0.01
         self.damagetype=['pierce','cut']
@@ -693,7 +746,9 @@ class Wool(Material):
         self.shear=1.31*weave/(weave+20) #0.00023   #1.31 for fiber
         self.shear_strength=0.2*self.tensile_strength
         self.electric_conduction=False
-        self.heat_conduction=False
+        self.heat_reaction='ignite'
+        self.heat_conduction=0.07
+        self.burn_temp=600
         self.dissipationfactor=1
         self.maxedge=0.01
         self.damagetype=['pierce','cut']
@@ -741,7 +796,9 @@ class Silk(Material):
         self.shear=3.81*weave/(weave+10)#0.0033  #3.81 for individual thread
         self.shear_strength=0.2*self.tensile_strength
         self.electric_conduction=False
-        self.heat_conduction=False
+        self.heat_reaction='burn'
+        self.heat_conduction=0.1
+        self.burn_temp=500
         self.dissipationfactor=1
         self.maxedge=0.01
         self.damagetype=['pierce','cut']
@@ -771,7 +828,9 @@ class Spider_Silk(Material):
         self.shear=2.38*weave/(weave+10)#0.004  #2.38 for pure fiber
         self.shear_strength=0.2*self.tensile_strength
         self.electric_conduction=False
-        self.heat_conduction=False
+        self.heat_reaction='burn'
+        self.heat_conduction=1
+        self.burn_temp=900
         self.dissipationfactor=1
         self.maxedge=0.01
         self.damagetype=['pierce','cut']
@@ -801,7 +860,8 @@ class Basalt_Fiber(Material):
         self.shear=33*weave/(weave+20)#0.0033
         self.shear_strength=0.2*self.tensile_strength
         self.electric_conduction=False
-        self.heat_conduction=False
+        self.heat_conduction=0.01
+        self.burn_temp=1500
         self.dissipationfactor=1
         self.maxedge=0.01
         self.damagetype=['pierce','cut']
