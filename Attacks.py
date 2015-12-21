@@ -52,7 +52,7 @@ class Attack():
         f=self.force
         #print(self.name,'Force of',f,'time of',self.time,'pressure of',self.pressure)
         #print(self.recoverytime)
-        print(self.area)
+        #print(self.area)
 
         self.damage_dealt = 0
 
@@ -257,7 +257,7 @@ class Punch(Attack):
         self.contact = True
         highspeed = max(4 * (max(self.strikelength*self.strength / self.arm.movemass,0)) ** 0.5, 8)
         self.speed = random.triangular(low=1, high=highspeed, mode=3.5) * (
-            (self.attacker.stamina[0] / self.attacker.stamina[1]) ** 0.5) + 0.1
+            max(self.attacker.stamina[0] / self.attacker.stamina[1],0) ** 0.5) + 0.1
         broadcast_time=2*random.gauss(1,0.2)*self.attacker.focus[1]/(self.attacker.stats['tec']*(self.attacker.focus[0]+1))
         self.time = broadcast_time+self.strikelength / self.speed
 
@@ -485,7 +485,7 @@ class Slash_1H(Attack):
             self.strikemass = self.limb.movemass + weapon.mass + self.attacker.mass
             self.strikelength = weapon.length + armlength
             self.I = weapon.I
-        self.I+=self.arm.I
+        self.I+=0.2*self.arm.I
 
         if self.attacker.player == True:
             self.name = 'a slash with your {}'.format(weapon.name)
@@ -774,7 +774,7 @@ class Bludgeon_1H(Attack):
             self.strikemass = self.limb.movemass + weapon.mass + self.attacker.mass
             self.strikelength = weapon.length + armlength
             self.I = weapon.I
-        self.I+=self.arm.I
+        self.I+=0.2*self.arm.I
 
         if self.attacker.player == True:
             self.name = 'a swing of your {}'.format(weapon.name)
@@ -910,7 +910,7 @@ class Bite(Attack):
         self.target = target
         self.contact = True
 
-        broadcast_time=4*random.gauss(1,0.2)*self.attacker.focus[1]/(self.attacker.stats['tec']*(self.attacker.focus[0]+1))
+        broadcast_time=4*random.gauss(1,0.2)*self.attacker.focus[1]/max((self.attacker.stats['tec']*self.attacker.focus[0]),0.01)
         self.time = broadcast_time+self.head.movemass / self.head.stats['str']
         self.strikearea=(self.teeth.biting_surface)
         self.area=self.strikearea
@@ -1109,7 +1109,7 @@ class Strike_1H(Attack):
             self.strikemass = self.limb.movemass + weapon.mass + self.attacker.mass
             self.strikelength = weapon.length + armlength
             self.I = weapon.I
-        self.I+=self.arm.I
+        self.I+=0.2*self.arm.I
 
         if self.weapon==self.limb:
             self.strikelength=self.weapon.length
@@ -1586,7 +1586,7 @@ class Slash_2H(Attack):
                 arm=i
                 self.strikemass += i.movemass
                 self.strikelength = min(weapon.length + armlength,self.strikelength)
-            self.I+=arm.I
+            self.I+=0.2*arm.I
 
         self.I+=0.5*weapon.mass * ((self.strikelength-weapon.length)/2+weapon.centermass) ** 2
 
@@ -1663,7 +1663,11 @@ class Slash_2H(Attack):
         else:
             self.stattedweapon=False
             self.weapon.stats = self.attacker.stats
-        self.attacker.stamina[0] -= int(max(1, 10 * (sum(i.movemass for i in self.limbs) + self.I) / (self.basestrength+0.01)))
+        movemass=0
+        for i in self.limbs:
+            try: movemass+=i.movemass+i.attachpoint.movemass
+            except: movemass+=i.movemass
+        self.attacker.stamina[0] -= int(max(1, 5 * (movemass + self.I) / (self.basestrength+0.01)))
 
         self.recoverytime=random.random()*self.I*self.w/torque
         self.recoverytime=self.recoverytime*defender_reach/self.strikelength
@@ -1705,7 +1709,11 @@ class Slash_2H(Attack):
         avgpressure=avgforce/(self.strikearea*0.5/self.attacker.stats['tec']**0.5)
         information['Average Pressure']=avgpressure
 
-        information['Stamina Cost']=int(max(1, 10 * (sum(i.movemass for i in self.limbs) + self.I) / (self.basestrength+0.01)))
+        movemass=0
+        for i in self.limbs:
+            try: movemass+=i.movemass+i.attachpoint.movemass
+            except: movemass+=i.movemass
+        information['Stamina Cost']=int(max(1, 5 * (movemass + self.I) / (self.basestrength+0.01)))
 
         return information
 
@@ -1808,7 +1816,12 @@ class Stab_2H(Attack):
         else:
             self.stattedweapon=False
             self.weapon.stats = self.limb.stats
-        self.attacker.stamina[0] -= int(max(1, 10 * (sum(i.movemass for i in self.limbs) + self.weapon.mass) / (self.basestrength+0.01)))
+
+        movemass=0
+        for i in self.limbs:
+            try: movemass+=i.movemass+i.attachpoint.movemass
+            except: movemass+=i.movemass
+        self.attacker.stamina[0] -= int(max(1, 5 * (movemass + self.weapon.mass) / (self.basestrength+0.01)))
 
         self.recoverytime=random.random()*0.5*self.speed*self.strikemass/self.pushforce
         self.recoverytime=self.recoverytime*defender_reach/self.strikelength
@@ -1847,8 +1860,11 @@ class Stab_2H(Attack):
 
         avgpressure=avgforce/(self.strikearea)
         information['Average Pressure']=avgpressure
-
-        information['Stamina Cost']=int(max(1, 10 * (sum(i.movemass for i in self.limbs) + self.weapon.mass) / (self.basestrength+0.01)))
+        movemass=0
+        for i in self.limbs:
+            try: movemass+=i.movemass+i.attachpoint.movemass
+            except: movemass+=i.movemass
+        information['Stamina Cost']=int(max(1, 5 * (movemass + self.weapon.mass) / (self.basestrength+0.01)))
 
         return information
 
@@ -1895,7 +1911,7 @@ class Bludgeon_2H(Attack):
                 arm=i
                 self.strikemass += i.movemass
                 self.strikelength = min(weapon.length + armlength,self.strikelength)
-            self.I+=arm.I
+            self.I+=0.2*arm.I
 
         self.I+=0.5*weapon.mass * ((self.strikelength-weapon.length)/2+weapon.centermass) ** 2
 
@@ -1941,7 +1957,11 @@ class Bludgeon_2H(Attack):
         else:
             self.stattedweapon=False
             self.weapon.stats = self.limb.stats
-        self.attacker.stamina[0] -= int(max(1, 8 * (sum(i.movemass for i in self.limbs) + self.I) / (self.basestrength+0.01)))
+        movemass=0
+        for i in self.limbs:
+            try: movemass+=i.movemass+i.attachpoint.movemass
+            except: movemass+=i.movemass
+        self.attacker.stamina[0] -= int(max(1, 4 * (movemass + self.I) / (self.basestrength+0.01)))
 
         self.recoverytime=self.I*self.w/torque
         self.recoverytime=self.recoverytime*defender_reach/self.strikelength
@@ -1984,7 +2004,11 @@ class Bludgeon_2H(Attack):
         avgpressure=avgforce/(self.strikearea/self.attacker.stats['tec']**0.5)
         information['Average Pressure']=avgpressure
 
-        information['Stamina Cost']=int(max(1, 8 * (sum(i.movemass for i in self.limbs) + self.I) / (self.basestrength+0.01)))
+        movemass=0
+        for i in self.limbs:
+            try: movemass+=i.movemass+i.attachpoint.movemass
+            except: movemass+=i.movemass
+        information['Stamina Cost']=int(max(1, 4 * (movemass + self.I) / (self.basestrength+0.01)))
 
         return information
 
@@ -2020,7 +2044,11 @@ class Swing_Pierce_2H(Bludgeon_2H):
         avgpressure=avgforce/(self.strikearea/self.attacker.stats['tec']**0.5)
         information['Average Pressure']=avgpressure
 
-        information['Stamina Cost']=int(max(1, 8 * (sum(i.movemass for i in self.limbs) + self.I) / (self.basestrength+0.01)))
+        movemass=0
+        for i in self.limbs:
+            try: movemass+=i.movemass+i.attachpoint.movemass
+            except: movemass+=i.movemass
+        information['Stamina Cost']=int(max(1, 4 * (movemass + self.I) / (self.basestrength+0.01)))
 
         return information
 
@@ -2068,8 +2096,11 @@ class Shield_Bash_2H(Bludgeon_2H):
 
         avgpressure=avgforce/(self.strikearea/self.attacker.stats['tec']**0.5)
         information['Average Pressure']=avgpressure
-
-        information['Stamina Cost']=int(max(1, 8 * (sum(i.movemass for i in self.limbs) + self.I) / (self.basestrength+0.01)))
+        movemass=0
+        for i in self.limbs:
+            try: movemass+=i.movemass+i.attachpoint.movemass
+            except: movemass+=i.movemass
+        information['Stamina Cost']=int(max(1, 4 * (movemass + self.I) / (self.basestrength+0.01)))
 
         return information
 
@@ -2108,7 +2139,7 @@ class Strike_2H(Attack):
                 armlength = arm.length
                 self.strikemass += arm.movemass
                 self.strikelength = min(weapon.length + armlength,self.strikelength)
-            elif self.limb.attachpoint is not None:
+            elif i.attachpoint is not None:
                 anchor = None
                 self.basestrength = ((0.5 * i.stats['str'] * i.ability + 0.5 * arm.stats['str'] * arm.ability + 0.1)**2+self.basestrength**2)**0.5
                 armlength = i.length
@@ -2120,7 +2151,7 @@ class Strike_2H(Attack):
                 arm=i
                 self.strikemass += i.movemass
                 self.strikelength = min(weapon.length + armlength,self.strikelength)
-            self.I+=arm.I
+            self.I+=0.2*arm.I
 
         self.I+=0.5*weapon.mass * ((self.strikelength-weapon.length)/2+centermass) ** 2
 
@@ -2168,7 +2199,12 @@ class Strike_2H(Attack):
         else:
             self.stattedweapon=False
             self.weapon.stats = self.limb.stats
-        self.attacker.stamina[0] -= int(max(1, 8 * (sum(i.movemass for i in self.limbs) + self.I) / (self.basestrength+0.01)))
+
+        movemass=0
+        for i in self.limbs:
+            try: movemass+=i.movemass+i.attachpoint.movemass
+            except: movemass+=i.movemass
+        self.attacker.stamina[0] -= int(max(1, 4 * (movemass + self.I) / (self.basestrength+0.01)))
 
         self.recoverytime=random.random()*self.I*self.w/torque
         self.recoverytime=self.recoverytime*defender_reach/self.strikelength
@@ -2213,7 +2249,11 @@ class Strike_2H(Attack):
         avgpressure=avgforce/(self.strikearea/self.attacker.stats['tec']**0.5)
         information['Average Pressure']=avgpressure
 
-        information['Stamina Cost']=int(max(1, 8 * (sum(i.movemass for i in self.limbs) + self.I) / (self.basestrength+0.01)))
+        movemass=0
+        for i in self.limbs:
+            try: movemass+=i.movemass+i.attachpoint.movemass
+            except: movemass+=i.movemass
+        information['Stamina Cost']=int(max(1, 4 * (movemass + self.I) / (self.basestrength+0.01)))
 
         return information
 
@@ -2247,7 +2287,11 @@ class Blunt_Thrust_2H(Stab_2H):
         avgpressure=avgforce/(self.strikearea)
         information['Average Pressure']=avgpressure
 
-        information['Stamina Cost']=int(max(1, 10 * (sum(i.movemass for i in self.limbs) + self.weapon.mass) / (self.basestrength+0.01)))
+        movemass=0
+        for i in self.limbs:
+            try: movemass+=i.movemass+i.attachpoint.movemass
+            except: movemass+=i.movemass
+        information['Stamina Cost']=int(max(1, 5 * (movemass + self.weapon.mass) / (self.basestrength+0.01)))
 
         return information
 

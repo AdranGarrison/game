@@ -259,6 +259,21 @@ class Human(Creature):
         self.vitals=[]
         self.attacks=[]
         self.disabled_attack_types=[Bite]
+        self.iprefs={'mass':-1,'length':1,'edge':1,'tip':1,'I':-1,'quality':1,'thickness':1,'type':[(Limb,-4)],
+                     'material':[(Bone_Material,-2),(Flesh_Material,-5),(Hair,-1)],'collection threshold':5,
+                     'weight threshold':10*self.stats['str']+20}
+
+        #Some people randomly collect things
+        collect=random.random()
+        while collect>0.992:
+            if random.random()>0.5:
+                self.iprefs['material'].append((random.choice([Iron,Steel,Copper,Bronze,Brass,Titanium,Aluminum,Zicral,
+                                                              Silk,Spider_Silk,Leather,Wood,Wool,Cotton,Basalt_Fiber]),
+                random.gauss(2,1)))
+            else:
+                self.iprefs['type'].append((random.choice(allitems),random.gauss(2,1)))
+                collect=random.random()
+
         #self.body=Torso(self.stats,'torso',owner=self)
         humanoid_assembler(self,self.stats,self.name)
         self.mass_calc()

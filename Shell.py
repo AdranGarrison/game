@@ -1,40 +1,35 @@
 __author__ = 'Alan'
 
 import os
-from Creatures import *
-from Attacks import *
-from Items import *
-from Materials import *
-from Limbs import *
+import Creatures
+import Attacks
+import Items
+import Materials
+import Limbs
 import NameGen
 import cProfile
 import Enchantments
 import pickle
+import copy
+from kivy.uix.floatlayout import FloatLayout
+from kivy.properties import ListProperty,StringProperty,NumericProperty
+from Materials import *
+import dill
+import sys
 
 
 
 os.environ['KIVY_NO_FILELOG']='true'
+sys.setrecursionlimit(5000)
 
-#Contained in this space are the objects which can be contained in cells
-
-
-class Sword():
-    def __init__(self,color=(1,1,1,1)):
-        self.name='dummysword'
-        self.image='./images/sword.png'
-        self.location=[None,None]
-        self.passable=True
-        self.color=color
-        self.targetable=False
-        self.hostile=[]
-
-        pass
 
 
 def picklecopy(object):
+    print(object)
     try:
-        return pickle.loads(pickle.dumps(object,-1))
+        return dill.loads(dill.dumps(object))
     except:
+    #    print('Pickling failed!')
         return copy.deepcopy(object)
 
 
@@ -43,7 +38,7 @@ def picklecopy(object):
 
 
 
-player=Human(player=True,stats={'s':15,'t':15,'p':15,'w':15,'l':15},name="Sir Bugsmasher")
+player=Creatures.Human(player=True,stats={'s':15,'t':15,'p':15,'w':15,'l':15},name="Sir Bugsmasher")
 
 #This class is the total game, all the pieces put together, complete with listeners for keyboard and mouse inputs
 class Shell(FloatLayout):
@@ -140,7 +135,7 @@ class Shell(FloatLayout):
 
 
 
-        player=Human(color=(0,1,0,0.8),player=True,stats={'s':15,'t':15,'p':15,'w':15,'l':15},name="Sir Bugsmasher")
+        player=Creatures.Human(color=(0,1,0,0.8),player=True,stats={'s':15,'t':15,'p':15,'w':15,'l':15},name="Sir Bugsmasher")
         #placing a player character
         self.player=player
 
@@ -188,12 +183,14 @@ class Shell(FloatLayout):
         self.playerstamina=self.player.stamina
         self.playerfocus=self.player.focus
 
-        if any(isinstance(i,Target_Dummy) for i in self.dungeonmanager.current_screen.creaturelist):
+        if any(isinstance(i,Creatures.Target_Dummy) for i in self.dungeonmanager.current_screen.creaturelist):
             self.player.stamina[0]=self.player.stamina[1]
             self.player.focus[0]=self.player.focus[1]
 
-        elif random.random()>0.98:
-            newcreaturetype=random.choice([Human,Amorphous_Horror,Giant,Halfling,Fairy,Goblin,Blob,Acid_Blob])
+        elif random.triangular(0,1,1/(len(self.dungeonmanager.current_screen.creaturelist)+1))>0.95:
+            newcreaturetype=random.choice([Creatures.Human,Creatures.Amorphous_Horror,Creatures.Giant,
+                                           Creatures.Halfling,Creatures.Fairy,Creatures.Goblin,Creatures.Blob,
+                                           Creatures.Acid_Blob])
             creature=newcreaturetype(color=(random.random(),random.random(),random.random(),0.8),name=NameGen.namegen(random.choice(['m','f'])))
             self.dungeonmanager.current_screen.place_creature(creature)
             self.dungeonmanager.current_screen.creaturelist.append(creature)
@@ -203,12 +200,18 @@ class Shell(FloatLayout):
     def mouselistener(self,instance,pos):
         newpos=self.dungeonmanager.to_widget(pos[0],pos[1])
         floor=self.dungeonmanager.current_screen
+        targetedcell=None
         for i in range(0,floor.dimensions[0]):
             for j in range(0,floor.dimensions[1]):
                 if floor.cells[i][j].collide_point(newpos[0],newpos[1]):
-                    floor.cells[i][j].highlight()
+                    #floor.cells[i][j].highlight()
+                    targetedcell=floor.cells[i][j]
                 else:
                     floor.cells[i][j].unhighlight()
+        if targetedcell!=None:
+            line=BaseClasses.get_line(self.player.location,targetedcell.location)
+            for position in line:
+                floor.cells[position[0]][position[1]].highlight()
 
     def on_key_down(self,keyboard,keycode,text,modifiers):
         if keycode[0]==303 or keycode[0]==304:
@@ -221,11 +224,11 @@ class Shell(FloatLayout):
                 self.dungeonmanager.current=self.dungeonmanager.current+'new'
             if keycode[1]=='t' and self.shift==True:
                 print("UNARMORED")
-                unittestone(Spear,enemy_armor=False,twohand=False)
+                unittestone(Items.Spear,enemy_armor=False,twohand=False)
 
 
                 print("ARMORED")
-                unittestone(Spear,enemy_armor=True,twohand=True)
+                unittestone(Items.Spear,enemy_armor=True,twohand=True)
             if keycode[1]=='b' and self.shift==True:
                 for i in self.player.limbs:
                     i.burn(1000,5)
@@ -416,7 +419,7 @@ class Shell(FloatLayout):
 
                 attacked=False
                 for i in self.dungeonmanager.current_screen.cells[target.location[0]+distance[0]][target.location[1]+distance[1]].contents:
-                    if i.targetable==True and hostilitycheck(target,i)==True:
+                    if i.targetable==True and Attacks.hostilitycheck(target,i)==True:
                         if target.player==True:
                             target.attack(i)
                             self.turn+=1
@@ -424,7 +427,7 @@ class Shell(FloatLayout):
                             target.attack(i)
                         attacked=True
                         break
-                    elif i.targetable==True and hostilitycheck(target,i)==False and target.player:
+                    elif i.targetable==True and Attacks.hostilitycheck(target,i)==False and target.player:
                         #TODO: Need ability to attack non-hostile targets (usually a bad idea, but should be possible)
                         self.log.addtext('Do you want to attack {}?'.format(i.name))
                 if attacked==False and target.player:
@@ -441,20 +444,20 @@ class Shell(FloatLayout):
     def populate(self):
         initialinventory=[]
 
-        initialinventory.append(Mace(material=Steel,id=True))
-        initialinventory.append(LongSword(material=Steel,id=True))
-        initialinventory.append(WarHammer(material=Steel,id=True))
-        initialinventory.append(Axe(material=Steel,id=True))
-        initialinventory.append(Glove(material=Steel,id=True))
-        initialinventory.append(Glove(material=Steel,id=True))
-        initialinventory.append(Chest(material=Steel,id=True))
-        initialinventory.append(Armlet(material=Steel,id=True))
-        initialinventory.append(Armlet(material=Steel,id=True))
-        initialinventory.append(Boot(material=Steel,id=True))
-        initialinventory.append(Boot(material=Steel,id=True))
-        initialinventory.append(Helm(material=Steel,id=True))
-        initialinventory.append(Legging(material=Steel,id=True))
-        initialinventory.append(Legging(material=Steel,id=True))
+        initialinventory.append(Items.Mace(material=Steel,id=True))
+        initialinventory.append(Items.LongSword(material=Steel,id=True))
+        initialinventory.append(Items.WarHammer(material=Steel,id=True))
+        initialinventory.append(Items.Axe(material=Steel,id=True))
+        initialinventory.append(Items.Glove(material=Steel,id=True))
+        initialinventory.append(Items.Glove(material=Steel,id=True))
+        initialinventory.append(Items.Chest(material=Steel,id=True))
+        initialinventory.append(Items.Armlet(material=Steel,id=True))
+        initialinventory.append(Items.Armlet(material=Steel,id=True))
+        initialinventory.append(Items.Boot(material=Steel,id=True))
+        initialinventory.append(Items.Boot(material=Steel,id=True))
+        initialinventory.append(Items.Helm(material=Steel,id=True))
+        initialinventory.append(Items.Legging(material=Steel,id=True))
+        initialinventory.append(Items.Legging(material=Steel,id=True))
         #self.player.equip(LongSword(material=Steel,id=True),log=False)
         #self.player.equip(Glove(material=Steel,id=True),log=False)
         #self.player.equip(Glove(material=Steel,id=True),log=False)
@@ -469,11 +472,11 @@ class Shell(FloatLayout):
         self.dungeonmanager.current_screen.cells[3][3].contents.append(self.player)
 
         self.player.inventory.extend(initialinventory)
-        self.player.inventory.extend([Mace(material=Steel,id=True),LongSword(material=Steel,id=True)])
+        self.player.inventory.extend([Items.Mace(material=Steel,id=True),Items.Knife(material=Steel,id=True)])
         self.player.inventory.extend(self.player.equipped_items)
-        self.player.inventory.extend([QuarterStaff()])
+        self.player.inventory.extend([Items.QuarterStaff()])
 
-        self.player.disabled_attack_types.append(Kick)
+        self.player.disabled_attack_types.append(Attacks.Kick)
         #self.player.disabled_attack_types.append(Stab_1H)
 
         while any(isinstance(x,MapTiles.Wall) for x in self.dungeonmanager.current_screen.cells[self.player.location[0]][self.player.location[1]].contents):
@@ -490,34 +493,37 @@ class Shell(FloatLayout):
         currentscreen=self.dungeonmanager.current_screen
 
         #Some objects to play around with
-        currentscreen.creaturelist=[Human(color=(1,0,0,0.8),stats={'s':15,'t':15,'p':15,'w':15,'l':15})]
+        currentscreen.creaturelist=[Creatures.Human(color=(1,0,0,0.8),stats={'s':15,'t':15,'p':15,'w':15,'l':15})]
         adversarymaterial=Brass
 
-        foe=Human(color=(0,1,0,0.8))
+        foe=Creatures.Human(color=(0,1,0,0.8))
         currentscreen.creaturelist.append(foe)
         adversary=currentscreen.creaturelist[0]
-        adversary.disabled_attack_types=[Slash_1H,Stab_1H,Kick,Punch,Bludgeon_1H,Bite]
+        adversary.disabled_attack_types=[Attacks.Slash_1H,Attacks.Stab_1H,Attacks.Kick,Attacks.Punch,Attacks.Bludgeon_1H,Attacks.Bite]
 
-        dummyarmor=Chest(material=adversarymaterial)
+        dummyarmor=Items.Chest(material=adversarymaterial)
 
         currentscreen.creaturelist[0].equip(dummyarmor,log=False)
-        currentscreen.creaturelist[0].equip(Glove(material=adversarymaterial),log=False)
-        currentscreen.creaturelist[0].equip(Glove(material=adversarymaterial),log=False)
-        currentscreen.creaturelist[0].equip(Armlet(material=adversarymaterial),log=False)
-        currentscreen.creaturelist[0].equip(Armlet(material=adversarymaterial),log=False)
-        currentscreen.creaturelist[0].equip(Boot(material=adversarymaterial),log=False)
-        currentscreen.creaturelist[0].equip(Boot(material=adversarymaterial),log=False)
-        currentscreen.creaturelist[0].equip(Helm(material=adversarymaterial),log=False)
-        adversary.equip(LongSword(material=adversarymaterial),log=False)
-        adversary.equip(Mace(material=adversarymaterial),log=False)
-        adversary.equip(Shield(material=adversarymaterial),log=False)
-        adversary.equip(Buckler(material=adversarymaterial),log=False)
-        adversary.equip(Legging(material=adversarymaterial),log=False)
-        adversary.equip(Legging(material=adversarymaterial),log=False)
+        currentscreen.creaturelist[0].equip(Items.Glove(material=adversarymaterial),log=False)
+        currentscreen.creaturelist[0].equip(Items.Glove(material=adversarymaterial),log=False)
+        currentscreen.creaturelist[0].equip(Items.Armlet(material=adversarymaterial),log=False)
+        currentscreen.creaturelist[0].equip(Items.Armlet(material=adversarymaterial),log=False)
+        currentscreen.creaturelist[0].equip(Items.Boot(material=adversarymaterial),log=False)
+        currentscreen.creaturelist[0].equip(Items.Boot(material=adversarymaterial),log=False)
+        currentscreen.creaturelist[0].equip(Items.Helm(material=adversarymaterial),log=False)
+        adversary.equip(Items.LongSword(material=adversarymaterial),log=False)
+        adversary.equip(Items.Mace(material=adversarymaterial),log=False)
+        adversary.equip(Items.Shield(material=adversarymaterial),log=False)
+        adversary.equip(Items.Buckler(material=adversarymaterial),log=False)
+        adversary.equip(Items.Legging(material=adversarymaterial),log=False)
+        adversary.equip(Items.Legging(material=adversarymaterial),log=False)
 
         adversary.inventory.extend(adversary.equipped_items)
 
-        for i in adversary.inventory: i.randomize(1)
+        for i in adversary.inventory:
+            i.randomize(1)
+            adversary.value_item(i)
+
 
         '''
         for i in adversary.limbs:
@@ -532,16 +538,16 @@ class Shell(FloatLayout):
         self.dungeonmanager.current_screen.place_creature(adversary,[6,6])
         #self.dungeonmanager.current_screen.cells[6][6].contents.append(currentscreen.creaturelist[0])
         #self.dungeonmanager.current_screen.cells[8][9].contents.append(foe)
-        self.dungeonmanager.current_screen.cells[7][7].contents.append(Sword())
-        self.dungeonmanager.current_screen.cells[8][7].contents.append(Shield())
+        self.dungeonmanager.current_screen.cells[7][7].contents.append(Items.LongSword())
+        self.dungeonmanager.current_screen.cells[8][7].contents.append(Items.Shield())
         self.player.inventory_setup()
 
-        wolf=Wolf()
+        wolf=Creatures.Wolf()
         currentscreen.creaturelist.append(wolf)
         currentscreen.place_creature(wolf,[10,10])
 
 
-
+        self.player.inventory_setup()
         for i in currentscreen.creaturelist:
             for j in i.inventory:
                 j.generate_descriptions(per=self.player.stats['per'])
@@ -553,16 +559,20 @@ class Shell(FloatLayout):
         for i in self.player.limbs:
             for j in i.layers:
                 j.generate_descriptions(per=100)
+        for i in range(0,30):
+            item=Items.weighted_generation()
+            self.dungeonmanager.current_screen.place_creature(item)
 
 
 
-        for i in adversary.limbs:
-            i.add_outer_layer(Hair,Hair_Material,0.01)
-
+        #for i in adversary.limbs:
+        #    i.add_outer_layer(Hair,Hair_Material,0.01)
+'''
         for i in self.player.inventory:
             Enchantments.Acidic(i)
-            Enchantments.Burning(i)
-
+            Enchantments.Burning(i,strength=8)
+            Enchantments.BloodDrinking(i)
+'''
 
 
 
@@ -578,8 +588,8 @@ shell.populate()
 
 
 def unittestone(weapon,armored=False,enemy_armor=False,twohand=False):
-    attacker1=Human(stats={'s':15,'t':15,'p':15,'w':15,'l':15})
-    defender1=Target_Dummy(stats={'s':15,'t':15,'p':15,'w':15,'l':15})
+    attacker1=Creatures.Human(stats={'s':15,'t':15,'p':15,'w':15,'l':15})
+    defender1=Creatures.Target_Dummy(stats={'s':15,'t':15,'p':15,'w':15,'l':15})
     attacker1.location=None
     defender1.location=None
     theweapon=weapon(material=Steel)
@@ -591,19 +601,19 @@ def unittestone(weapon,armored=False,enemy_armor=False,twohand=False):
         attacker1.equip(theweapon,log=False)
         attacker1.equip(theweapon,log=False)
     if armored==True:
-        attacker1.equip(Glove(material=Steel))
-        attacker1.equip(Glove(material=Steel))
-        attacker1.equip(Armlet(material=Steel))
-        attacker1.equip(Armlet(material=Steel))
-        attacker1.equip(Legging(material=Steel))
-        attacker1.equip(Legging(material=Steel))
-        attacker1.equip(Chest(material=Steel))
-        attacker1.equip(Helm(material=Steel))
-        attacker1.equip(Boot(material=Steel))
-        attacker1.equip(Boot(material=Steel))
+        attacker1.equip(Items.Glove(material=Steel))
+        attacker1.equip(Items.Glove(material=Steel))
+        attacker1.equip(Items.Armlet(material=Steel))
+        attacker1.equip(Items.Armlet(material=Steel))
+        attacker1.equip(Items.Legging(material=Steel))
+        attacker1.equip(Items.Legging(material=Steel))
+        attacker1.equip(Items.Chest(material=Steel))
+        attacker1.equip(Items.Helm(material=Steel))
+        attacker1.equip(Items.Boot(material=Steel))
+        attacker1.equip(Items.Boot(material=Steel))
 
 
-    attacker1.disabled_attack_types=[Kick,Bite]
+    attacker1.disabled_attack_types=[Attacks.Kick,Attacks.Bite]
     bruising=0
     bruising_events=0
     breaking=0
@@ -618,16 +628,16 @@ def unittestone(weapon,armored=False,enemy_armor=False,twohand=False):
     crushing_events=0
     for i in range (0,1000):
         if enemy_armor==True:
-            defender1.equip(Glove(material=Steel),log=False)
-            defender1.equip(Glove(material=Steel),log=False)
-            defender1.equip(Armlet(material=Steel),log=False)
-            defender1.equip(Armlet(material=Steel),log=False)
-            defender1.equip(Legging(material=Steel),log=False)
-            defender1.equip(Legging(material=Steel),log=False)
-            defender1.equip(Chest(material=Steel),log=False)
-            defender1.equip(Helm(material=Steel),log=False)
-            defender1.equip(Boot(material=Steel),log=False)
-            defender1.equip(Boot(material=Steel),log=False)
+            defender1.equip(Items.Glove(material=Steel),log=False)
+            defender1.equip(Items.Glove(material=Steel),log=False)
+            defender1.equip(Items.Armlet(material=Steel),log=False)
+            defender1.equip(Items.Armlet(material=Steel),log=False)
+            defender1.equip(Items.Legging(material=Steel),log=False)
+            defender1.equip(Items.Legging(material=Steel),log=False)
+            defender1.equip(Items.Chest(material=Steel),log=False)
+            defender1.equip(Items.Helm(material=Steel),log=False)
+            defender1.equip(Items.Boot(material=Steel),log=False)
+            defender1.equip(Items.Boot(material=Steel),log=False)
         if weapon!=None:
             attacker1.equip(weapon(material=Steel),log=False)
             attacker1.equip(weapon(material=Steel),log=False)

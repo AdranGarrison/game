@@ -260,7 +260,7 @@ class Hand(Limb):
                 if isinstance(i,Finger):
                     self.dexterity+=i.ability
                 if isinstance(i,Claw):
-                    print('claw here')
+                    #print('claw here')
                     self.dexterity+=i.ability/3
                     claws.append(i)
         if claws!=[]:
@@ -272,7 +272,12 @@ class Hand(Limb):
         if self.dexterity<=0:
             self.grasp=False
             if self.equipment['grasp'] is not None:
-                self.unequip('grasp',drop=True)
+                if self.equipment['grasp'].equipped==[self]:
+                    try: self.owner.unequip(self.equipment['grasp'],drop=True)
+                    except: self.unequip('grasp',drop=True)
+
+                else:
+                    self.unequip('grasp',drop=False)
         else:
             self.grasp=True
 
@@ -1438,7 +1443,12 @@ class Tentacle(Limb):
         if self.dexterity<=0:
             self.grasp=False
             if self.equipment['grasp'] is not None:
-                self.unequip('grasp',drop=True)
+                if self.equipment['grasp'].equipped==[self]:
+                    try: self.owner.unequip(self,drop=True)
+                    except: self.unequip('grasp',drop=True)
+                else:
+                    try: self.owner.unequip(self,drop=False)
+                    except: self.unequip('grasp',drop=False)
         else:
             self.grasp=True
 
@@ -1567,8 +1577,7 @@ class Snout(Limb):
         self.natural=natural
         self.name=name
         self.smell=True
-        self.smell_sense=1
-        self.smell_acuity=100
+        self.smell_sense=100
         self.ability=1
         self.stats=stats
         self.equiptype=['helmet']

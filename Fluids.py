@@ -10,7 +10,10 @@ class Blood(BaseClasses.Fluid):
         self.color=(1,0,0,0.3)
         self.adjective='bloody'
         self.basicname='blood'
-        self.name=''.join((self.owner.basicname,' blood'))
+        if self.owner!=None:
+            self.name=''.join((self.owner.basicname,' blood'))
+        else:
+            self.name='blood'
 
     def process(self,log=True,limb=None,**kwargs):
         if self.on is not None:

@@ -187,7 +187,7 @@ class Gladius(Item):
         self.curvature=0
         self.attacktype=['stab','slash']
         self.function=1
-        self.attacks=[Slash_1H,Stab_1H],Slash_2H,Stab_2H
+        self.attacks=[Slash_1H,Stab_1H,Slash_2H,Stab_2H]
         self.recalc()
         self.damagetype.append('blunt')
         self.generate_descriptions()
@@ -901,3 +901,47 @@ class ExperimentalMace(Mace):
     def __init__(self,material=Iron,quality=1):
         super().__init__(material=material,quality=quality)
         self.attacks=[Experimental_Bash]
+
+default_item_weights=[(Bone,0),(Flesh,0),(Hair,0),(LongSword,10),(Gladius,5),(Knife,7),(Saber,4),(Claymore,4),(Mace,8),
+                 (WarHammer,3),(Spear,5),(Axe,6),(QuarterStaff,3),(Chest,8),(Glove,12),(Legging,12),(Armlet,12),
+                (Boot,12),(Helm,8),(GreatHelm,3),(Shield,6),(Buckler,6)]
+total_item_weight=sum(i[1] for i in default_item_weights)
+
+hard_material_weights=[(Iron,10),(Bone_Material,7),(Wood,10),(Copper,10),(Brass,6),(Bronze,5),(Steel,4),(Aluminum,3),(Silver,2),(Duraluminum,1),(Zicral,1)]
+soft_material_weights=[(Leather,10),(Cotton,10),(Wool,9),(Silk,5),(Spider_Silk,2),(Basalt_Fiber,1),(Fur,3),(Flesh_Material,1)]
+
+def weighted_choice(pairs):
+    total=0
+    for i in pairs:
+        total+=i[1]
+    number=random.random()*total
+    for i in pairs:
+        if number<=i[1]:
+            return i[0]
+        else: number-=i[1]
+
+def weighted_generation(weighted_items=default_item_weights,totalweight=total_item_weight,hard_materials=hard_material_weights,soft_materials=soft_material_weights):
+    chosen_material=None
+    choicenumber=random.random()*totalweight
+    for i in weighted_items:
+        if choicenumber<=i[1]:
+            itemtype=i[0]
+            break
+        else:
+            choicenumber-=i[1]
+    if itemtype in (LongSword,Gladius,Knife,Saber,Claymore,Mace,WarHammer,Spear,Axe,QuarterStaff,Shield,Buckler):
+        if random.random()<0.99:
+            chosen_material=weighted_choice(hard_materials)
+    if chosen_material==None:
+        mats=hard_materials.copy()
+        mats.extend(soft_materials)
+        chosen_material=weighted_choice(mats)
+    item=itemtype(material=chosen_material)
+    item.randomize()
+    return item
+
+
+
+
+allitems=[Bone,Flesh,Hair,Limb,LongSword,Gladius,Knife,Saber,Claymore,Mace,WarHammer,Spear,Axe,QuarterStaff,
+          Chest,Glove,Legging,Armlet,Boot,Helm,GreatHelm,Shield,Buckler]

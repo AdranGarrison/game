@@ -7,6 +7,9 @@ import random
 from kivy.uix.widget import Widget
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.label import Label
+from kivy.graphics.fbo import Fbo
+from kivy.graphics import Canvas
+from kivy.properties import ObjectProperty
 import Shell
 import Attacks as A
 import Contamination
@@ -19,6 +22,49 @@ import copy
 
 def inventoryadd(item):
     print('{} added to inventory'.format(item))
+
+def get_line(start,stop):
+    x1,y1=start
+    x2,y2=stop
+
+    coordinateswitch=False
+    if abs(y2-y1)>abs(x2-x1):
+        x1,y1=y1,x1
+        x2,y2=y2,x2
+        coordinateswitch=True
+
+    pointswitch=False
+    if x1>x2:
+        x1,x2=x2,x1
+        y1,y2=y2,y1
+        pointswitch=True
+
+    dx=x2-x1
+    dy=y2-y1
+
+    try: slope=dy/dx
+    except ZeroDivisionError: slope=1000
+    if slope>0:
+        sign=1
+    else: sign=-1
+    points=[]
+
+    for x in range(0,dx+1):
+        y=int(y1+slope*x+0.5)
+        if coordinateswitch==True:
+            point=(y,x+x1)
+        else:
+            point=(x+x1,y)
+        points.append(point)
+
+    if pointswitch:
+        points.reverse()
+    return points
+
+
+
+
+
 
 
 incapacitate=re.compile("incapacitated")
@@ -78,6 +124,8 @@ class Limb():
         self.contains_vitals=False
         self.image='./images/limb.png'
         self.location=[None,None]
+        self.floor=None
+        self.vision_blocking=False
         self.color=color
         self.passable=True
         self.targetable=False
@@ -273,6 +321,7 @@ class Limb():
         if slot=='grasp':
             self.attacks=self.defaultattacks
         if self.equipment[slot] is not None:
+            print(self.equipment[slot],self.equipment[slot].equipped)
             if cascade==False:
                 if destroyed==False:
                     if drop==True:
@@ -296,9 +345,10 @@ class Limb():
                     messages.append("The {} is destroyed!".format(self.equipment[slot].name))
                 if destroyed==True and self.equipment[slot] in self.owner.inventory:
                     self.owner.inventory.remove(self.equipment[slot])
-            if self.equipment[slot] in self.owner.equipped_items:
+            if self.equipment[slot] in self.owner.equipped_items and self.equipment[slot].equipped==[self]:
                 self.owner.equipped_items.remove(self.equipment[slot])
-            self.equipment[slot].equipped=[]
+            try: self.equipment[slot].equipped.remove(self)
+            except ValueError: self.equipment[slot].equipped=[]
             self.equipment[slot]=None
             try: self.armor=self.equipment[self.armortype]
             except KeyError: self.armor=None
@@ -334,7 +384,9 @@ class Limb():
         for i in self.equipment:
             if self.equipment[i] is not None:
                 if self.equipment[i].wield in self.primaryequip and self in self.equipment[i].equipped:
-                    self.unequip(i,drop=True,log=False)
+                    if self.equipment[i].equipped==[self]:
+                        self.unequip(i,drop=True,log=False)
+                    else: self.unequip(i,drop=False,log=False)
                 else:
                     self.unequip(i,drop=False,log=False)
         if primary:
@@ -345,7 +397,7 @@ class Limb():
                 if self not in self.attachpoint.limbs:
                     print("Tried to remove {}'s {} from {} and failed".format(self.owner.name,self.name,self.attachpoint.name))
                     print(self.attachpoint.limbs)
-                self.attachpoint.limbs.remove(self)
+                else: self.attachpoint.limbs.remove(self)
             if self.owner.location is not None:
                 self.location[0]=min(max(self.owner.location[0]+int(random.gauss(0,2)),0),Shell.shell.dungeonmanager.current_screen.dimensions[0])
                 self.location[1]=min(max(self.owner.location[1]+int(random.gauss(0,2)),0),Shell.shell.dungeonmanager.current_screen.dimensions[1])
@@ -458,7 +510,7 @@ class Limb():
     def describe_damage(self):
         self.damagemessage=''
         for i in self.layers:
-            self.damagemessage=''.join((self.damagemessage,i.describe_damage(title=i.name)))
+            self.damagemessage=''.join((self.damagemessage,i.describe_damage(title=''.join(('The ',i.name)))))
         return self.damagemessage
 
     def can_equip(self,item,override=False):
@@ -466,7 +518,7 @@ class Limb():
             return (True,True)
         if item.wield not in self.primaryequip:
             return (False,True)
-        if item.wield=='grasp':
+        if item.wield=='grasp' and self.grasp:
             return (True,True)
         if not hasattr(item,'in_radius'):
             return (False,True)
@@ -528,6 +580,9 @@ class Creature():
         self.enchantments=[]
         self.kills=[]
         self.location=[None,None]
+        self.floor=None
+        self.vision_blocking=False
+        self.visible_cells=[]
         self.missing_limbs=[]
         self.alive=True
         self.tension=0
@@ -542,17 +597,22 @@ class Creature():
         self.can_smell=False
         self.can_hear=False
         self.feels_pain=True
+        self.seen_by_player=False
+        self.action_queue=[]
         self.balance=0
         self.vision=0
         self.hearing=0
         self.smell_sense=0
         self.esp=0
+        self.iprefs={'mass':-1,'length':1,'edge':1,'tip':1,'I':-1,'quality':1,'thickness':1,'type':[],'material':[],'collection threshold':5,'weight threshold':170}
+        self.item_values={}
         self.equipped_items=[]
         self.inventory=[]
         self.conditions=[]
         self.balance_recovery=0
         self.classification=[]
         self.hostile=[]
+        self.target=None
         self.target_preference='random'
         self.preference_enforcement=False
         self.disabled_attack_types=[]
@@ -571,7 +631,7 @@ class Creature():
         for i in self.limbs:
             if i.ability>0 and i.can_attack==True:
                 for j in i.attacks:
-                    if (j.name,j.limb,j.weapon) in self.disabled_attacks:
+                    if j.sig in self.disabled_attacks: #(j.name,j.limb,j.weapon)
                         j.disabled=True
                     if j.weapon is not None and hasattr(j.weapon,'equipped'):
                         hands=len(j.weapon.equipped)
@@ -686,7 +746,7 @@ class Creature():
 
             #run AI routines
             if self.player==False and self.alive==True:
-                self.chase(Shell.shell.player)
+                self.choose_action()
 
             total_contamination=-self.magic_contamination['total']
             for keys in self.magic_contamination:
@@ -720,17 +780,18 @@ class Creature():
                 if i.equipment[item.wield] is None and item.wield=='grasp' and len(item.equipped)>0:
                     i.equip(item)
                     if log==True:
-                        messages.append("{} is now also held in {}".format(item.name,i.name))
+                        Shell.shell.log.addtext("{} is now also held in {}".format(item.name,i.name))
                     self.updateattacks()
                     self.mass_calc()
                     return
         self.mass_calc()
 
-    def unequip(self,item,log=True):
+    def unequip(self,item,log=True,drop=False):
+
         for i in self.limbs:
             if hasattr(item,'wield') and item.wield in i.equipment:
                 if i.equipment[item.wield]==item:
-                    i.unequip(item.wield,log=log)
+                    i.unequip(item.wield,log=log,drop=drop)
 
     def die(self):
         #self.targetable=False
@@ -748,6 +809,73 @@ class Creature():
             i.equipped=[]
             self.inventory.remove(i)
             Shell.shell.dungeonmanager.current_screen.cells[self.location[0]][self.location[1]].contents.append(i)
+
+    def choose_action(self):
+        #If no target, choose a target
+        if self.target!=None and self.target not in self.visible_creatures:
+            self.target=None
+        if self.target!=None and self.target.alive==False:
+            self.target=None
+        if self.target==None:
+            potential_targets=[]
+            for i in self.visible_creatures:
+                if A.hostilitycheck(self,i) and i.alive:
+                    potential_targets.append(i)
+            if potential_targets!=[]:
+                self.target=random.choice(potential_targets)
+        #If we have a target and it is visible, chase and kill
+        if self.target!=None and self.target in self.visible_creatures:
+            self.chase(self.target)
+            return
+        #Follow steps in the action queue if they exist
+        if self.action_queue!=[]:
+            instructions=self.action_queue.pop(0)
+            if instructions[0]=='unequip':
+                #format is command, item, current equipment location
+                if self in Shell.shell.player.visible_creatures:
+                    self.unequip(instructions[1],log=True)
+                else:
+                    self.unequip(instructions[1],log=False)
+            elif instructions[0]=='equip':
+                #format is command, item, limb
+                instructions[2].equip(instructions[1])
+                if self in Shell.shell.player.visible_creatures:
+                    messages.append("{} equips {}".format(self.name,instructions[1].name))
+
+        #If we are not in combat, maybe we should pick up some items
+        #take inventory of surrounding items
+        for i in self.visible_items:
+            if isinstance(i,Item) or isinstance(i,Limb): pass
+            else: break
+            self.value_item(i)
+            if hasattr(i,'wield') and self.movemass+i.mass<self.iprefs['weight threshold']:
+                #See if it outvalues what we currently have equipped
+                for j in self.limbs:
+                    if i.wield in j.primaryequip:
+                        if j.equipment[i.wield]==None or self.item_values[i]>self.item_values[j.equipment[i.wield]]:
+                            #If we are standing on it, pick it up
+                            if i.location==self.location:
+                                self.inventory_add(i)
+                                self.floor.cells[self.location[0]][self.location[1]].contents.remove(i)
+                                i.location=[None,None]
+                                if j.equipment[i.wield]!=None:
+                                    self.action_queue.append(['unequip',j.equipment[i.wield],j])
+                                self.action_queue.append(['equip',i,j])
+                            else: self.chase(i)
+                            return
+
+        #Even if it's useless for us, take it if it is above collection threshold but won't put us over weight
+            if self.movemass+i.mass<self.iprefs['weight threshold'] and self.item_values[i]>self.iprefs['collection threshold']:
+                if i.location==self.location:
+                    self.inventory_add(i)
+                    self.floor.cells[self.location[0]][self.location[1]].contents.remove(i)
+                    i.location=[None,None]
+                else: self.chase(i)
+                return
+
+
+
+        self.wander()
 
     def move(self,movement):
         if self.can_walk==True:
@@ -980,18 +1108,19 @@ class Creature():
                 self.can_grasp=True
             if i.sight==True:
                 self.can_see=True
-                self.vision+=i.vision*i.stats['per']*i.visual_acuity
+                self.vision+=i.vision*i.stats['per']
             if i.hear==True:
                 self.can_hear=True
-                self.hearing+=i.hearing*i.stats['per']*i.hearing_acuity
+                self.hearing+=i.hearing*i.stats['per']
             if i.smell==True:
                 self.can_smell=True
-                self.smell_sense+=i.smell_sense*i.stats['per']*i.smell_acuity
+                self.smell_sense+=i.smell_sense*i.stats['per']
 
         if self.vision<=0 and self.smell_sense<=0 and self.hearing<=0 and self.esp<=0 and 'mindless' not in self.classification:
             self.conditions.append('sensory_incapacitated')
         elif "sensory_incapacitated" in self.conditions:
             self.conditions.remove("sensory_incapacitated")
+        self.check_visible_cells()
 
     def recover(self,fullheal=False,effect=1):
         for i in self.limbs:
@@ -1027,7 +1156,7 @@ class Creature():
 
     def magic_effects(self):
         mode=self.stats['luc']/(10+self.stats['luc'])
-        if random().random()*self.magic_contamination['total']>self.stats['wil']**2*random.triangular(0,1,mode=mode):
+        if random().random()*self.magic_contamination['total']>self.stats['wil']*self.stats['wil']*random.triangular(0,1,mode=mode):
             effect_type=random.randint(0,self.magic_contamination['total'])
             if effect_type<self.magic_contamination['dark']:
                 #dark-type magic contamination effect
@@ -1067,11 +1196,12 @@ class Creature():
         pass
 
     def inventory_add(self,item):
-        item.touched_by_player=True
-        if self.can_see==True:
-            item.seen_by_player=True
-        item.generate_descriptions(self.stats['per'])
-        letters='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-='
+        if self==Shell.shell.player:
+            item.touched_by_player=True
+            if self.can_see==True:
+                item.seen_by_player=True
+            item.generate_descriptions(self.stats['per'])
+            letters='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-='
         if item not in self.inventory:
             self.inventory.append(item)
             item.in_inventory=self
@@ -1128,6 +1258,121 @@ class Creature():
             self.indexed_inventory[letter]=i
             i.inventory_index=letter
             number+=1
+
+    def check_visible_cells(self):
+        self.visible_cells=[]
+        vision_radius=2*(self.vision)**0.5
+        outermost_points=[]
+        radius_squared=vision_radius*vision_radius
+        '''
+        for x in range (0,int(vision_radius)+1):
+            y=(radius_squared-x*x)**0.5
+            y=int(y)
+            outermost_points.append([self.location[0]+x,self.location[1]+y])
+            outermost_points.append([self.location[0]+x,self.location[1]-y])
+            outermost_points.append([self.location[0]-x,self.location[1]+y])
+            outermost_points.append([self.location[0]-x,self.location[1]-y])
+            while y>0:
+                y=y-1
+                length=int((x*x+y*y)**0.5)
+                if length==int(vision_radius) or length+1==int(vision_radius):
+                    outermost_points.append([self.location[0]+x,self.location[1]+y])
+                    outermost_points.append([self.location[0]+x,self.location[1]-y])
+                    outermost_points.append([self.location[0]-x,self.location[1]+y])
+                    outermost_points.append([self.location[0]-x,self.location[1]-y])
+        x1,y1=self.location[0],self.location[1]
+        for i in outermost_points:
+            #generate a set of points on connecting line
+            visible_indices=get_line([x1,y1],i)
+            cease_line=False
+            for j in visible_indices:
+                try:
+                    cell=self.floor.cells[j[0]][j[1]]
+                    self.visible_cells.append(cell)
+                    if cell.transparent==False:
+                        cease_line=True
+                except KeyError:
+                    cease_line=True
+                if cease_line==True:
+                    break
+        '''
+        visible_indices=[]
+        for x in range(0,int(vision_radius*0.70710678)+1):
+            visible_indices.append([])
+            for y in range(0,x+1):
+                visible_indices[x].append([x,y])
+        for x in range(int(vision_radius*0.70710678)+1,int(vision_radius)+1):
+            ymax=(radius_squared-x*x)**0.5
+            visible_indices.append([])
+            for y in range(0,int(ymax)+1):
+                visible_indices[x].append([x,y])
+        self.visible_cells=self.floor.shadowcasting(visible_indices,self.location)
+        #print(self.visible_cells)
+        #self.visible_cells=set(self.visible_cells)
+        self.visible_creatures=[]
+        self.visible_items=[]
+        for i in self.visible_cells:
+            self.visible_creatures.extend(i.creatures)
+            self.visible_items.extend(i.items)
+            if self==Shell.shell.player:
+                i.visible_to_player=True
+                i.seen_by_player=True
+                i.update_graphics()
+        if self==Shell.shell.player:
+            for i in self.visible_items:
+                i.seen_by_player=True
+            for i in self.visible_creatures:
+                i.seen_by_player=True
+        return
+
+    def value_item(self,item):
+        if item in self.item_values:
+            return
+
+        value=0
+
+        equippable=False
+        if hasattr(item,'wield'):
+            for i in self.limbs:
+                if i.can_equip(item)[0]:
+                    equippable=True
+                    break
+        #for weapons
+        if hasattr(item,'sortingtype') and item.sortingtype=='weapon' and equippable==True:
+            if hasattr(item,'mass'):
+                value+=self.iprefs['mass']*item.mass/5
+            if hasattr(item,'length'):
+                value+=self.iprefs['length']*item.length
+            if hasattr(item,'edge'):
+                value+=self.iprefs['edge']*1/(100000*item.edge)
+            if hasattr(item,'tip'):
+                value+=self.iprefs['tip']*1/(10000000*item.tip)
+            if hasattr(item,'I'):
+                value+=self.iprefs['I']*item.I
+            if hasattr(item,'quality'):
+                value+=self.iprefs['quality']*item.quality
+        #for armor
+        elif hasattr(item,'sortingtype') and item.sortingtype=='armor' and equippable==True:
+            if hasattr(item,'mass'):
+                value+=self.iprefs['mass']*item.mass/5
+            if hasattr(item,'thickness'):
+                value+=self.iprefs['thickness']*item.thickness/0.005
+            if hasattr(item,'quality'):
+                value+=self.iprefs['quality']*item.quality
+
+        for i in self.iprefs['type']:
+            if isinstance(item,i[0]):
+                value=max(value+i[1],value*i[1])
+
+        for i in self.iprefs['material']:
+            if hasattr(item,'material') and isinstance(item.material,i[0]):
+                value=max(value+i[1],value*i[1])
+
+        print(item.name,value)
+        self.item_values[item]=value
+
+    def generate_equipment(self):
+        pass
 
 class Material():
     def __init__(self):
@@ -1436,6 +1681,8 @@ class Item():
         self.inventory_index=None
         self.in_inventory=None
         self.location=[None,None]
+        self.floor=None
+        self.vision_blocking=False
         self.image='./images/Defaultitem.png'
         self.damage={'bruise':0,'crack':0,'dent':0,'bend':0,'deform':0,'break':0,'cut':0,'shatter':0,'crush':0,'burn':0,
                      'pierce':0,'edgedull':0,'tipdull':0,'edgechip':0,'tipchip':0,'rust':0,'corrode':0,'disintegrate':0}
@@ -2614,30 +2861,27 @@ class Item():
 
     def randomize(self,stdev=0.1,material_set=None):
         r={}
-        try: r['length']=self.length
-        except AttributeError: r['length']=None
-        try: r['thickness']=self.thickness
-        except AttributeError:r['thickness']=None
-        try: r['edge']=self.edge
-        except AttributeError:r['edge']=None
-        try: r['tip']=self.tip
-        except AttributeError:r['tip']=None
-        try: r['head']=self.head
-        except AttributeError:r['head']=None
-        try: r['headvolume']=self.headvolume
-        except AttributeError:r['headvolume']=None
-        try: r['headsize']=self.headsize
-        except AttributeError:r['headsize']=None
-        try: r['width']=self.width
-        except AttributeError:r['width']=None
-        try: r['in radius']=self.in_radius
-        except AttributeError:r['in radius']=None
-        try: r['quality']=self.quality
-        except AttributeError:r['quality']=None
+        if hasattr(self,'length'): r['length']=self.length*random.triangular(1/2,1.5,1)
+        else: r['length']=None
+        if hasattr(self,'thickness'): r['thickness']=self.thickness*random.triangular(1/3,2,1)
+        else: r['thickness']=None
+        if hasattr(self,'edge'): r['edge']=self.edge*random.triangular(1/4,5,1)
+        else: r['edge']=None
+        if hasattr(self,'tip'): r['tip']=self.tip*random.triangular(1/4,5,1)
+        else: r['tip']=None
+        if hasattr(self,'head'): r['head']=self.head*random.triangular(2/3,1.5,1)
+        else: r['head']=None
+        if hasattr(self,'headvolume'): r['headvolume']=self.headvolume*random.triangular(0.5,2,1)
+        else: r['headvolume']=None
+        if hasattr(self,'headsize'): r['headsize']=self.headsize*random.triangular(0.5,2,1)
+        else: r['headsize']=None
+        if hasattr(self,'width'): r['width']=self.width*random.triangular(2/3,1.5,1)
+        else: r['width']=None
+        if hasattr(self,'in_radius'): r['in radius']=self.in_radius*random.triangular(0.5,2,1)
+        else: r['in radius']=None
+        if hasattr(self,'quality'): r['quality']=self.quality*random.triangular(0.2,5,1)
+        else: r['quality']=None
 
-        for i in r:
-            try: r[i]=max(r[i]*random.gauss(1,stdev),0.01*r[i])
-            except TypeError: pass
         self.material=type(self.material)
         if material_set==None:
             pass
@@ -2655,6 +2899,7 @@ class Fluid():
         self.identification_difficulty=5
         self.passable=True
         self.targetable=False
+        self.vision_blocking=False
         self.on=None
         self.flammable=False
         self.evaporate=True
@@ -2828,6 +3073,7 @@ class Floor(Screen):
         FloorGen.experimental_automaton(self)
         for i in self.nonindexedcells:
             i.on_contents(None,None)
+            i.floor=self
 
     def place_creature(self,creature,location=[0,0],retry='random'):
         attempts=0
@@ -2861,3 +3107,122 @@ class Floor(Screen):
 
     def place_item(self,item):
         pass
+
+    def shadowcasting(self,visible_indices,start_location):
+        visible_cells=[self.cells[start_location[0]][start_location[1]]]
+        octants=[[],[],[],[],[],[],[],[]]
+        translation_index1=0
+        translation_index2=0
+        #octant 1
+        for i in visible_indices:
+            for oct in octants:
+                oct.append([])
+            for j in i:
+                for oct in octants:
+                    for con in oct:
+                        con.append([])
+                #octant 1
+                x1,y1=j[0]+start_location[0],j[1]+start_location[1]
+                octants[0][translation_index1][translation_index2]=[x1,y1]
+
+                #octant 2
+                x2,y2=start_location[0]+j[1],start_location[1]+j[0]
+                octants[1][translation_index1][translation_index2]=[x2,y2]
+
+                #octant 3
+                x,y=start_location[0]-j[1],start_location[1]+j[0]
+                octants[2][translation_index1][translation_index2]=[x,y]
+
+                #octant 4
+                x,y=start_location[0]-j[0],start_location[1]+j[1]
+                octants[3][translation_index1][translation_index2]=[x,y]
+
+                #octant 5
+                x,y=start_location[0]-j[0],start_location[1]-j[1]
+                octants[4][translation_index1][translation_index2]=[x,y]
+
+                #octant 6
+                x,y=start_location[0]-j[1],start_location[1]-j[0]
+                octants[5][translation_index1][translation_index2]=[x,y]
+
+                #octant 7
+                x,y=start_location[0]+j[1],start_location[1]-j[0]
+                octants[6][translation_index1][translation_index2]=[x,y]
+
+                #octant 8
+                x,y=start_location[0]+j[0],start_location[1]-j[1]
+                octants[7][translation_index1][translation_index2]=[x,y]
+
+                translation_index2+=1
+            translation_index1+=1
+            translation_index2=0
+        visible_cells.extend(self.shadow_octant(octants[0]))
+        visible_cells.extend(self.shadow_octant(octants[1]))
+        visible_cells.extend(self.shadow_octant(octants[2]))
+        visible_cells.extend(self.shadow_octant(octants[3]))
+        visible_cells.extend(self.shadow_octant(octants[4]))
+        visible_cells.extend(self.shadow_octant(octants[5]))
+        visible_cells.extend(self.shadow_octant(octants[6]))
+        visible_cells.extend(self.shadow_octant(octants[7]))
+        return visible_cells
+
+    def shadow_octant(self,visible_indices,minslope=0,maxslope=1,startx=1,starty=0):
+        visible_cells=[]
+        opaque_encounter=False
+        new_maxslope=maxslope
+        next_minslope=minslope
+        opening=False
+        y_enc=False
+        for x in range(startx,len(visible_indices)):
+            opaque_encounter=False
+            next_minslope=minslope
+            try:
+                for y in range(starty,len(visible_indices[x])):
+                    lowslope=(y-0.5)/(x+0.5)
+                    highslope=(y+0.5)/(x-0.5)
+                    if highslope<minslope:
+                        continue
+                    if lowslope>maxslope:
+                        break
+                    try:
+                        cell=self.cells[visible_indices[x][y][0]][visible_indices[x][y][1]]
+                        visible_cells.append(cell)
+                    except KeyError:
+
+                        break
+
+                    if cell.transparent:
+                        opening=True
+                        if opaque_encounter==False:
+                    #Have not yet encountered an opaque cell. Continue onwards
+                            continue
+                    #or if we HAVE seen an opaque cell, set our minslope for the next iteration
+                        elif next_minslope==minslope:
+                            next_minslope=(y-0.5)/(x-0.5)
+                            y_enc=y
+                            continue
+
+                    elif opaque_encounter==False:
+                    #We have just found our first opaque cell
+                        new_maxslope=lowslope
+                        opaque_encounter=True
+                        continue
+                    elif next_minslope!=minslope:
+                    #We have found a new batch of opaque cells. We need to start a new search.
+                        visible_cells.extend(self.shadow_octant(visible_indices,next_minslope,lowslope,x+1,y_enc))
+                        next_minslope=minslope
+                        continue
+            except IndexError: pass
+            if opaque_encounter and next_minslope!=minslope and opening==True:
+                visible_cells.extend(self.shadow_octant(visible_indices,next_minslope,maxslope,x+1,y_enc))
+            maxslope=new_maxslope
+            if maxslope<=0 or maxslope<minslope: return visible_cells
+            opaque_encounter=False
+            if opening==False:
+                return visible_cells
+            else: opening=False
+
+
+
+        return visible_cells
+

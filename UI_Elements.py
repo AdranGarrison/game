@@ -628,7 +628,8 @@ Builder.load_string('''
         text:'Missing Limbs'
 
     ScrollView:
-        size_hint:0.25,0.6-10/root.height
+        id:limbsscroll
+        size_hint:0.25,0.5-10/root.height
         pos: root.x+0.2*root.width+20,root.y+0.85*root.height-self.height-20
         canvas.before:
             Color:
@@ -642,7 +643,8 @@ Builder.load_string('''
             size_hint:1,0
 
     ScrollView:
-        size_hint:0.25,0.6-10/root.height
+        id:injuriesscroll
+        size_hint:0.25,0.5-10/root.height
         pos: root.x+0.45*root.width+30,root.y+0.85*root.height-self.height-20
         canvas.before:
             Color:
@@ -656,7 +658,8 @@ Builder.load_string('''
             size_hint:1,0
 
     ScrollView:
-        size_hint:0.25,0.6-10/root.height
+        id:missinglimbsscroll
+        size_hint:0.25,0.5-10/root.height
         pos: root.x+0.7*root.width+40,root.y+0.85*root.height-self.height-20
         canvas.before:
             Color:
@@ -668,6 +671,69 @@ Builder.load_string('''
             cols:1
             id:missinglimbs
             size_hint:1,0
+
+    FloatLayout:
+        id:limbinfo
+        size_hint:0.8-30/root.width,0.3-30/root.height
+        pos:root.x+0.2*root.width+20,root.y+10+0.05*root.height
+        canvas.before:
+            Color:
+                rgba:0,0,0,0.95
+            Rectangle:
+                size:self.width,self.height
+                pos:self.pos
+        GridLayout:
+            cols:1
+            id:limbgraphic
+            size_hint:0.032,0.1
+            pos:limbinfo.x,limbinfo.y+limbinfo.height-self.height
+        GridLayout:
+            cols:1
+            id:limbname
+            size_hint:0.968,0.1
+            pos:limbinfo.x+0.032*limbinfo.width,limbinfo.y+limbinfo.height-self.height
+        GridLayout:
+            cols:1
+            id:limbdata
+            size_hint:0.282,0.7
+            pos:limbinfo.x,limbinfo.y+0.2*limbinfo.height
+        GridLayout:
+            cols:1
+            id:limbdata2
+            size_hint:0.718,0.3
+            pos:limbinfo.x+0.282*limbinfo.width,limbinfo.y+0.9*limbinfo.height-self.height
+        GridLayout:
+            cols:1
+            id:limbinjuries
+            size_hint:0.718,0.244
+            pos:limbinfo.x+0.282*limbinfo.width,limbinfo.y+0.356*limbinfo.height
+        GridLayout:
+            cols:1
+            id:limbnote
+            size_hint:0.718,0.2
+            pos:limbinfo.x+0.282*limbinfo.width,limbinfo.y+0.2*limbinfo.height
+        GridLayout:
+            rows:1
+            id:limbstats
+            size_hint:1,0.1
+            pos:limbinfo.x,limbinfo.y+0.1*limbinfo.height
+        GridLayout:
+            cols:1
+            id:limbattacks
+            size_hint:1,0.1
+            pos:limbinfo.x,limbinfo.y
+
+    GridLayout:
+        cols:1
+        id:creaturenote
+        size_hint:0.2,0.16
+        pos:root.x+10,root.y+10+0.05*root.height
+
+    OutlinedTextBox:
+        id:instructions
+        pos:root.x+10,root.y+10
+        size_hint:(root.width-20)/root.width,(root.height*0.05-10)/root.height
+        text:'Press[b][color=ffff00] Enter[/color][/b] for further options'
 
     ''')
 '''
@@ -870,6 +936,7 @@ class AttackDescription(FloatLayout):
         super().__init__(**kwargs)
         if mode=='item':
             attackinfo=[]
+            '''
             copyplayer=Shell.picklecopy(player)
             for i in copy.copy(copyplayer.equipped_items):
                 if i.wield==item.wield:
@@ -888,6 +955,34 @@ class AttackDescription(FloatLayout):
                     newinfo=i.average_values()
                     if newinfo not in attackinfo:
                         attackinfo.append(newinfo)
+            '''
+            equippable_limbs=[]
+            for i in player.limbs:
+                if i.can_equip(item)[0]:
+                    equippable_limbs.append(i)
+            for i in item.attacks:
+                if len(equippable_limbs)>=1:
+                    oldequipped=item.equipped.copy()
+                    limb=random.choice(equippable_limbs)
+                    item.equipped=[limb]
+                    attack=i(weapon=item,limb=limb)
+                    if attack.hands==1:
+                        newinfo=attack.average_values()
+                        if newinfo not in attackinfo:
+                            attackinfo.append(newinfo)
+                    item.equipped=oldequipped
+                if len(equippable_limbs)>=2:
+                    oldequipped=item.equipped.copy()
+                    limb=equippable_limbs[0]
+                    limbs=[equippable_limbs[0],equippable_limbs[1]]
+                    item.equipped=limbs
+                    attack=i(weapon=item,limb=limb)
+                    if attack.hands==2:
+                        newinfo=attack.average_values()
+                        if newinfo not in attackinfo:
+                            attackinfo.append(newinfo)
+                    item.equipped=oldequipped
+
 
         elif mode=='character':
             attackinfo=[]
@@ -1388,9 +1483,9 @@ class InventorySidebar(ScrollView):
 #The classes below deal with creature status screens
 
 class CreatureStatusScreen(FloatLayout):
-    #TODO: Make limbs collapsible
     def __init__(self,creature=None,**kwargs):
         self.creature=creature
+        self.currentlimb=None
         super().__init__(**kwargs)
         self.pos_hint={'x':0,'y':0.13}
         self.nametag=DisplayBox(titletext='Name:',info=self.creature.name)
@@ -1439,15 +1534,165 @@ class CreatureStatusScreen(FloatLayout):
         self.tension=DisplayBox(titletext='Tension',info="{} %".format(int(100*creature.tension)))
         self.ids['tension'].add_widget(self.tension)
 
+        self.note=NoteBox(titletext='Note',info=creature.note,color=(1,0,0,1))
+        self.ids['creaturenote'].add_widget(self.note)
+        self.note.ids['information'].bind(on_text_validate=self.update_creature_note)
+
         for i in creature.limbs:
-            self.ids['limbs'].size_hint[1]+=0.05
-            self.ids['limbs'].add_widget(OutlinedTextBox(text=i.name))
+            if i.attachpoint==None:
+                self.ids['limbs'].add_widget(LimbBox(i,origin=(self,'limbs')))
             if i.ability<1:
                 self.ids['injuries'].size_hint[1]+=0.05
-                self.ids['injuries'].add_widget(OutlinedTextBox(text=i.name))
+                self.ids['injuries'].add_widget(LimbBox(i,origin=(self,'injuries'),unclickable=True))
         for i in creature.missing_limbs:
             self.ids['missinglimbs'].size_hint[1]+=0.05
-            self.ids['missinglimbs'].add_widget(OutlinedTextBox(text=i.name))
+            self.ids['missinglimbs'].add_widget(LimbBox(i,origin=(self,'missinglimbs')))
+        self.adjust_sizing((self,'limbs'))
+        self.adjust_sizing((self,'injuries'))
+        self.adjust_sizing((self,'missinglimbs'))
+
+    def adjust_sizing(self,origin):
+        id=str(origin[1])
+        self.ids[id].size_hint[1]=0
+        '''
+        newchildren=[]
+        for i in self.ids[id].children:
+            newchildren.append(i)
+            i.size_hint[1]=1/len(newchildren)
+        while newchildren!=[]:
+            self.ids[id].size_hint[1]+=0.05*len(newchildren)
+            newer=[]
+            for i in newchildren:
+                newer.extend(i.children)
+                i.size_hint[1]=max(1,len(i.children))/len(newchildren)
+                i.parent.size_hint[1]*=max(1,len(i.children))
+            newchildren=newer
+            print(newchildren,self.ids[id].size_hint[1])
+            '''
+        allchildren=self.ids[id].children.copy()
+        to_check=allchildren.copy()
+        while len(to_check)!=0:
+            newcheck=[]
+            for i in to_check:
+                if len(i.children)!=0:
+                    allchildren.extend(i.children)
+                    newcheck.extend(i.children)
+            to_check=newcheck
+        self.ids[id].size_hint[1]=0.05*len(allchildren)
+        for i in allchildren:
+            total=len(i.children)
+            test=i.children
+            while len(test)!=0:
+                newtest=[]
+                for j in test:
+                    if len(j.children)!=0:
+                        newtest.extend(j.children)
+                        total+=len(j.children)
+                test=newtest
+            i.size_hint[1]=max(total+2,1)
+        self.ids[id].size_hint[1]=self.ids[id].size_hint[1]/2
+        self.ids['limbsscroll'].update_from_scroll()
+        self.ids['injuriesscroll'].update_from_scroll()
+        self.ids['missinglimbsscroll'].update_from_scroll()
+
+    def keyboard_input(self,input,shift):
+        pass
+
+    def show_limb_info(self,limb):
+        self.currentlimb=limb
+        self.ids['limbgraphic'].clear_widgets()
+        self.ids['limbgraphic'].add_widget(ItemGraphic(limb))
+        self.ids['limbname'].clear_widgets()
+        self.ids['limbname'].add_widget(OutlinedTextBox(color=(1,0,0,1),text=limb.name))
+        self.ids['limbdata'].clear_widgets()
+        if limb.attachpoint==None:
+            info='None'
+        else:
+            info=limb.attachpoint.name
+        self.ids['limbdata'].add_widget(DisplayBox(titletext='Attach Point',info=info,color=(0.5,0.5,0.5,0.5)))
+        self.ids['limbdata'].add_widget(DisplayBox(titletext='Attached Limbs',info=str(len(limb.limbs)),color=(0.5,0.5,0.5,0.5)))
+        self.ids['limbdata'].add_widget(DisplayBox(titletext='Length',info=''.join([str(int(1000*limb.length)/1000),' m']),color=(0.5,0.5,0.5,0.5)))
+        self.ids['limbdata'].add_widget(DisplayBox(titletext='Radius',info=''.join([str(int(10000*limb.radius)/10000),' m']),color=(0.5,0.5,0.5,0.5)))
+        self.ids['limbdata'].add_widget(DisplayBox(titletext='Mass',info=''.join([str(int(10000*limb.mass)/10000),' kg']),color=(0.5,0.5,0.5,0.5)))
+        self.ids['limbdata'].add_widget(DisplayBox(titletext='Ability',info=''.join([str(int(100*limb.ability)),'%']),color=(0.5,0.5,0.5,0.5)))
+        self.ids['limbdata'].add_widget(DisplayBox(titletext='Natural',info=str(limb.natural),color=(0.5,0.5,0.5,0.5)))
+
+        self.ids['limbdata2'].clear_widgets()
+        layerinfo=[i.name for i in limb.layers]
+        layerinfo.reverse()
+        self.ids['limbdata2'].add_widget(DisplayBox(titletext='Layers',info=', '.join(layerinfo),color=(0.5,0.5,0.5,0.5)))
+        self.ids['limbdata2'].add_widget(DisplayBox(titletext='Equippable Types',info=', '.join([i for i in limb.equipment]),color=(0.5,0.5,0.5,0.5)))
+        equipment=[]
+        for i in limb.equipment:
+            if limb.equipment[i]!=None:
+                equipment.append(limb.equipment[i].name)
+        if equipment==[]:
+            equipment='None'
+        else:
+            equipment=', '.join(equipment)
+        self.ids['limbdata2'].add_widget(DisplayBox(titletext='Equipped Items',info=equipment,color=(0.5,0.5,0.5,0.5)))
+
+        self.ids['limbinjuries'].clear_widgets()
+        injurydata=limb.describe_damage()
+        self.ids['limbinjuries'].add_widget(DisplayBox(titletext='Damage',info=injurydata,color=(0.5,0.5,0.5,0.5)))
+
+        self.ids['limbnote'].clear_widgets()
+        note=NoteBox(titletext='Note:',info=limb.note,color=(0.5,0.5,0.5,0.5))
+        self.ids['limbnote'].add_widget(note)
+        note.ids['information'].bind(on_text_validate=self.update_limb_note)
+
+        self.ids['limbstats'].clear_widgets()
+        if limb.stats['str']!=limb.stats['s']:
+            self.ids['limbstats'].add_widget(DisplayBox(titletext='Str',info='{} ({})'.format(limb.stats['str'],limb.stats['s']),color=(0.5,0.5,0.5,0.5)))
+        else:
+            self.ids['limbstats'].add_widget(DisplayBox(titletext='Str',info='{}'.format(limb.stats['str']),color=(0.5,0.5,0.5,0.5)))
+        if limb.stats['tec']!=limb.stats['t']:
+            self.ids['limbstats'].add_widget(DisplayBox(titletext='Tec',info='{} ({})'.format(limb.stats['tec'],limb.stats['t']),color=(0.5,0.5,0.5,0.5)))
+        else:
+            self.ids['limbstats'].add_widget(DisplayBox(titletext='Tec',info='{}'.format(limb.stats['tec']),color=(0.5,0.5,0.5,0.5)))
+        if limb.stats['per']!=limb.stats['p']:
+            self.ids['limbstats'].add_widget(DisplayBox(titletext='Per',info='{} ({})'.format(limb.stats['per'],limb.stats['p']),color=(0.5,0.5,0.5,0.5)))
+        else:
+            self.ids['limbstats'].add_widget(DisplayBox(titletext='Per',info='{}'.format(limb.stats['per']),color=(0.5,0.5,0.5,0.5)))
+        if limb.stats['wil']!=limb.stats['w']:
+            self.ids['limbstats'].add_widget(DisplayBox(titletext='Wil',info='{} ({})'.format(limb.stats['wil'],limb.stats['w']),color=(0.5,0.5,0.5,0.5)))
+        else:
+            self.ids['limbstats'].add_widget(DisplayBox(titletext='Wil',info='{}'.format(limb.stats['wil']),color=(0.5,0.5,0.5,0.5)))
+        if limb.stats['luc']!=limb.stats['l']:
+            self.ids['limbstats'].add_widget(DisplayBox(titletext='Luc',info='{} ({})'.format(limb.stats['luc'],limb.stats['l']),color=(0.5,0.5,0.5,0.5)))
+        else:
+            self.ids['limbstats'].add_widget(DisplayBox(titletext='Luc',info='{}'.format(limb.stats['luc']),color=(0.5,0.5,0.5,0.5)))
+
+        self.ids['limbattacks'].clear_widgets()
+        attacks=[]
+        self.creature.updateattacks()
+        for i in limb.attacks:
+            try:
+                if hasattr(i,'weapon') and hasattr(i.weapon,'equipped') and i.weapon not in (limb,None):
+                    hands=len(i.weapon.equipped)
+                    hands=min(hands,2)
+                else:
+                    hands=1
+                if i.hands==hands and i.useless==False:
+                    attacks.append(i.average_values()['Attack Name'])
+            except AttributeError: pass
+        if attacks==[]:
+            attacks='None'
+        else:
+            attacks=', '.join(attacks)
+        self.ids['limbattacks'].add_widget(DisplayBox(titletext='Attacks',info=attacks,color=(0.5,0.5,0.5,0.5)))
+
+    def update_limb_note(self,instance):
+        if self.currentlimb==None:
+            return
+        self.currentlimb.note=instance.text
+
+    def update_creature_note(self,instance):
+        self.creature.note=instance.text
+
+
+
+
 
 class AttackManagementScreen(FloatLayout):
     def __init__(self,creature=None,**kwargs):
@@ -1613,10 +1858,69 @@ class AttackPref(ButtonBehavior,GridLayout):
             i.clear_widgets()
             i.__init__(pref=i.pref,creature=i.creature,index=i.index)
 
+class LimbBox(GridLayout):
+    def __init__(self,limb,indentationlevel=0,origin=None,unclickable=False,**kwargs):
+        super().__init__(**kwargs)
+        self.sizing_factor=1
+        self.cols=1
+        self.add_widget(LimbTitle(limb,indentationlevel=indentationlevel,origin=origin,unclickable=unclickable))
+        self.primary=limb
+        self.secondaries=[]
+        self.expanded=False
+        self.origin=origin
 
-class LimbIndicator(ButtonBehavior,GridLayout):
-    def __init__(self,limb,**kwargs):
+class LimbTitle(ButtonBehavior,OutlinedTextBox):
+    def __init__(self,limb,indentationlevel=0,origin=None,unclickable=False,**kwargs):
+        super().__init__(**kwargs)
+        self.sizing_factor=0
+        self.limb=limb
+        self.indentationlevel=indentationlevel
+        if self.limb.limbs==[]:
+            self.joiningsymbol=''
+        else:
+            self.joiningsymbol='+'
+        self.text=''.join(['     ','    '*indentationlevel,self.joiningsymbol,limb.name])
+        self.halign='left'
+        self.origin=origin
+        self.unclickable=unclickable
+        if limb.ability>0.9:
+            self.color=(1,1,1,1)
+        elif limb.ability>0.7:
+            self.color=(1,1,0.7,1)
+        elif limb.ability>0.5:
+            self.color=(1,1,0.1,1)
+        elif limb.ability>0.3:
+            self.color=(1,0,0,1)
+        elif limb.ability>0.1:
+            self.color=(0.52,0,0.46,1)
+        else:
+            self.color=(0.5,0.5,0.5,0.9)
         pass
+
+    def on_press(self):
+        redo=False
+        if self.limb!=self.origin[0].currentlimb:
+            self.origin[0].show_limb_info(self.limb)
+            return
+        if self.unclickable==True:
+            return
+        if self.parent.expanded==False:
+            for i in self.limb.limbs:
+                self.parent.secondaries.append(i)
+                self.parent.add_widget(LimbBox(i,indentationlevel=self.indentationlevel+1,origin=self.origin))
+                self.parent.expanded=True
+                redo=True
+            if redo==True:
+                self.text=self.text.replace('+','-')
+        else:
+            for i in self.parent.children.copy():
+                if isinstance(i,LimbBox):
+                    if i.primary in self.limb.limbs:
+                        self.parent.remove_widget(i)
+                        self.parent.expanded=False
+            self.text=''.join(['     ','    '*self.indentationlevel,self.joiningsymbol,self.limb.name])
+        #self.parent.size_hint[1]=len(self.parent.children)
+        self.origin[0].adjust_sizing(self.origin)
 
 
 class StatusScreen(FloatLayout):
@@ -1646,27 +1950,34 @@ class StatusScreen(FloatLayout):
 #The intention is that the Cell class will serve as a container for all creatures and items to be displayed on the screen.
 #I expect to be tinkering with it quite a bit to make everything work just right.
 
-#TODO: Need to ensure updates to graphics only occur when the cell is visible to the player. Much work to be done.
 
 class Cell(Widget):
     contents=ListProperty([])
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
+        self.floor=None
         self.alignment=0
         self.size_hint=(None,None)
         self.size=(cellsize,cellsize)
         self.passable=True
+        self.transparent=True
         self.highlighted=False
         self.location=[None,None]
         self.immediate_neighbors=[]
+        self.seen_by_player=False
+        self.visible_to_player=False
+        self.creatures=[]
+        self.items=[]
+        self.dungeon=[]
+        self.fog=False
+        self.recently_seen=False
 
-
-    def highlight(self):
+    def highlight(self,color=(1,1,1,0.1)):
         if self.highlighted==False:
             self.glow=Widget(pos=self.pos,size=self.size)
             self.add_widget(self.glow)
             with self.glow.canvas:
-                Color(1,1,1,0.1)
+                Color(color[0],color[1],color[2],color[3])
                 Rectangle(size=self.glow.size,pos=self.glow.pos)
         self.highlighted=True
         if self.contents!=[]: print(self.contents)
@@ -1690,38 +2001,77 @@ class Cell(Widget):
 
     def on_contents(self,instance,content):
         #print('Ah!!',instance,content)
-        creatures=[]
-        self.canvas.after.clear()
+        self.recently_seen=False
+        self.creatures=[]
+        self.items=[]
+        self.dungeon=[]
         self.passable=True
+        self.transparent=True
         for i in self.contents:
-            if isinstance(i,BaseClasses.Creature)==False:
-                i.location=self.location
+            if isinstance(i,BaseClasses.Creature)==True:
+                self.creatures.append(i)
+            if isinstance(i,BaseClasses.Item) or isinstance(i,BaseClasses.Fluid) or isinstance(i,BaseClasses.Limb):
+                self.items.append(i)
+            if isinstance(i,MapTiles.DungeonFeature):
+                self.dungeon.append(i)
+            i.location=self.location
+            i.floor=self.floor
+            if i.passable==False:
+                self.passable=False
+            if i.vision_blocking==True:
+                self.transparent=False
+        if self.visible_to_player==True:
+            self.update_graphics()
+
+    def update_graphics(self,show_dungeon=True,show_items=True,show_creatures=True):
+        if self.recently_seen==True: return
+        self.canvas.after.clear()
+        if show_dungeon==True:
+            self.seen_by_player=True
+            for i in self.dungeon:
                 with self.canvas.after:
                     if hasattr(i,'color')==False:
                         Color(1,1,1,1)
                     else:
                         Color(i.color[0],i.color[1],i.color[2],i.color[3])
                     Rectangle(size=self.size,pos=self.pos,source=i.image)
-            else:
-                creatures.append(i)
-            if i.passable==False:
-                self.passable=False
-        for i in creatures:
-            i.location=self.location
-            with self.canvas.after:
-                if not i.color:
-                    pass
-                else:
-                    Color(i.color[0],i.color[1],i.color[2],i.color[3])
-                Rectangle(size=self.size,pos=self.pos,source=i.image)
-            if i.passable==False:
-                self.passable=False
+        if show_items==True:
+            for i in self.items:
+                with self.canvas.after:
+                    if hasattr(i,'color')==False:
+                        Color(1,1,1,1)
+                    else:
+                        Color(i.color[0],i.color[1],i.color[2],i.color[3])
+                    Rectangle(size=self.size,pos=self.pos,source=i.image)
+        if show_creatures==True:
+            for i in self.creatures:
+                with self.canvas.after:
+                    if not i.color:
+                        pass
+                    else:
+                        Color(i.color[0],i.color[1],i.color[2],i.color[3])
+                    Rectangle(size=self.size,pos=self.pos,source=i.image)
+        self.fog=False
+        self.recently_seen=True
 
     def on_turn(self):
         for i in self.contents:
             if isinstance(i,BaseClasses.Item) or isinstance(i,MapTiles.DungeonFeature) or isinstance(i,BaseClasses.Fluid):
                 i.on_turn()
-        pass
+        if self.seen_by_player==True and self.visible_to_player==False and self.fog==False:
+            self.fog=True
+            self.recently_seen=False
+            with self.canvas.after:
+                Color(0.5,0.5,0.5,0.5)
+                Rectangle(size=self.size,pos=self.pos)
+        self.visible_to_player=False
+
+    def distance_to(self,cell):
+        if cell.floor!=self.floor:
+            return False
+        distance=((self.location[0]-cell.location[0])**2+(self.location[1]-cell.location[1])**2)**0.5
+        return distance
+
 
 
 cellsize=16

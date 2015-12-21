@@ -9,6 +9,7 @@ class DungeonFeature():
     def __init__(self,screen=None,x=None,y=None,image='./images/BlankTile.png'):
         self.location=[None,None]
         self.passable=True
+        self.vision_blocking=False
         self.hostile=[]
         self.targetable=False
         self.image=image
@@ -31,3 +32,4 @@ class Wall(DungeonFeature):
     def __init__(self,screen=None,x=None,y=None):
         super().__init__(screen,x,y,image='./images/Wall.png')
         self.passable=False
+        self.vision_blocking=True
