@@ -41,7 +41,7 @@ class Bone_Material(Material):
         self.mode='brittle'
         self.fracture_toughness=(self.youngs*self.fracture_energy)**0.5
         self.shear=3.3
-        self.shear_strength=5*self.quality
+        self.shear_strength=30*self.quality
         self.electric_conduction=True
         self.heat_conduction=0.5
         self.dissipationfactor=4
@@ -164,7 +164,7 @@ class Flesh_Material(Material):
         self.default_thickness=0.02
         self.basicname='flesh'
         self.name='flesh'
-        self.maxquality=2
+        self.maxquality=5
         self.quality=min(quality,self.maxquality)
         self.thickness=thickness
         self.density=1000
@@ -659,7 +659,6 @@ class Wood(Material):
         self.identification_difficulty=7
 
 
-
 class Leather(Material):
     def __init__(self,thickness=1,quality=1,**kwargs):
         super().__init__(**kwargs)
@@ -867,5 +866,80 @@ class Basalt_Fiber(Material):
         self.damagetype=['pierce','cut']
         self.magic_affinity=2
         self.identification_difficulty=18
+
+
+class Demonic_Material(Material):
+    def __init__(self,thickness=1,quality=1,power=3,**kwargs):
+        super().__init__(**kwargs)
+        self.color=(random.random(),random.random(),random.random(),1)
+        self.acid_reaction=random.choice(['embrittle','corrode'])
+        self.wetdamage=random.choice(['rust',None,None])
+        self.poisson=random.random()*0.49
+        self.name='demonic'
+        self.maxquality=random.random()*power
+        self.quality=min(quality,self.maxquality)
+        self.thickness=thickness
+        self.density=abs(random.gauss(1,0.3*power/(5+power))*9000)+1
+        self.youngs=abs(100*random.gauss(1,0.3*power/(5+power))**power)+0.00001
+        self.fracture_energy=10*self.quality*random.triangular(0.001,10,mode=5*power/(power+5))
+        self.tensile_strength=1
+        for i in range(0,int(power)):self.tensile_strength+=random.gauss(0,power)**2
+        moderandom=random.random()
+        if moderandom<0.02:
+            self.mode='soft'
+            self.basicname=random.choice(['flesh','slime'])
+        elif moderandom<0.4:
+            self.mode='brittle'
+            self.basicname=random.choice(['metal','metal','metal','bone','stone','wood','glass'])
+        elif moderandom<0.7:
+            self.mode='ductile'
+            self.basicname='metal'
+        else:
+            self.mode='fabric'
+            self.basicname=random.choice(['leather','fabric','fur'])
+        self.fracture_toughness=(self.youngs*self.fracture_energy)**0.5
+        self.shear=0.5*self.youngs/(1+self.poisson)
+        self.shear_strength=1
+        for i in range(0,int(power)):self.shear_strength+=random.gauss(0,power)**2
+        self.shear_strength=0.6*self.shear_strength
+        self.electric_conduction= random.random()>0.5
+        self.heat_conduction=500/(1+random.gauss(0,power)**2)
+        self.burn_temp=100*random.gauss(power**0.5,power/3)**2
+        self.dissipationfactor=1
+        self.maxedge=(5*10**-8)/self.quality
+        self.damagetype=['dent','crush','bend','cut']
+        self.magic_affinity=int(random.triangular(1,5+2*power,2*power))
+        self.identification_difficulty=30
+        self.default_thickness=random.random()/self.density**0.5
+
+class Aether(Material):
+    def __init__(self,thickness=1,quality=1,power=3,**kwargs):
+        super().__init__(**kwargs)
+        self.color=(0,0.8,0.8,0.5)
+        self.acid_reaction='corrode'
+        self.wetdamage=None
+        self.poisson=0.25
+        self.name='aether'
+        self.basicname='magical'
+        self.maxquality=100
+        self.quality=min(power,self.maxquality)
+        self.thickness=thickness
+        self.density=1
+        self.youngs=1
+        self.fracture_energy=5*power
+        self.tensile_strength=1
+        self.mode='brittle'
+        self.fracture_toughness=(self.youngs*self.fracture_energy)**0.5
+        self.shear=1
+        self.shear_strength=1
+        self.electric_conduction=True
+        self.heat_conduction=500
+        self.burn_temp=300*power
+        self.dissipationfactor=1
+        self.maxedge=(5*10**-8)/self.quality
+        self.damagetype=['dent','crush','bend','cut']
+        self.magic_affinity=10
+        self.identification_difficulty=30
+        self.default_thickness=0.004**power
 ######################################################################################################################
 

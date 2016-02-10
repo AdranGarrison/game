@@ -3,6 +3,7 @@ __author__ = 'Alan'
 import os
 import Creatures
 import Attacks
+import Abilities
 import Items
 import Materials
 import Limbs
@@ -121,6 +122,7 @@ class Shell(FloatLayout):
 
         #Below are mouse and keyboard listening devices
         #setting up listener for mouse position, to correctly identify the cell to which the mouse points.
+        self.mousemode='cell'
         Window.bind(mouse_pos=self.mouselistener)
 
         #setting up listener for keyboard inputs. Must have different settings for different screens.
@@ -187,11 +189,12 @@ class Shell(FloatLayout):
             self.player.stamina[0]=self.player.stamina[1]
             self.player.focus[0]=self.player.focus[1]
 
-        elif random.triangular(0,1,1/(len(self.dungeonmanager.current_screen.creaturelist)+1))>0.95:
+        elif random.random()>0.98:
             newcreaturetype=random.choice([Creatures.Human,Creatures.Amorphous_Horror,Creatures.Giant,
                                            Creatures.Halfling,Creatures.Fairy,Creatures.Goblin,Creatures.Blob,
-                                           Creatures.Acid_Blob])
-            creature=newcreaturetype(color=(random.random(),random.random(),random.random(),0.8),name=NameGen.namegen(random.choice(['m','f'])))
+                                           Creatures.Acid_Blob,Creatures.Wolf])
+            creature=newcreaturetype(color=(random.random(),random.random(),random.random(),0.8))
+            creature.abilities=[Abilities.Conjur_Weapon(creature),Abilities.Psychokinesis(creature)]
             self.dungeonmanager.current_screen.place_creature(creature)
             self.dungeonmanager.current_screen.creaturelist.append(creature)
 
@@ -208,12 +211,29 @@ class Shell(FloatLayout):
                     targetedcell=floor.cells[i][j]
                 else:
                     floor.cells[i][j].unhighlight()
-        if targetedcell!=None:
+        if targetedcell==None:
+            return
+        if self.mousemode=='cell':
+            targetedcell.highlight()
+        if self.mousemode=='line':
             line=BaseClasses.get_line(self.player.location,targetedcell.location)
             for position in line:
                 floor.cells[position[0]][position[1]].highlight()
+        if self.mousemode=='los':
+            color=(1,1,1,0.1)
+            line=BaseClasses.get_line(self.player.location,targetedcell.location)
+            if len(line)>0:line.pop(0)
+            known_blockage=False
+            for position in line:
+                if floor.cells[position[0]][position[1]].seen_by_player==False and known_blockage==False:
+                    color=(0.5,1,0,0.2)
+                elif floor.cells[position[0]][position[1]].passable==False:
+                    color=(1,0,0,0.1)
+                    known_blockage=True
+                floor.cells[position[0]][position[1]].highlight(color=color)
 
     def on_key_down(self,keyboard,keycode,text,modifiers):
+        floor=self.dungeonmanager.current_screen
         if keycode[0]==303 or keycode[0]==304:
             self.shift=True
         if self.keyboard_mode=='play':
@@ -284,6 +304,23 @@ class Shell(FloatLayout):
                 self.add_widget(self.status_screen)
                 self.keyboard_mode='status screen'
                 return
+            elif keycode[1]=='l' and self.shift==False:
+                self.reticule=Reticule()
+                self.reticule.location=self.player.location
+                self.reticule.floor=self.player.floor
+                self.dungeonmanager.current_screen.cells[self.player.location[0]][self.player.location[1]].contents.append(self.reticule)
+                self.keyboard_mode='targeting'
+                return
+            elif keycode[1]=='p' and self.shift==False:
+                psychokenesis=Abilities.Psychokinesis(self.player)
+                self.reticule=Reticule(purpose=psychokenesis)
+                self.reticule.location=self.player.location
+                self.reticule.floor=self.player.floor
+                self.dungeonmanager.current_screen.cells[self.player.location[0]][self.player.location[1]].contents.append(self.reticule)
+                self.keyboard_mode='targeting'
+                return
+            elif keycode[1]=='s' and self.shift==True:
+                Abilities.Summon_Demonic_Weapon(self.player)
 
         if self.keyboard_mode=='inventory sidebar':
             if keycode[1]=='escape':
@@ -366,12 +403,41 @@ class Shell(FloatLayout):
         if self.keyboard_mode=='pass':
             pass
 
+        if self.keyboard_mode=='targeting':
+            if keycode[1]=='escape':
+                try:
+                    floor.cells[self.reticule.location[0]][self.reticule.location[1]].contents.remove(self.reticule)
+                    self.reticule=None
+                except: pass
+                self.keyboard_mode='play'
+            elif keycode[1]=='numpad7':
+                self.move(self.reticule,[-1,1],track=True,phasing=True)
+            elif keycode[1]=='numpad8' or keycode[1]=='up':
+                self.move(self.reticule,[0,1],track=True,phasing=True)
+            elif keycode[1]=='numpad9':
+                self.move(self.reticule,[1,1],track=True,phasing=True)
+            elif keycode[1]=='numpad4' or keycode[1]=='left':
+                self.move(self.reticule,[-1,0],track=True,phasing=True)
+            elif keycode[1]=='numpad6' or keycode[1]=='right':
+                self.move(self.reticule,[1,0],track=True,phasing=True)
+            elif keycode[1]=='numpad1':
+                self.move(self.reticule,[-1,-1],track=True,phasing=True)
+            elif keycode[1]=='numpad2' or keycode[1]=='down':
+                self.move(self.reticule,[0,-1],track=True,phasing=True)
+            elif keycode[1]=='numpad3':
+                self.move(self.reticule,[1,-1],track=True,phasing=True)
+            elif keycode[1]=='numpad5' or keycode[1]=='.':
+                self.move(self.reticule,[0,0],track=True,phasing=True)
+            elif keycode[1]=='enter':
+                self.reticule.do()
+
+
     def on_key_up(self,keyboard,keycode):
         if keycode[0]==303 or keycode[0]==304:
             self.shift=False
     #kbclosed should never be called in normal operation
     def kbclosed(self):
-        print('Uhhhh... guys... the keyboard just closed')
+        #print('Uhhhh... guys... the keyboard just closed')
         self.keyboard.unbind(on_key_down=self.on_keyboard_down)
         self.keyboard=None
 
@@ -379,11 +445,11 @@ class Shell(FloatLayout):
         pass
 
     #This function handles movement of objects from cell to cell and calls for bump attacks
-    def move(self,target,distance,teleport=False,mobile=True,*args,**kwargs):
+    def move(self,target,distance,teleport=False,mobile=True,free=False,track=False,phasing=False,*args,**kwargs):
         #Make sure the cell we are trying to move to exists and is passable
         if target.location[0]+distance[0] in range(0,self.dungeonmanager.current_screen.dimensions[0]) and target.location[1]+distance[1] in range(0,self.dungeonmanager.current_screen.dimensions[1]):
             self.dungeonmanager.current_screen.cells[target.location[0]+distance[0]][target.location[1]+distance[1]].on_contents(None,None)
-            if self.dungeonmanager.current_screen.cells[target.location[0]+distance[0]][target.location[1]+distance[1]].passable==True:
+            if self.dungeonmanager.current_screen.cells[target.location[0]+distance[0]][target.location[1]+distance[1]].passable==True or phasing==True:
 
                 if target in self.dungeonmanager.current_screen.cells[target.location[0]][target.location[1]].contents:
                     #print(target.location,distance)
@@ -394,8 +460,9 @@ class Shell(FloatLayout):
 
 
                     #Ensuring that the viewport tracks the player-controlled character
-                    if target.player:
+                    if target==self.player and free==False:
                         self.turn+=1
+                    if target==self.player or track:
                         scrollamount=viewport.convert_distance_to_scroll(cellsize,cellsize)
                         cell=self.dungeonmanager.current_screen.cells[target.location[0]][target.location[1]]
                         if viewport.width-cell.to_window(cell.pos[0],cell.pos[1])[0]<110:
@@ -434,7 +501,7 @@ class Shell(FloatLayout):
                     self.log.addtext('You cannot pass through here')
                     print('not passable')
 
-        elif target.player:
+        elif target==self.player:
             print("There is no cell where you are trying to move")
             self.log.addtext('Trust me, you don\'t want to go that way')
 
@@ -494,7 +561,7 @@ class Shell(FloatLayout):
 
         #Some objects to play around with
         currentscreen.creaturelist=[Creatures.Human(color=(1,0,0,0.8),stats={'s':15,'t':15,'p':15,'w':15,'l':15})]
-        adversarymaterial=Brass
+        adversarymaterial=Wool
 
         foe=Creatures.Human(color=(0,1,0,0.8))
         currentscreen.creaturelist.append(foe)
@@ -518,7 +585,10 @@ class Shell(FloatLayout):
         adversary.equip(Items.Legging(material=adversarymaterial),log=False)
         adversary.equip(Items.Legging(material=adversarymaterial),log=False)
 
-        adversary.inventory.extend(adversary.equipped_items)
+        for i in adversary.equipped_items:
+            if i not in adversary.inventory:
+                adversary.inventory.append(i)
+
 
         for i in adversary.inventory:
             i.randomize(1)
@@ -533,7 +603,8 @@ class Shell(FloatLayout):
 
 
         adversary.mass_calc()
-        print(adversary.mass)
+        adversary.updateattacks()
+
 
         self.dungeonmanager.current_screen.place_creature(adversary,[6,6])
         #self.dungeonmanager.current_screen.cells[6][6].contents.append(currentscreen.creaturelist[0])
@@ -545,6 +616,10 @@ class Shell(FloatLayout):
         wolf=Creatures.Wolf()
         currentscreen.creaturelist.append(wolf)
         currentscreen.place_creature(wolf,[10,10])
+
+        golem=Creatures.Golem(power=10)
+        currentscreen.creaturelist.append(golem)
+        currentscreen.place_creature(golem,[15,15])
 
 
         self.player.inventory_setup()
@@ -567,12 +642,14 @@ class Shell(FloatLayout):
 
         #for i in adversary.limbs:
         #    i.add_outer_layer(Hair,Hair_Material,0.01)
-'''
+
         for i in self.player.inventory:
-            Enchantments.Acidic(i)
-            Enchantments.Burning(i,strength=8)
-            Enchantments.BloodDrinking(i)
-'''
+            #Enchantments.Acidic(i)
+            #Enchantments.Burning(i,strength=8)
+            #Enchantments.BloodDrinking(i)
+            #Enchantments.Indestructable(i)
+            #Enchantments.Shifting(i)
+            Enchantments.Blinking(i)
 
 
 

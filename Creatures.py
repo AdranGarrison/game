@@ -10,6 +10,7 @@ from Limbs import *
 import Shell as S
 import NameGen
 import Fluids
+import Enchantments
 
 
 import random
@@ -221,12 +222,8 @@ def humanoid_assembler(creature,stats,name,scale=1):
     creature.lowerteeth.attachpoint=creature.jaw
 
 
-
-    pass
-
-
 class Human(Creature):
-    def __init__(self,color=(1,1,1,1),name='the human',job='',named=False,hostile=True,player=False,stats='random'):
+    def __init__(self,color=(1,1,1,1),name='the human',job='',named=False,hostile=True,player=False,stats='random',sizefactor=random.gauss(1,0.1)):
         super().__init__()
         self.basicname='human'
         if stats=='random':
@@ -261,7 +258,13 @@ class Human(Creature):
         self.disabled_attack_types=[Bite]
         self.iprefs={'mass':-1,'length':1,'edge':1,'tip':1,'I':-1,'quality':1,'thickness':1,'type':[(Limb,-4)],
                      'material':[(Bone_Material,-2),(Flesh_Material,-5),(Hair,-1)],'collection threshold':5,
-                     'weight threshold':10*self.stats['str']+20}
+                     'weight threshold':10*self.stats['str']+20,'desired weapons':random.choice((1,2)),
+                     'wield preference':random.choice((1,2)),'enchantment':0}
+        if self.stats['tec']>self.stats['str'] and random.random()>0.05:
+            self.iprefs['wield preference']=1
+        if self.stats['tec']<self.stats['str'] and random.random()>0.05:
+            self.iprefs['wield preference']=2
+            self.iprefs['desired weapons']=1
 
         #Some people randomly collect things
         collect=random.random()
@@ -275,14 +278,13 @@ class Human(Creature):
                 collect=random.random()
 
         #self.body=Torso(self.stats,'torso',owner=self)
-        humanoid_assembler(self,self.stats,self.name)
+        self.sizefactor=sizefactor
+        humanoid_assembler(self,self.stats,self.name,scale=self.sizefactor)
         self.mass_calc()
         self.updateattacks()
 
         for i in self.limbs:
-            for j in i.layers:
-                if isinstance(j.material,Flesh_Material):
-                    j.fluid=Fluids.Blood(self)
+            self.process_new_limb(i)
 
         self.classification.append('humanoid')
         self.classification.append('intelligent')
@@ -293,8 +295,15 @@ class Human(Creature):
         if hostile==True:
             self.hostile.append('player')
 
+        if self.player==False: self.generate_equipment(items=5)
+
+    def process_new_limb(self,limb):
+        for i in limb.layers:
+            if isinstance(i.material,Flesh_Material):
+                i.fluid=Fluids.Blood(self)
+
 class Giant(Creature):
-    def __init__(self,color=(1,1,1,1),name='the giant',job='',named=False,hostile=True,player=False,stats='random'):
+    def __init__(self,color=(1,1,1,1),name='the giant',job='',named=False,hostile=True,player=False,stats='random',sizefactor=random.gauss(3,0.2)):
         super().__init__()
         self.basicname='giant'
         if stats=='random':
@@ -327,14 +336,13 @@ class Giant(Creature):
         self.vitals=[]
         self.attacks=[]
         #self.body=Torso(self.stats,'torso',owner=self)
-        humanoid_assembler(self,self.stats,self.name,scale=3)
+        self.sizefactor=sizefactor
+        humanoid_assembler(self,self.stats,self.name,scale=self.sizefactor)
         self.mass_calc()
         self.updateattacks()
 
         for i in self.limbs:
-            for j in i.layers:
-                if isinstance(j.material,Flesh_Material):
-                    j.fluid=Fluids.Blood(self)
+            self.process_new_limb(i)
 
         self.classification.append('humanoid')
         self.classification.append('intelligent')
@@ -345,8 +353,15 @@ class Giant(Creature):
         if hostile==True:
             self.hostile.append('player')
 
+        if self.player==False: self.generate_equipment(items=5)
+
+    def process_new_limb(self,limb):
+        for i in limb.layers:
+            if isinstance(i.material,Flesh_Material):
+                i.fluid=Fluids.Blood(self)
+
 class Goblin(Creature):
-    def __init__(self,color=(1,1,1,1),name='the goblin',job='',named=False,hostile=True,player=False,stats='random'):
+    def __init__(self,color=(1,1,1,1),name='the goblin',job='',named=False,hostile=True,player=False,stats='random',sizefactor=random.gauss(0.7,0.1)):
         super().__init__()
         self.basicname='goblin'
         if stats=='random':
@@ -379,14 +394,13 @@ class Goblin(Creature):
         self.vitals=[]
         self.attacks=[]
         #self.body=Torso(self.stats,'torso',owner=self)
+        self.sizefactor=sizefactor
         humanoid_assembler(self,self.stats,self.name,scale=0.7)
         self.mass_calc()
         self.updateattacks()
 
         for i in self.limbs:
-            for j in i.layers:
-                if isinstance(j.material,Flesh_Material):
-                    j.fluid=Fluids.Blood(self)
+            self.process_new_limb(i)
 
         self.classification.append('humanoid')
         self.classification.append('intelligent')
@@ -401,8 +415,15 @@ class Goblin(Creature):
         if hostile==True:
             self.hostile.append('player')
 
+        self.generate_equipment(items=5)
+
+    def process_new_limb(self,limb):
+        for i in limb.layers:
+            if isinstance(i.material,Flesh_Material):
+                i.fluid=Fluids.Blood(self)
+
 class Halfling(Creature):
-    def __init__(self,color=(1,1,1,1),name='the halfling',job='',named=False,hostile=True,player=False,stats='random'):
+    def __init__(self,color=(1,1,1,1),name='the halfling',job='',named=False,hostile=True,player=False,stats='random',sizefactor=random.gauss(0.6,0.03)):
         super().__init__()
         self.basicname='halfling'
         if stats=='random':
@@ -436,14 +457,13 @@ class Halfling(Creature):
         self.attacks=[]
         self.disabled_attack_types=[Bite]
         #self.body=Torso(self.stats,'torso',owner=self)
-        humanoid_assembler(self,self.stats,self.name,scale=0.6)
+        self.sizefactor=sizefactor
+        humanoid_assembler(self,self.stats,self.name,scale=self.sizefactor)
         self.mass_calc()
         self.updateattacks()
 
         for i in self.limbs:
-            for j in i.layers:
-                if isinstance(j.material,Flesh_Material):
-                    j.fluid=Fluids.Blood(self)
+            self.process_new_limb(i)
 
         self.classification.append('humanoid')
         self.classification.append('intelligent')
@@ -454,8 +474,15 @@ class Halfling(Creature):
         if hostile==True:
             self.hostile.append('player')
 
+        if self.player==False: self.generate_equipment(items=5)
+
+    def process_new_limb(self,limb):
+        for i in limb.layers:
+            if isinstance(i.material,Flesh_Material):
+                i.fluid=Fluids.Blood(self)
+
 class Fairy(Creature):
-    def __init__(self,color=(1,1,1,1),name='the human',job='',named=False,hostile=True,player=False,stats='random'):
+    def __init__(self,color=(1,1,1,1),name='the fairy',job='',named=False,hostile=True,player=False,stats='random',sizefactor=random.gauss(0.15,0.01)):
         super().__init__()
         self.basicname='fairy'
         if stats=='random':
@@ -489,7 +516,8 @@ class Fairy(Creature):
         self.attacks=[]
         self.disabled_attack_types=[Bite]
         #self.body=Torso(self.stats,'torso',owner=self)
-        humanoid_assembler(self,self.stats,self.name,scale=0.15)
+        self.sizefactor=sizefactor
+        humanoid_assembler(self,self.stats,self.name,scale=self.sizefactor)
 
         self.leftwing=Wing(self.stats,'left wing',owner=self,scale=0.1)
         self.torso.limbs.append(self.leftwing)
@@ -504,9 +532,7 @@ class Fairy(Creature):
         self.updateattacks()
 
         for i in self.limbs:
-            for j in i.layers:
-                if isinstance(j.material,Flesh_Material):
-                    j.fluid=Fluids.Blood(self)
+            self.process_new_limb(i)
 
         self.classification.append('humanoid')
         self.classification.append('intelligent')
@@ -517,9 +543,15 @@ class Fairy(Creature):
         if hostile==True:
             self.hostile.append('player')
 
+        self.generate_equipment(items=5)
+
+    def process_new_limb(self,limb):
+        for i in limb.layers:
+            if isinstance(i.material,Flesh_Material):
+                i.fluid=Fluids.Blood(self)
 
 class Wolf(Creature):
-    def __init__(self,color=(1,1,1,1),name='the wolf',job='',named=False,hostile=True,player=False,stats='random'):
+    def __init__(self,color=(1,1,1,1),name='the wolf',job='',named=False,hostile=True,player=False,stats='random',sizefactor=random.gauss(1,0.08)):
         super().__init__()
         self.basicname='wolf'
         if stats=='random':
@@ -552,18 +584,19 @@ class Wolf(Creature):
         self.vitals=[]
         self.attacks=[]
         self.disabled_attack_types=[Kick]
+        self.sizefactor=sizefactor
 
         #Creating the body of the wolf.
 
-        self.body=Upper_Torso(self.stats,name='body',length=0.3,radius=0.07,owner=self)               #main body
+        self.body=Upper_Torso(self.stats,name='body',length=0.3,radius=0.07,owner=self,scale=self.sizefactor)               #main body
         self.body.add_outer_layer(Hair,Fur,0.05,name='fur')
 
         #all the legs
-        self.front_right_leg=Leg(self.stats,name='front right ',length=0.3,boneradius=0.008,owner=self)
-        self.front_left_leg=Leg(self.stats,name='front left ',length=0.3,boneradius=0.008,owner=self)
-        self.hind_right_leg=Leg(self.stats,name='right hind ',length=0.3,boneradius=0.008,owner=self)
-        self.hind_left_leg=Leg(self.stats,name='left hind ',length=0.3,boneradius=0.008,owner=self)
-        self.flank=Abdomen(self.stats,name='flank',length=0.2,radius=0.06,owner=self)
+        self.front_right_leg=Leg(self.stats,name='front right ',length=0.3,boneradius=0.008,owner=self,scale=self.sizefactor)
+        self.front_left_leg=Leg(self.stats,name='front left ',length=0.3,boneradius=0.008,owner=self,scale=self.sizefactor)
+        self.hind_right_leg=Leg(self.stats,name='right hind ',length=0.3,boneradius=0.008,owner=self,scale=self.sizefactor)
+        self.hind_left_leg=Leg(self.stats,name='left hind ',length=0.3,boneradius=0.008,owner=self,scale=self.sizefactor)
+        self.flank=Abdomen(self.stats,name='flank',length=0.2,radius=0.06,owner=self,scale=self.sizefactor)
         self.flank.add_outer_layer(Hair,Fur,0.04,name='fur')
         self.hind_right_leg.add_outer_layer(Hair,Fur,0.03,name='fur')
         self.hind_left_leg.add_outer_layer(Hair,Fur,0.03,name='fur')
@@ -574,44 +607,44 @@ class Wolf(Creature):
             i.add_outer_layer(Hair,Fur,0.03,name='fur')
             i.attachpoint=self.body
             self.body.limbs.append(i)
-        self.neck=Neck(self.stats,owner=self)                                       #neck
+        self.neck=Neck(self.stats,owner=self,scale=self.sizefactor)                                       #neck
         self.neck.add_outer_layer(Hair,Fur,0.05,name='fur')
         self.neck.attachpoint=self.body
         self.body.limbs.append(self.neck)
-        self.head=Head(self.stats,length=0.1,radius=0.04,owner=self)                #head
+        self.head=Head(self.stats,length=0.1,radius=0.04,owner=self,scale=self.sizefactor)                #head
         self.head.add_outer_layer(Hair,Fur,0.03,name='fur')
         self.head.join_to(self.neck)
-        self.muzzle=Snout(self.stats,name='muzzle',length=0.2,radius=0.04,owner=self)
-        self.lefteye=Eye(self.stats,name='left ',owner=self)
-        self.righteye=Eye(self.stats,name='right ',owner=self)
-        self.leftear=Ear(self.stats,name='left ',radius=0.03,owner=self)
+        self.muzzle=Snout(self.stats,name='muzzle',length=0.2,radius=0.04,owner=self,scale=self.sizefactor)
+        self.lefteye=Eye(self.stats,name='left ',owner=self,scale=self.sizefactor)
+        self.righteye=Eye(self.stats,name='right ',owner=self,scale=self.sizefactor)
+        self.leftear=Ear(self.stats,name='left ',radius=0.03,owner=self,scale=self.sizefactor)
         self.leftear.add_outer_layer(Hair,Fur,0.005,name='fur')
-        self.rightear=Ear(self.stats,name='right ',radius=0.03,owner=self)
+        self.rightear=Ear(self.stats,name='right ',radius=0.03,owner=self,scale=self.sizefactor)
         self.rightear.add_outer_layer(Hair,Fur,0.005,name='fur')
-        self.jaw=Jaw(copy.deepcopy(self.stats),length=0.4,radius=0.015,owner=self)
+        self.jaw=Jaw(copy.deepcopy(self.stats),length=0.4,radius=0.015,owner=self,scale=self.sizefactor)
         self.jaw.add_outer_layer(Hair,Fur,0.01,name='fur')
         self.jaw.stats['s']*=2
         self.jaw.stats['str']*=2
         for i in (self.muzzle,self.lefteye,self.righteye,self.leftear,self.rightear,self.jaw):
             i.join_to(self.head)
-        self.upper_teeth=Teeth(self.stats,name='upper teeth',length=0.18,radius=0.01,owner=self)
+        self.upper_teeth=Teeth(self.stats,name='upper teeth',length=0.18,radius=0.01,owner=self,scale=self.sizefactor)
         self.upper_teeth.join_to(self.muzzle)
-        self.lower_teeth=Teeth(self.stats,name='lower teeth',length=0.18,radius=0.01,owner=self,biting_surface=0.00005)
+        self.lower_teeth=Teeth(self.stats,name='lower teeth',length=0.18,radius=0.01,owner=self,biting_surface=0.00005,scale=self.sizefactor)
         self.lower_teeth.join_to(self.jaw)
-        self.front_right_paw=Foot(self.stats,name='front right paw',length=0.05,radius=0.02,owner=self)
-        self.front_left_paw=Foot(self.stats,name='front left paw',length=0.05,radius=0.02,owner=self)
-        self.hind_right_paw=Foot(self.stats,name='hind right paw',length=0.05,radius=0.02,owner=self)
-        self.hind_left_paw=Foot(self.stats,name='hind left paw',length=0.05,radius=0.02,owner=self)
+        self.front_right_paw=Foot(self.stats,name='front right paw',length=0.05,radius=0.02,owner=self,scale=self.sizefactor)
+        self.front_left_paw=Foot(self.stats,name='front left paw',length=0.05,radius=0.02,owner=self,scale=self.sizefactor)
+        self.hind_right_paw=Foot(self.stats,name='hind right paw',length=0.05,radius=0.02,owner=self,scale=self.sizefactor)
+        self.hind_left_paw=Foot(self.stats,name='hind left paw',length=0.05,radius=0.02,owner=self,scale=self.sizefactor)
         for i in (self.front_right_paw,self.front_left_paw,self.hind_right_paw,self.hind_left_paw):
             i.add_outer_layer(Hair,Fur,0.01,name='fur')
             for j in ('first','second','third','fourth'):
-                newclaw=Claw(self.stats,name='{} claw, {}'.format(j,i.name),length=0.01,radius=0.001,owner=self)
+                newclaw=Claw(self.stats,name='{} claw, {}'.format(j,i.name),length=0.01,radius=0.001,owner=self,scale=self.sizefactor)
                 newclaw.join_to(i)
         self.front_right_paw.join_to(self.front_right_leg)
         self.front_left_paw.join_to(self.front_left_leg)
         self.hind_left_paw.join_to(self.hind_left_leg)
         self.hind_right_paw.join_to(self.hind_right_leg)
-        self.tail=Balancing_Tail(self.stats,length=0.3,radius=0.02,owner=self)
+        self.tail=Balancing_Tail(self.stats,length=0.3,radius=0.02,owner=self,scale=self.sizefactor)
         self.tail.add_outer_layer(Hair,Fur,0.06,name='fur')
         self.tail.join_to(self.flank)
 
@@ -626,9 +659,7 @@ class Wolf(Creature):
         self.updateattacks()
 
         for i in self.limbs:
-            for j in i.layers:
-                if isinstance(j.material,Flesh_Material):
-                    j.fluid=Fluids.Blood(self)
+            self.process_new_limb(i,remake=False)
 
 
         self.classification.append('beast')
@@ -640,9 +671,133 @@ class Wolf(Creature):
         if hostile==True:
             self.hostile.append('player')
 
+    def process_new_limb(self,limb,remake=True):
+        limb.primaryequip=[]
+        for i in limb.layers:
+            if isinstance(i.material,Flesh_Material):
+                i.fluid=Fluids.Blood(self)
+        if remake==True:
+            if isinstance(limb,Teeth) or isinstance(limb,Claw) or isinstance(limb,Eye):
+                return
+            else: limb.add_outer_layer(Hair,Fur,0.03,name='fur')
+
+#be mindful that for golems, the material attribute is an -instance- of the material, not the -class-. This is so
+#that materials of any quality or arbitrarily modified attributes can be used for golem making
+class Golem(Creature):
+    def __init__(self,color=(1,1,1,1),name='the golem',job='',named=False,hostile=True,player=False,stats='power',mass=500,material=Iron(),power=5,creator=None):
+        super().__init__()
+        self.basicname='golem'
+        if stats=='power':
+            self.stats= {'s': int(power*mass*.04+1),
+                         't': int(power*2),
+                         'p': int(power*1.5),
+                         'w': int(1),
+                         'l': int(power+3)}
+        else:
+            self.stats=stats
+        self.stats['str']=self.stats['s']
+        self.stats['tec']=self.stats['t']
+        self.stats['per']=self.stats['p']
+        self.stats['wil']=self.stats['w']
+        self.stats['luc']=self.stats['l']
+        self.level=1
+        self.exp=[0,100]
+        self.focus=[int(20*(self.stats['p']**0.7+self.level**0.3)),int(20*(self.stats['p']**0.7+self.level**0.3))]
+        self.stamina=[int(10*(2*self.stats['s']**2+self.level**2)**0.5),int(10*(2*self.stats['s']**2+self.level**2)**0.5)]
+        self.maxstamina=int(10*(2*self.stats['s']**2+self.level**2)**0.5)
+        self.image='./images/Untitled.jpg'
+        self.location=[None,None]
+        self.passable=False
+        self.color=color
+        self.name=name+job
+        self.indefinitename=name.replace('the ', 'a ',1)
+        self.targetable=True
+        self.player=player
+        self.limbs=[]
+        self.vitals=[]
+        self.attacks=[]
+        self.disabled_attack_types=[]
+        self.sizefactor=1
+
+        #Creating the body
+
+        self.abdomen=Material_Abdomen(self.stats,name='body',natural=False,owner=self,material=material)
+        self.chest=Material_Upper_Torso(self.stats,name='torso',natural=False,owner=self,material=material)
+        self.chest.join_to(self.abdomen)
+        self.leftleg=Material_Leg(self.stats,name='left leg',natural=False,owner=self,material=material)
+        self.leftleg.join_to(self.abdomen)
+        self.rightleg=Material_Leg(self.stats,name='right leg',natural=False,owner=self,material=material)
+        self.rightleg.join_to(self.abdomen)
+        self.leftfoot=Material_Foot(self.stats,name='left foot',natural=False,owner=self,material=material)
+        self.leftfoot.join_to(self.leftleg)
+        self.rightfoot=Material_Foot(self.stats,name='right foot',natural=False,owner=self,material=material)
+        self.rightfoot.join_to(self.rightleg)
+        self.head=Material_Head(self.stats,name='head',natural=False,owner=self,material=material)
+        self.head.join_to(self.chest)
+        self.rightarm=Material_Arm(self.stats,name='right arm',natural=False,owner=self,material=material)
+        self.rightarm.join_to(self.chest)
+        self.leftarm=Material_Arm(self.stats,name='left arm',natural=False,owner=self,material=material)
+        self.leftarm.join_to(self.chest)
+        self.lefthand=Material_Hand(self.stats,name='left hand',natural=False,owner=self,material=material)
+        self.lefthand.join_to(self.leftarm)
+        self.righthand=Material_Hand(self.stats,name='right hand',natural=False,owner=self,material=material)
+        self.righthand.join_to(self.rightarm)
+
+        for i in ('first','second','third','fourth','fifth'):
+            new_finger=Material_Finger(self.stats,name='{} finger, left hand'.format(i),natural=False,owner=self,material=material)
+            new_finger.join_to(self.lefthand)
+        for i in ('first','second','third','fourth','fifth'):
+            new_finger=Material_Finger(self.stats,name='{} finger, right hand'.format(i),natural=False,owner=self,material=material)
+            new_finger.join_to(self.righthand)
+
+
+        self.material=material
+        self.power=power
+        self.creator=creator
+        self.feels_pain=False
+        self.mass_calc()
+        self.updateattacks()
+
+        for i in self.limbs:
+            desired_mass=mass*i.mass/self.mass
+            i.recalc_from_mass(mass=desired_mass,material=self.material)
+
+        self.runed_limb=targetchoice(self)
+        self.rune=Magic_Rune(power=self.power)
+        self.vitals.append(self.rune)
+        self.runed_limb.layers.append(self.rune)
+        self.runed_limb.target_class.append('vital')
+        if 'nonvital' in self.runed_limb.target_class:
+            self.runed_limb.target_class.remove('nonvital')
+
+        Enchantments.Magical_Sense(self,strength=self.power,smell=False,hearing=False)
+
+
+        self.classification.append('magic')
+        self.classification.append('mindless')
+        self.classification.append('golem')
+        self.classification.append('unnatural')
+        self.classification.append('animated')
+        if creator==None:
+            self.hostile.append('humanoid')
+        else:
+            self.hostile.extend(creator.hostile)
+        if self.player==True:
+            self.classification.append('player')
+        if hostile==True:
+            self.hostile.append('player')
+
+    def process_new_limb(self,limb,remake=True):
+        pass
+
+    def on_turn(self,turns=1):
+        self.stamina[0]=self.stamina[1]
+        self.focus[0]=self.focus[1]
+        super().on_turn(turns=turns)
+
 
 class Blob(Creature):
-    def __init__(self,color=(1,1,1,1),name='the blob',job='',named=False,hostile=True,player=False,stats='random',mass=500,material=Slime):
+    def __init__(self,color=(1,1,1,1),name='the blob',job='',named=False,hostile=True,player=False,stats='random',mass=random.gauss(500,30),material=Slime):
         super().__init__()
         self.basicname='blob'
         if stats=='random':
@@ -738,8 +893,13 @@ class Blob(Creature):
             super().on_turn()
             self.reform()
 
+    def process_new_limb(self,limb,remake=True):
+        for i in limb.layers:
+            i.fluid=Fluids.Slime_Fluid(self)
+            i.fluid.add(i)
+
 class Acid_Blob(Blob):
-    def __init__(self,color=(1,1,1,1),name='the acid blob',job='',named=False,hostile=True,player=False,stats='random',mass=500,material=Slime):
+    def __init__(self,color=(1,1,1,1),name='the acid blob',job='',named=False,hostile=True,player=False,stats='random',mass=random.gauss(400,30),material=Slime):
         super().__init__(color=color,name=name,job=job,named=named,hostile=hostile,player=player,stats=stats,mass=mass,material=material)
 
     def fluidize(self):
@@ -748,8 +908,13 @@ class Acid_Blob(Blob):
                 j.fluid=Fluids.Acid(self,strength=5+random.uniform(0,3))
                 j.fluid.add(j)
 
+    def process_new_limb(self,limb,remake=True):
+        for i in limb.layers:
+            i.fluid=Fluids.Acid(self,strength=5+random.uniform(0,3))
+            i.fluid.add(i)
+
 class Amorphous_Horror(Creature):
-    def __init__(self,color=(1,1,1,1),name='the amorphous horror',job='',named=False,hostile=True,player=False,stats='random',mass=500,decay=True):
+    def __init__(self,color=(1,1,1,1),name='the amorphous horror',job='',named=False,hostile=True,player=False,stats='random',mass=random.gauss(600,80),decay=True):
         super().__init__()
         self.basicname='amorphous horror'
         if stats=='random':
@@ -800,6 +965,8 @@ class Amorphous_Horror(Creature):
 
         self.movemass=self.mass
         self.updateattacks()
+
+        self.generate_equipment(items=5)
 
     def reform(self):
         equipped_copy=self.equipped_items.copy()
@@ -871,6 +1038,10 @@ class Amorphous_Horror(Creature):
         super().die()
         S.shell.dungeonmanager.current_screen.cells[self.location[0]][self.location[1]].contents.remove(self)
 
+    def process_new_limb(self,limb):
+        for i in limb.layers:
+            if isinstance(i.material,Flesh_Material):
+                i.fluid=random.choice([Fluids.Blood,Fluids.Water,Fluids.Acid])(self,strength=random.gauss(5,1))
 
 #Acidic horror is not yet implemented
 class Acidic_Horror(Creature):

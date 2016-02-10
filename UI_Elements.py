@@ -38,6 +38,8 @@ import BaseClasses
 import MapTiles
 import FloorGen
 
+
+
 def flatten(l,ltypes=(list,tuple)):
     ltype=type(l)
     l=list(l)
@@ -959,7 +961,27 @@ class AttackDescription(FloatLayout):
             equippable_limbs=[]
             for i in player.limbs:
                 if i.can_equip(item)[0]:
-                    equippable_limbs.append(i)
+                    if i.attachpoint:
+                        dummyarm=i.attachpoint.copyself()
+                        for j in i.attachpoint.equipment:
+                            dummyarm.equipment[j]=i.attachpoint.equipment[j]
+                        for j in dummyarm.limbs:
+                            if j.can_equip(item)[0]:
+                                dummylimb=j
+                                for k in i.equipment:
+                                    try:
+                                        dummylimb.equipment[k]=i.equipment[k]
+                                        dummylimb.equipment[item.wield]=item
+                                    except: pass
+                        dummylimb.mass_calc()
+                        dummyarm.mass_calc()
+                    else:
+                        dummylimb=i.copyself()
+                        for j in i.equipment:
+                            dummylimb.equipment[j]=i.equipment[j]
+                        dummylimb.equipment[item.wield]=item
+                        dummylimb.mass_calc()
+                    equippable_limbs.append(dummylimb)
             for i in item.attacks:
                 if len(equippable_limbs)>=1:
                     oldequipped=item.equipped.copy()
@@ -1419,11 +1441,13 @@ class InventorySidebar(ScrollView):
                     self.shell.player.unequip(i.item,log=False)
                     self.shell.player.inventory.remove(i.item)
                     cell.contents.append(i.item)
+                    i.in_inventory=None
                     self.shell.log.addtext('You drop the {}'.format(i.item.name))
                     #dropped_items+=1
             else:
                 self.shell.player.inventory.remove(i.item)
                 cell.contents.append(i.item)
+                i.in_inventory=None
                 self.shell.log.addtext('You drop the {}'.format(i.item.name))
                 dropped_items+=1
         if dropped_items>0:
@@ -1539,12 +1563,14 @@ class CreatureStatusScreen(FloatLayout):
         self.note.ids['information'].bind(on_text_validate=self.update_creature_note)
 
         for i in creature.limbs:
+            if i.listed_in_limbs==False: continue
             if i.attachpoint==None:
                 self.ids['limbs'].add_widget(LimbBox(i,origin=(self,'limbs')))
             if i.ability<1:
                 self.ids['injuries'].size_hint[1]+=0.05
                 self.ids['injuries'].add_widget(LimbBox(i,origin=(self,'injuries'),unclickable=True))
         for i in creature.missing_limbs:
+            if i.listed_in_limbs==False: continue
             self.ids['missinglimbs'].size_hint[1]+=0.05
             self.ids['missinglimbs'].add_widget(LimbBox(i,origin=(self,'missinglimbs')))
         self.adjust_sizing((self,'limbs'))
@@ -1599,6 +1625,7 @@ class CreatureStatusScreen(FloatLayout):
         pass
 
     def show_limb_info(self,limb):
+        if limb.listed_in_limbs==False: return
         self.currentlimb=limb
         self.ids['limbgraphic'].clear_widgets()
         self.ids['limbgraphic'].add_widget(ItemGraphic(limb))
@@ -1947,6 +1974,23 @@ class StatusScreen(FloatLayout):
         self.screen=CreatureStatusScreen(self.character)
         self.add_widget(self.screen)
 
+
+class Reticule():
+    def __init__(self,purpose=None,location=None):
+        self.purpose=purpose
+        if location==None:
+            self.location=Shell.shell.player.location
+        else:
+            self.location=location
+        self.floor=Shell.shell.player.floor
+        self.image='./images/Reticule.png'
+        self.name='targeting reticule'
+
+
+    def do(self,**kwargs):
+        if self.purpose!=None:
+            loc=self.floor.cells[self.location[0]][self.location[1]]
+            self.purpose.do(location=loc,**kwargs)
 #The intention is that the Cell class will serve as a container for all creatures and items to be displayed on the screen.
 #I expect to be tinkering with it quite a bit to make everything work just right.
 
@@ -1960,6 +2004,10 @@ class Cell(Widget):
         self.size_hint=(None,None)
         self.size=(cellsize,cellsize)
         self.passable=True
+        self.flyable=True
+        self.swimable=True
+        self.movementcost_to=1
+        self.movementcost_from=0
         self.transparent=True
         self.highlighted=False
         self.location=[None,None]
@@ -1971,6 +2019,24 @@ class Cell(Widget):
         self.dungeon=[]
         self.fog=False
         self.recently_seen=False
+        self.has_targeting_reticule=False
+
+    def place_reticule(self):
+        reticule=None
+        for i in self.contents:
+            if isinstance(i,Reticule):
+                reticule=i
+        if reticule==None:
+            self.has_targeting_reticule=False
+            self.reticule.canvas.clear()
+            del self.reticule
+            return
+        self.reticule=Widget(pos=self.pos,size=self.size)
+        self.add_widget(self.reticule)
+        with self.reticule.canvas:
+            Color(1,1,1,1)
+            Rectangle(size=self.reticule.size,pos=self.reticule.pos,source=reticule.image)
+        self.has_targeting_reticule=True
 
     def highlight(self,color=(1,1,1,0.1)):
         if self.highlighted==False:
@@ -2008,6 +2074,11 @@ class Cell(Widget):
         self.passable=True
         self.transparent=True
         for i in self.contents:
+            if isinstance(i,Reticule):
+                self.has_targeting_reticule=True
+                i.location=self.location
+                i.floor=self.floor
+                continue
             if isinstance(i,BaseClasses.Creature)==True:
                 self.creatures.append(i)
             if isinstance(i,BaseClasses.Item) or isinstance(i,BaseClasses.Fluid) or isinstance(i,BaseClasses.Limb):
@@ -2022,14 +2093,20 @@ class Cell(Widget):
                 self.transparent=False
         if self.visible_to_player==True:
             self.update_graphics()
+        elif self.has_targeting_reticule==True:
+            self.place_reticule()
+            return
 
     def update_graphics(self,show_dungeon=True,show_items=True,show_creatures=True):
-        if self.recently_seen==True: return
-        self.canvas.after.clear()
+        if self.recently_seen==True and self.has_targeting_reticule==False: return
+        elif self.recently_seen==True and self.has_targeting_reticule==True:
+            self.place_reticule()
+            return
+        self.canvas.clear()
         if show_dungeon==True:
             self.seen_by_player=True
             for i in self.dungeon:
-                with self.canvas.after:
+                with self.canvas:
                     if hasattr(i,'color')==False:
                         Color(1,1,1,1)
                     else:
@@ -2037,7 +2114,7 @@ class Cell(Widget):
                     Rectangle(size=self.size,pos=self.pos,source=i.image)
         if show_items==True:
             for i in self.items:
-                with self.canvas.after:
+                with self.canvas:
                     if hasattr(i,'color')==False:
                         Color(1,1,1,1)
                     else:
@@ -2045,7 +2122,7 @@ class Cell(Widget):
                     Rectangle(size=self.size,pos=self.pos,source=i.image)
         if show_creatures==True:
             for i in self.creatures:
-                with self.canvas.after:
+                with self.canvas:
                     if not i.color:
                         pass
                     else:
@@ -2053,6 +2130,9 @@ class Cell(Widget):
                     Rectangle(size=self.size,pos=self.pos,source=i.image)
         self.fog=False
         self.recently_seen=True
+        if self.has_targeting_reticule==True:
+            self.place_reticule()
+            return
 
     def on_turn(self):
         for i in self.contents:
@@ -2061,7 +2141,7 @@ class Cell(Widget):
         if self.seen_by_player==True and self.visible_to_player==False and self.fog==False:
             self.fog=True
             self.recently_seen=False
-            with self.canvas.after:
+            with self.canvas:
                 Color(0.5,0.5,0.5,0.5)
                 Rectangle(size=self.size,pos=self.pos)
         self.visible_to_player=False
@@ -2069,7 +2149,9 @@ class Cell(Widget):
     def distance_to(self,cell):
         if cell.floor!=self.floor:
             return False
-        distance=((self.location[0]-cell.location[0])**2+(self.location[1]-cell.location[1])**2)**0.5
+        xloc=self.location[0]-cell.location[0]
+        yloc=self.location[1]-cell.location[1]
+        distance=(xloc*xloc+yloc*yloc)**0.5
         return distance
 
 

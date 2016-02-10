@@ -33,7 +33,7 @@ class Bone(Item):
         super().__init__(**kwargs)
         self.base_descriptor='A bone from some creature or another'
         self.plural=plural
-        self.material=material(quality=quality)
+        self.material=material(quality=quality,power=self.power)
         self.names=['bone']
         self.knowledge_level['truename']=1
         if isinstance(self.material,Bone_Material):
@@ -62,7 +62,8 @@ class Flesh(Item):
         super().__init__(**kwargs)
         self.base_descriptor='Flesh carved from some creature or another'
         self.plural=plural
-        self.material=material(quality=quality)
+        try: self.material=material(quality=quality,power=self.power)
+        except: self.material=material
         self.names=['flesh']
         self.knowledge_level['truename']=1
         if isinstance(self.material,Flesh_Material):
@@ -92,7 +93,7 @@ class Hair(Item):
         self.base_descriptor='Hair from some creature or another'
         self.coverage=0.1
         self.plural=plural
-        self.material=material(quality=quality)
+        self.material=material(quality=quality,power=self.power)
         self.names=['hair']
         self.knowledge_level['truename']=1
         if isinstance(self.material,Hair_Material) or isinstance(self.material,Fur):
@@ -113,7 +114,27 @@ class Hair(Item):
         self.function=1
         self.recalc()
 
-
+class Magic_Rune(Item):
+    def __init__(self,length=0.01,in_radius=0,out_radius=0.08,material=Aether,name='rune',plural=False,quality=1,threshold=0,**kwargs):
+        super().__init__(**kwargs)
+        self.base_descriptor='A rune for binding magic to matter'
+        self.plural=plural
+        self.material=material(quality=quality,power=self.power)
+        self.names=['markings','rune']
+        self.truename='rune'
+        self.name=name
+        self.length=length
+        self.radius=out_radius
+        self.in_radius=in_radius
+        self.cross_section_range=[3.14*(self.radius**2-in_radius**2),self.length*2*(self.radius-in_radius)]
+        self.parry=False
+        self.wield=None
+        self.curvature=0
+        self.attacktype=None
+        self.threshold=threshold
+        self.function=1
+        self.coverage=0.5
+        self.recalc()
 
 
 ############################################Weapons#########################################
@@ -131,7 +152,7 @@ class LongSword(Item):
         self.names=['weapon','sword','long sword']
         self.base_descriptor='A straight, double-edged sword with a long blade. A well-balanced and versatile weapon for cutting and thrusting'
         self.sortingtype='weapon'
-        self.material=material(quality=quality)
+        self.material=material(quality=quality,power=self.power)
         self.plural=False
         self.truename=self.material.name+' long sword'
         self.length=length
@@ -173,7 +194,7 @@ class Gladius(Item):
         self.names=['weapon','sword','gladius']
         self.base_descriptor='A two-edged short sword balanced for cutting, chopping, or thrusting'
         self.sortingtype='weapon'
-        self.material=material(quality=quality)
+        self.material=material(quality=quality,power=self.power)
         self.plural=False
         self.truename=self.material.name+' gladius'
         self.length=length
@@ -215,7 +236,7 @@ class Knife(Item):
         self.names=['weapon','dagger']
         self.base_descriptor='A short, bladed weapon with a very sharp point. Suitable for throwing, slashing, or stabbing'
         self.sortingtype='weapon'
-        self.material=material(quality=quality)
+        self.material=material(quality=quality,power=self.power)
         self.plural=False
         self.truename=self.material.name+' dagger'
         self.length=length
@@ -258,7 +279,7 @@ class Saber(Item):
         self.names=['weapon','sword','saber']
         self.base_descriptor='A curved, single-edge sword optimized for cutting'
         self.sortingtype='weapon'
-        self.material=material(quality=quality)
+        self.material=material(quality=quality,power=self.power)
         self.plural=False
         self.truename=self.material.name+' saber'
         self.length=length
@@ -300,7 +321,7 @@ class Claymore(Item):
         self.names=['weapon','sword','claymore']
         self.base_descriptor='A broad, heavy longsword suitable only for those strong enough to effectively wield it'
         self.sortingtype='weapon'
-        self.material=material(quality=quality)
+        self.material=material(quality=quality,power=self.power)
         self.plural=False
         self.truename=self.material.name+' claymore'
         self.length=length
@@ -339,7 +360,7 @@ class Mace(Item):
         self.names=['weapon','club','mace']
         self.base_descriptor='A heavy, blunt weapon for delivering powerful blows'
         self.sortingtype='weapon'
-        self.material=material(quality=quality)
+        self.material=material(quality=quality,power=self.power)
         self.length=length
         self.head=head
         self.parry=True
@@ -375,7 +396,7 @@ class FlangedMace(Item):
         super().__init__(**kwargs)
         self.names=['weapon','club','flanged mace']
         self.sortingtype='weapon'
-        self.material=material(quality=quality)
+        self.material=material(quality=quality,power=self.power)
         self.length=length
         self.head=head
         self.contactarea=contactarea
@@ -400,7 +421,7 @@ class WarHammer(Item):
         self.names=['weapon','club','war hammer']
         self.base_descriptor='A long, heavy hammer with a head for bashing attacks and a spike for piercing through armor'
         self.sortingtype='weapon'
-        self.material=material(quality=quality)
+        self.material=material(quality=quality,power=self.power)
         self.length=length
         self.headvolume=headvolume
         self.headsize=headsize
@@ -440,7 +461,7 @@ class Spear(Item):
         self.names=['weapon','polearm','spear']
         self.base_descriptor='A long pole weapon with a sharp tip for piercing attacks.'
         self.sortingtype='weapon'
-        self.material=material(quality=quality)
+        self.material=material(quality=quality,power=self.power)
         self.plural=False
         self.truename=self.material.name+' spear'
         self.length=length
@@ -476,7 +497,7 @@ class Axe(Item):
         self.names=['weapon','axe']
         self.base_descriptor='A heavy, broad-headed bladed weapon. Somewhat clumsier than a sword but capable of delivering considerably more force.'
         self.sortingtype='weapon'
-        self.material=material(quality=quality)
+        self.material=material(quality=quality,power=self.power)
         self.plural=False
         self.truename=self.material.name+' axe'
         self.length=length
@@ -512,7 +533,7 @@ class QuarterStaff(Item):
         self.names=['weapon','polearm','quarterstaff']
         self.base_descriptor='A long staff capable of delivering quick blows while keeping adversaries at range.'
         self.sortingtype='weapon'
-        self.material=material(quality=quality)
+        self.material=material(quality=quality,power=self.power)
         self.plural=False
         self.truename=self.material.name+' quarterstaff'
         self.length=length
@@ -551,7 +572,7 @@ class Chest(Item):
         super().__init__(**kwargs)
         self.sortingtype='armor'
         self.plural=plural
-        self.material=material(quality=quality)
+        self.material=material(quality=quality,power=self.power)
         if self.material.mode=='ductile' or self.material.mode=='brittle':
             self.names=['armor','chestpiece','plate armor']
             self.truename=self.material.name+' plate armor'
@@ -596,7 +617,7 @@ class Glove(Item):
         super().__init__(**kwargs)
         self.sortingtype='armor'
         self.plural=plural
-        self.material=material(quality=quality)
+        self.material=material(quality=quality,power=self.power)
         if self.material.mode=='ductile' or self.material.mode=='brittle':
             self.names=['armor','hand armor','gauntlet']
             self.base_descriptor='Heavy glove for protecting the hand from injury'
@@ -630,7 +651,7 @@ class Legging(Item):
         super().__init__(**kwargs)
         self.sortingtype='armor'
         self.plural=plural
-        self.material=material(quality=quality)
+        self.material=material(quality=quality,power=self.power)
         if self.material.mode=='ductile' or self.material.mode=='brittle':
             self.names=['armor','leg armor','greave']
             self.truename=self.material.name+' greave'
@@ -664,7 +685,7 @@ class Armlet(Item):
         super().__init__(**kwargs)
         self.sortingtype='armor'
         self.plural=plural
-        self.material=material(quality=quality)
+        self.material=material(quality=quality,power=self.power)
         if self.material.mode=='ductile' or self.material.mode=='brittle':
             self.names=['armor','arm guard','vambrace']
             self.truename=self.material.name+' vambrace'
@@ -706,7 +727,7 @@ class Boot(Item):
         self.base_descriptor='Footwear worn for protection of the foot and ankle'
         self.sortingtype='armor'
         self.plural=plural
-        self.material=material(quality=quality)
+        self.material=material(quality=quality,power=self.power)
         self.truename=self.material.name+' boot'
         if thickness=='default':
             thickness=self.material.default_thickness*2*thickness_factor
@@ -733,7 +754,7 @@ class Helm(Item):
         super().__init__(**kwargs)
         self.sortingtype='armor'
         self.plural=plural
-        self.material=material(quality=quality)
+        self.material=material(quality=quality,power=self.power)
         if self.material.mode=='brittle' or self.material.mode=='ductile':
             self.names=['armor','hat','helm']
             self.truename=self.material.name+' helm'
@@ -767,7 +788,7 @@ class GreatHelm(Item):
         super().__init__(**kwargs)
         self.sortingtype='armor'
         self.plural=plural
-        self.material=material(quality=quality)
+        self.material=material(quality=quality,power=self.power)
         if self.material.mode=='brittle' or self.material.mode=='ductile':
             self.names=['armor','hat','greathelm']
             self.truename=self.material.name+' greathelm'
@@ -810,7 +831,7 @@ class Shield(Item):
         self.sortingtype='armor'
         self.image='c:/Project/shield.png'
         self.plural=plural
-        self.material=material(quality=quality)
+        self.material=material(quality=quality,power=self.power)
         self.truename=self.material.name+' shield'
         self.default_thickness=0.02
         self.length=length
@@ -841,7 +862,7 @@ class Shield(Item):
         self.mass=0.25*self.material.density*(self.length*(self.radius**2-self.in_radius**2))*3.14
         self.movemass=self.mass
         self.centermass=self.length*0.5
-        self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
+        self.I=0.01#(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
         self.contactarea=3.14*self.radius**2
         if self.base_thickness==0:
             self.base_thickness=self.thickness
@@ -856,7 +877,7 @@ class Buckler(Item):
         self.sortingtype='armor'
         self.image='c:/Project/shield.png'
         self.plural=plural
-        self.material=material(quality=quality)
+        self.material=material(quality=quality,power=self.power)
         self.defaultmaterial=material
         self.default_thickness=0.02
         self.truename=self.material.name+' buckler'
@@ -888,7 +909,7 @@ class Buckler(Item):
         self.mass=0.25*self.material.density*(self.length*(self.radius**2-self.in_radius**2))*3.14
         self.movemass=self.mass
         self.centermass=self.length*0.5
-        self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
+        self.I=0.01#(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
         self.contactarea=3.14*self.radius**2
         if self.base_thickness==0:
             self.base_thickness=self.thickness
@@ -920,7 +941,7 @@ def weighted_choice(pairs):
             return i[0]
         else: number-=i[1]
 
-def weighted_generation(weighted_items=default_item_weights,totalweight=total_item_weight,hard_materials=hard_material_weights,soft_materials=soft_material_weights):
+def weighted_generation(weighted_items=default_item_weights,totalweight=total_item_weight,hard_materials=hard_material_weights,soft_materials=soft_material_weights,size=1):
     chosen_material=None
     choicenumber=random.random()*totalweight
     for i in weighted_items:
@@ -936,7 +957,7 @@ def weighted_generation(weighted_items=default_item_weights,totalweight=total_it
         mats=hard_materials.copy()
         mats.extend(soft_materials)
         chosen_material=weighted_choice(mats)
-    item=itemtype(material=chosen_material)
+    item=itemtype(material=chosen_material,scale_factor=size)
     item.randomize()
     return item
 

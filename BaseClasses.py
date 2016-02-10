@@ -16,6 +16,7 @@ import Contamination
 import re
 import Items
 import copy
+import queue
 
 
 
@@ -129,6 +130,7 @@ class Limb():
         self.color=color
         self.passable=True
         self.targetable=False
+        self.listed_in_limbs=True
         self.hostile=[]
         self.visual_acuity=1
         self.smell_acuity=1
@@ -209,10 +211,7 @@ class Limb():
         i=len(self.layers)-1
         f=attack.force
         pressure=attack.pressure
-        if attack.weapon==None:
-            aweapon=attack.limb
-        else:
-            aweapon=attack.weapon
+
         if pressure==0:
             area=1
         else:
@@ -251,7 +250,7 @@ class Limb():
                 if self.armor is not None:
                     self.armor.functioncheck()
             else:
-                messages.append("The blow strikes an opening in the armor!")
+                if self.owner in Shell.shell.player.visible_creatures: messages.append("The blow strikes an opening in the armor!")
                 attack.contact=True
         while i>=0:
             attack.target=self.layers[i]
@@ -277,10 +276,6 @@ class Limb():
             elif attack.contact==False:
                 f-=(self.layers[i].function/2+0.5)*softnessfactor*f*self.layers[i].mass/mass
                 #area=area+(3.54*self.layers[i].thickness*area**0.5+3.14*self.layers[i].thickness**2)*(self.layers[i].material.shear**0.7)/softnessfactor
-                if attack.weapon==None:
-                    aweapon=attack.limb
-                else:
-                    aweapon=attack.weapon
                 #area+=0.5*((self.layers[i].shear*attack.reducedmass*(self.layers[i].thickness/self.layers[i].youngs+aweapon.thickness/aweapon.youngs)/self.layers[i].density)**1.5)/area**2
                 if self.layers[i].damage['crush']==0:
                     #oldarea=area
@@ -305,7 +300,7 @@ class Limb():
 
         severed=True
         for i in self.layers:
-            if i.damage['cut']<1 and i.damage['break']<1:
+            if i.damage['cut']<1 and i.damage['break']<1 and i.damage['disintegrate']<1:
                 severed=False
         if severed==True:
             self.sever()
@@ -321,7 +316,7 @@ class Limb():
         if slot=='grasp':
             self.attacks=self.defaultattacks
         if self.equipment[slot] is not None:
-            print(self.equipment[slot],self.equipment[slot].equipped)
+            #print(self.equipment[slot],self.equipment[slot].equipped)
             if cascade==False:
                 if destroyed==False:
                     if drop==True:
@@ -342,7 +337,7 @@ class Limb():
                 if self.equipment[slot].mass:
                     self.movemass-=self.equipment[slot].mass
                 if log==True and destroyed==True:
-                    messages.append("The {} is destroyed!".format(self.equipment[slot].name))
+                    if self in Shell.shell.player.visible_creatures: messages.append("The {} is destroyed!".format(self.equipment[slot].name))
                 if destroyed==True and self.equipment[slot] in self.owner.inventory:
                     self.owner.inventory.remove(self.equipment[slot])
             if self.equipment[slot] in self.owner.equipped_items and self.equipment[slot].equipped==[self]:
@@ -390,13 +385,14 @@ class Limb():
                 else:
                     self.unequip(i,drop=False,log=False)
         if primary:
-            if self.natural==True: self.owner.missing_limbs.append(copy.copy(self))
+            if self.natural==True: #self.owner.missing_limbs.append(copy.copy(self))
+                self.owner.missing_limbs.append(self.copyself())
             self.owner.pain+=75*self.painfactor
-            messages.append("{}'s {} is severed from the body!".format(self.owner.name,self.name))
+            if self.owner in Shell.shell.player.visible_creatures: messages.append("{}'s {} is severed from the body!".format(self.owner.name,self.name))
             if self.attachpoint:
                 if self not in self.attachpoint.limbs:
                     print("Tried to remove {}'s {} from {} and failed".format(self.owner.name,self.name,self.attachpoint.name))
-                    print(self.attachpoint.limbs)
+                    #print(self.attachpoint.limbs)
                 else: self.attachpoint.limbs.remove(self)
             if self.owner.location is not None:
                 self.location[0]=min(max(self.owner.location[0]+int(random.gauss(0,2)),0),Shell.shell.dungeonmanager.current_screen.dimensions[0])
@@ -474,10 +470,15 @@ class Limb():
                     elif len(i.weapon.equipped)==1 and i.hands==1:
                         self.owner.attacks.append(i)
                     elif len(i.weapon.equipped)>1 and i.hands>1:
-                        if not any((i.weapon.equipped,i.name)==(j.weapon.equipped,j.name) for j in self.owner.attacks):
-                            self.owner.attacks.append(i)
+                        try:
+                            if not any((i.weapon.equipped,i.name)==(j.weapon.equipped,j.name) for j in self.owner.attacks):
+                                self.owner.attacks.append(i)
+                        except:
+                            pass
         self.process_coatings()
         for i in self.enchantments:
+            i.on_turn()
+        for i in self.layers:
             i.on_turn()
 
     def on_strike(self,attack):
@@ -494,6 +495,9 @@ class Limb():
     def on_destruction(self):
         for i in self.enchantments:
             i.on_destruction()
+
+    def on_equip(self,**kwargs):
+        pass
 
     def change_material(self,oldmaterial,newmaterial):
         for i in self.layers:
@@ -573,6 +577,58 @@ class Limb():
         self.attachpoint=target
         target.limbs.append(self)
 
+    def copyself(self):
+        limbtype=type(self)
+        if hasattr(self,'boneradius'):
+            boneradius=self.boneradius
+        else:
+            boneradius=0
+        try: item=self.layers[0]
+        except: item=None
+        newlimb=limbtype(self.stats.copy(),length=self.length,radius=self.radius,natural=self.natural,owner=self.owner,boneradius=boneradius,item=item)
+        newlimb.name=self.name
+        if newlimb in self.owner.limbs: self.owner.limbs.remove(newlimb)
+        if hasattr(self,'biting_surface'):
+            newlimb.biting_surface=self.biting_surface
+        if hasattr(self,'tip'):
+            newlimb.tip=self.tip
+        for i in self.limbs:
+            attachedlimb=i.copyself()
+            attachedlimb.join_to(newlimb)
+        if self.owner is not None:
+            self.owner.process_new_limb(newlimb)
+        newlimb.can_attack=self.can_attack
+        newlimb.attachpoint=self.attachpoint
+        return newlimb
+
+    def recalc_from_mass(self,mass=None,material=None,ratio=None):
+        mass_proportions={}
+        materials={}
+        ratios={}
+        uniform=False
+        if mass==None:
+            mass=self.mass
+        for i in self.layers:
+            mass_proportions[i]=i.mass/self.mass
+            if material==None:
+                materials[i]=i.material
+            else:
+                materials[i]=material
+                uniform=True
+            if ratio==None:
+                ratios[i]=i.length/i.radius
+            else:
+                ratios[i]=ratio
+        if uniform==False:
+            newlayers=[]
+            scale=(mass/self.mass)**(1/3)
+            for i in self.layers:
+                new=type(i)(length=i.length*scale,in_radius=i.in_radius*scale,out_radius=i.radius*scale,radius=i.radius*scale,material=i.material,quality=i.quality)
+                newlayers.append(new)
+            self.layers=newlayers
+            self.youngscalc()
+            self.mass_calc()
+
 class Creature():
     def __init__(self,**kwargs):
         self.basicname=''
@@ -583,12 +639,17 @@ class Creature():
         self.floor=None
         self.vision_blocking=False
         self.visible_cells=[]
+        self.visible_creatures=[]
+        self.visible_items=[]
         self.missing_limbs=[]
         self.alive=True
+        self.sizefactor=1
         self.tension=0
         self.pain=0
         self.oldpain=0
         self.recoverytime=0
+        self.blood=[100,100]
+        self.fatal_bleeding=True
         self.reach=0.01
         self.combataction=False
         self.can_grasp=False
@@ -604,7 +665,17 @@ class Creature():
         self.hearing=0
         self.smell_sense=0
         self.esp=0
-        self.iprefs={'mass':-1,'length':1,'edge':1,'tip':1,'I':-1,'quality':1,'thickness':1,'type':[],'material':[],'collection threshold':5,'weight threshold':170}
+        self.iprefs={'mass':-1,'length':1,'edge':1,'tip':1,'I':-1,'quality':1,'thickness':1,'type':[],'material':[],
+                     'collection threshold':5,'weight threshold':170,'desired weapons':1,'wield preference':1,'enchantment':0}
+        self.item_weights=[(Items.Bone,0),(Items.Flesh,0),(Items.Hair,0),(Items.LongSword,10),(Items.Gladius,5),
+                           (Items.Knife,7),(Items.Saber,4),(Items.Claymore,4),(Items.Mace,8),(Items.WarHammer,3),
+                           (Items.Spear,5),(Items.Axe,6),(Items.QuarterStaff,3),(Items.Chest,8),(Items.Glove,12),
+                           (Items.Legging,12),(Items.Armlet,12),(Items.Boot,12),(Items.Helm,8),(Items.GreatHelm,3),
+                           (Items.Shield,6),(Items.Buckler,6)]
+        self.hard_material_weights=[(Items.Iron,10),(Items.Bone_Material,7),(Items.Wood,10),(Items.Copper,10),(Items.Brass,6),
+                                    (Items.Bronze,5),(Items.Steel,4),(Items.Aluminum,3),(Items.Silver,2),(Items.Duraluminum,1),(Items.Zicral,1)]
+        self.soft_material_weights=[(Items.Leather,10),(Items.Cotton,10),(Items.Wool,9),(Items.Silk,5),(Items.Spider_Silk,2),
+                                    (Items.Basalt_Fiber,1),(Items.Fur,3),(Items.Flesh_Material,1)]
         self.item_values={}
         self.equipped_items=[]
         self.inventory=[]
@@ -612,11 +683,16 @@ class Creature():
         self.balance_recovery=0
         self.classification=[]
         self.hostile=[]
+        self.limbs=[]
+        self.path=[]
+        self.indefinitename=''
+        self.player=False
         self.target=None
         self.target_preference='random'
         self.preference_enforcement=False
         self.disabled_attack_types=[]
         self.disabled_attacks=[]
+        self.abilities=[]
         self.magic_contamination={'dark':0,'elemental':0,'summoning':0,'transmutation':0,'arcane':0,'total':0}
         self.descriptor=''
         self.note=''
@@ -664,12 +740,12 @@ class Creature():
             if self.stamina[0]<self.stats['str']*random.gauss(4/self.stats['luc']**0.5,1/self.stats['luc']):
                 if 'stamina_incapacitated' not in self.conditions:
                     self.conditions.append('stamina_incapacitated')
-                    messages.append('{} collapses from exhaustion'.format(self.name))
+                    if self in Shell.shell.player.visible_creatures: messages.append('{} collapses from exhaustion'.format(self.name))
             elif 'stamina_incapacitated' in self.conditions:
                 self.stamina[0]+=int(self.stats['str']**0.8)+1
                 if (self.stats['str']*self.stats['luc'])**0.5>random.gauss(300,60)/self.stamina[0]:
                     self.conditions.remove('stamina_incapacitated')
-                    messages.append("{} recovers from exhaustion".format(self.name))
+                    if self in Shell.shell.player.visible_creatures: messages.append("{} recovers from exhaustion".format(self.name))
             if "off_balance" in self.conditions:
                 if self.balance_recovery==1:
                     while "off_balance" in self.conditions:
@@ -689,6 +765,8 @@ class Creature():
                     self.focus[0]+=int((self.focus[1]-self.focus[0])*self.stats['per']*self.stamina[0]/(100*self.stamina[1]))+1
             self.attacked=False
             self.combataction=False
+            if self.blood[0]<self.blood[1]:
+                self.blood[0]+=1
 
 
 
@@ -721,11 +799,14 @@ class Creature():
                 if self.pain*random.gauss(1,0.3)>self.stats['wil']**1.9:
                     if 'pain_incapacitated' not in self.conditions:
                         self.conditions.append('pain_incapacitated')
-                        messages.append('{} collapses in pain!'.format(self.name))
+                        if self in Shell.shell.player.visible_creatures: messages.append('{} collapses in pain!'.format(self.name))
+                    else:
+                        self.pain=max(self.pain-self.pain*self.stats['wil']*0.005,0)
                 elif 'pain_incapacitated' in self.conditions:
+                    self.pain=max(self.pain-self.pain*self.stats['wil']*0.005,0)
                     if self.stats['luc']*self.stats['wil']>self.pain*random.gauss(1,0.4):
                         self.conditions.remove('pain_incapacitated')
-                        messages.append('{} recovers from the pain.'.format(self.name))
+                        if self in Shell.shell.player.visible_creatures: messages.append('{} recovers from the pain.'.format(self.name))
                 self.oldpain=self.pain
             else: self.pain=0
 
@@ -762,22 +843,51 @@ class Creature():
             if i.function==0:
                 self.die()
                 return
+        if self.fatal_bleeding==True and self.blood[0]<=0:
+            if self in Shell.shell.player.visible_creatures:
+                if self.player==False: messages.append("{} has bled to death".format(self.name))
+                else: messages.append("You have bled to death")
+            self.die()
+            return
 
-    def equip(self,item,log=True):
+    def equip(self,item,log=True,limb=None):
         item.in_inventory=self
+        if limb!=None:
+            if item.wield in limb.equipment and item.wield in limb.primaryequip:
+                if limb.equipment[item.wield] is None and item.equipped==[]:
+                    #print('equipping',item.name,'to',limb.name)
+                    limb.equip(item)
+                    if limb in item.equipped:
+                        if item.wield=='grasp' and log==True:
+                            if self in Shell.shell.player.visible_creatures: messages.append("{} is now held in {}".format(item.name,limb.name))
+                        elif log==True:
+                            if self in Shell.shell.player.visible_creatures: messages.append("{} is now equipped on {}".format(item.name,limb.name))
+                        self.updateattacks()
+                        self.mass_calc()
+                        #print('equipped',item.name,'to',limb.name)
+                        return
+                elif limb.equipment[item.wield] is None and item.wield=='grasp' and len(item.equipped)>0:
+                    limb.equip(item)
+                    if log==True and self in Shell.shell.player.visible_creatures:
+                        Shell.shell.log.addtext("{} is now also held in {}".format(item.name,limb.name))
+                    self.updateattacks()
+                    self.mass_calc()
+                    return
         for i in self.limbs:
             if item.wield in i.equipment and item.wield in i.primaryequip:
                 if i.equipment[item.wield] is None and item.equipped==[]:
+                    #print('equipping',item.name,'to',i.name)
                     i.equip(item)
                     if i in item.equipped:
                         if item.wield=='grasp' and log==True:
-                            messages.append("{} is now held in {}".format(item.name,i.name))
+                            if self in Shell.shell.player.visible_creatures: messages.append("{} is now held in {}".format(item.name,i.name))
                         elif log==True:
-                            messages.append("{} is now equipped on {}".format(item.name,i.name))
+                            if self in Shell.shell.player.visible_creatures: messages.append("{} is now equipped on {}".format(item.name,i.name))
                         self.updateattacks()
                         self.mass_calc()
+                        #print('equipped',item.name,'to',i.name)
                         return
-                if i.equipment[item.wield] is None and item.wield=='grasp' and len(item.equipped)>0:
+                elif i.equipment[item.wield] is None and item.wield=='grasp' and len(item.equipped)>0:
                     i.equip(item)
                     if log==True:
                         Shell.shell.log.addtext("{} is now also held in {}".format(item.name,i.name))
@@ -793,13 +903,13 @@ class Creature():
                 if i.equipment[item.wield]==item:
                     i.unequip(item.wield,log=log,drop=drop)
 
-    def die(self):
+    def die(self,**kwargs):
         #self.targetable=False
         self.alive=False
         self.hostile=[]
         self.passable=True
         items_to_drop=[]
-        messages.append("{} has been slain!".format(self.name))
+        if self in Shell.shell.player.visible_creatures: messages.append("{} has been slain!".format(self.name))
         if self.player==True:
             messages.append("YOU HAVE DIED!")
         for i in self.inventory:
@@ -811,11 +921,28 @@ class Creature():
             Shell.shell.dungeonmanager.current_screen.cells[self.location[0]][self.location[1]].contents.append(i)
 
     def choose_action(self):
+        #start with non-turn-consuming actions
+        for i in self.equipped_items:
+            if hasattr(i,'sortingtype') and i.sortingtype=='weapon':
+                if len(i.equipped)<self.iprefs['wield preference']:
+                    self.equip(i)
+
+        #decide if any abilities should be used
+        random.shuffle(self.abilities)
+        for i in self.abilities:
+            chance=i.decide()
+            if random.random()<chance[0]:
+                i.enemy_activation()
+
         #If no target, choose a target
         if self.target!=None and self.target not in self.visible_creatures:
-            self.target=None
+            if len(self.path)>1:
+                self.follow_path()
+                return
+            else: self.target=None
         if self.target!=None and self.target.alive==False:
             self.target=None
+            self.path=[]
         if self.target==None:
             potential_targets=[]
             for i in self.visible_creatures:
@@ -825,7 +952,10 @@ class Creature():
                 self.target=random.choice(potential_targets)
         #If we have a target and it is visible, chase and kill
         if self.target!=None and self.target in self.visible_creatures:
-            self.chase(self.target)
+            if self.path==[] or self.target not in self.path[0].contents:
+                self.get_path(self.target.floor.cells[self.target.location[0]][self.target.location[1]])
+
+            self.follow_path()
             return
         #Follow steps in the action queue if they exist
         if self.action_queue!=[]:
@@ -843,15 +973,27 @@ class Creature():
                     messages.append("{} equips {}".format(self.name,instructions[1].name))
 
         #If we are not in combat, maybe we should pick up some items
+        #How many weapons are we currently wielding?
+        equipped_weapons=0
+        for i in self.equipped_items:
+            if hasattr(i,'sortingtype') and i.sortingtype=='weapon':
+                equipped_weapons+=1
         #take inventory of surrounding items
         for i in self.visible_items:
             if isinstance(i,Item) or isinstance(i,Limb): pass
-            else: break
+            else: continue
             self.value_item(i)
             if hasattr(i,'wield') and self.movemass+i.mass<self.iprefs['weight threshold']:
                 #See if it outvalues what we currently have equipped
                 for j in self.limbs:
                     if i.wield in j.primaryequip:
+                        if j.equipment[i.wield]==None and i.wield=='grasp':
+                            #don't wield more weapons than you want
+                            if hasattr(i,'sortingtype') and i.sortingtype=='weapon' and equipped_weapons>=self.iprefs['desired weapons']:
+                                continue
+                            #don't wield shields until you have the number of weapons you desire
+                            elif hasattr(i,'sortingtype') and i.sortingtype=='armor' and equipped_weapons<self.iprefs['desired weapons']:
+                                continue
                         if j.equipment[i.wield]==None or self.item_values[i]>self.item_values[j.equipment[i.wield]]:
                             #If we are standing on it, pick it up
                             if i.location==self.location:
@@ -861,7 +1003,12 @@ class Creature():
                                 if j.equipment[i.wield]!=None:
                                     self.action_queue.append(['unequip',j.equipment[i.wield],j])
                                 self.action_queue.append(['equip',i,j])
-                            else: self.chase(i)
+                            else:
+                                self.get_path(self.floor.cells[i.location[0]][i.location[1]])
+                                self.target=i
+                                self.follow_path()
+                                self.target=None
+                            #self.chase(i)
                             return
 
         #Even if it's useless for us, take it if it is above collection threshold but won't put us over weight
@@ -876,6 +1023,72 @@ class Creature():
 
 
         self.wander()
+
+    def get_path(self,target):
+        currentcell=self.floor.cells[self.location[0]][self.location[1]]
+        searchables=queue.PriorityQueue()
+        searchables.put((0,0,currentcell))
+        camefrom={}
+        cost={}
+        camefrom[currentcell]=None
+        cost[currentcell]=0
+        steps=0
+
+        while not searchables.empty():
+            current=searchables.get()[2]
+            #print(current.location,target.location)
+            if current==target:
+                break
+            random.shuffle(current.immediate_neighbors)
+            for next in current.immediate_neighbors:
+                if next.passable==False and next!=target:
+                    continue
+                else:
+                    newcost=cost[current]+next.movementcost_to+current.movementcost_from
+                if next not in cost or newcost<cost[next]:
+                    steps+=1
+                    cost[next]=newcost
+                    diag_distance=min(abs(target.location[0]-next.location[0]),abs(target.location[1]-next.location[1]))
+                    cardinal_distance=max(abs(target.location[0]-next.location[0]),abs(target.location[1]-next.location[1]))-diag_distance
+                    priority=newcost+diag_distance+cardinal_distance
+                    #print(priority,steps,next.location)
+                    searchables.put((priority,steps,next))
+                    camefrom[next]=current
+                if next==target:
+                    continue
+        #return camefrom
+        self.path=[target]
+        try:
+            while camefrom[self.path[len(self.path)-1]]!=None:
+                self.path.append(camefrom[self.path[len(self.path)-1]])
+            #print(self.path)
+        except: self.path=[]
+
+    def follow_path(self):
+        #first make sure path is followable
+        for i in self.path:
+            if i in (self.path[0],self.path[len(self.path)-1]): continue
+            #If the path is blocked, try to path around it
+            if not i.passable and self.target!=None:
+                self.get_path(self.target.floor.cells[self.target.location[0]][self.target.location[1]])
+                break
+            #If we have no target, we have nothing to path to
+            elif not i.passable:
+                self.path=[]
+                return
+        #Make sure that, at minimum, the path has 2 points on it (start and end)
+        if len(self.path)<2:
+            return
+        #If we get here, the path CAN be followed. So let's follow it
+        currentcell=self.path.pop()
+        movement=[self.path[-1].location[0]-currentcell.location[0],self.path[-1].location[1]-currentcell.location[1]]
+        self.move(movement)
+        if self.location==currentcell.location:
+            self.path.append(currentcell)
+        if len(self.path)==1: self.path=[]
+
+
+        pass
 
     def move(self,movement):
         if self.can_walk==True:
@@ -932,7 +1145,7 @@ class Creature():
             pref='balancing'
 
         while endattack==False:
-            accuracy=1+(len(self.attacks)-len(unusable_attacks))/10
+            accuracy*=1-len(unusable_attacks)/(5*len(self.attacks))
             hit_location=A.targetchoice(target)
             if hit_location is None:
                 return
@@ -973,7 +1186,7 @@ class Creature():
                 self.attacked=True
                 attacksmade+=1
             else:
-                messages.append('{} attacks {} in the {} with {}'.format(self.name,target.name,hit_location.name,atk[attacksmade].name))
+                if self in Shell.shell.player.visible_creatures: messages.append('{} attacks {} in the {} with {}'.format(self.name,target.name,hit_location.name,atk[attacksmade].name))
                 atk[attacksmade].do(hit_location)
                 self.attacked=True
                 attacksmade+=1
@@ -987,13 +1200,16 @@ class Creature():
 
     def evasion(self,attack,blockable=True,dodgeable=True,parryable=True):
         self.combataction=True
+        parrytime=0
+        blocktime=0
+        dodgetime=0
 
         #incapacitated foes are unable to make even the most basic of evasive maneuvers and take much greater damage
         for i in self.conditions:
             if incapacitate.search(i):
                 attack.damagefactor=attack.attacker.stats['tec']
                 attack.arpen+=0.5
-                messages.append('{} is defenseless!'.format(self.name))
+                if self in Shell.shell.player.visible_creatures: messages.append('{} is defenseless!'.format(self.name))
                 self.stamina[0]-=attack.basetarget.staminacost
                 self.focus[0]-=attack.basetarget.staminacost
                 return
@@ -1008,15 +1224,15 @@ class Creature():
 
         if attack.time<reactiontime or "off_balance" in self.conditions:
             attack.damagefactor=attack.attacker.stats['tec']**0.5
-            messages.append('The attack takes {} completely unaware!'.format(self.name))
+            if self in Shell.shell.player.visible_creatures: messages.append('The attack takes {} completely unaware!'.format(self.name))
             return
 
         #Attempt to dodge
-        dodgetime=reactiontime+((self.focus[1]/(1+self.focus[0]))**0.5)*random.gauss(3/(self.stats['tec']*self.stats['luc']**0.5),.01)*(self.movemass**1.2/(self.stats['str']*max(self.stamina[0],1)/self.stamina[1]))*1.5*attack.accuracy*self.targetsize/(7*self.balance+0.01)
-        if dodgetime<attack.time and random.random()*attack.attacker.stats['tec']<0.8*random.random()*self.stats['per'] and dodgeable==True:
+        dodgetime=reactiontime+((self.focus[1]/(1+self.focus[0]))**0.5)*random.gauss(3/(self.stats['tec']*self.stats['luc']**0.5),.01)*(self.movemass**1.2/(self.stats['str']*max(self.stamina[0],1)/self.stamina[1]))*attack.accuracy*self.targetsize/(7*self.balance+0.01)
+        if dodgetime<attack.time and random.random()*attack.attacker.stats['tec']<random.random()*self.stats['per'] and dodgeable==True:
             attack.dodged=True
             self.stamina[0]-=2*attack.basetarget.movemass/attack.basetarget.stats['str']
-            print("Attach dodged. Attack time of {} and dodge time of {}".format(attack.time,dodgetime))
+            #print("Attach dodged. Attack time of {} and dodge time of {}".format(attack.time,dodgetime))
             return
 
         #Attempt to block
@@ -1031,7 +1247,7 @@ class Creature():
                         basemass=i.equipped[0].movemass+encumbrance
                         strength=i.equipped[0].stats['str']*self.stamina[0]/(self.stamina[1]+1)
                     tec=i.equipped[0].stats['tec']*self.focus[0]/(self.focus[1]+1)
-                    blocktime=reactiontime+0.5*(self.targetsize/7)*attack.accuracy*((self.focus[1]/(self.focus[0]+1))**0.4)*random.gauss(1/(self.stats['luc']**0.5),.1)*(2*i.mass/strength**2+1/(tec*i.radius+0.5)**2+1/(tec/(2*i.mass+basemass*0.5)+1.57*strength*i.radius**2))
+                    blocktime=reactiontime+0.3*(self.targetsize/7)*attack.accuracy*((self.focus[1]/(self.focus[0]+1))**0.4)*random.gauss(1/(self.stats['luc']**0.5),.1)*(2*i.mass/strength**2+1/(tec*i.radius+0.5)**2+1/(tec/(2*i.mass+basemass*0.5)+1.57*strength*i.radius**2))
                 elif len(i.equipped)>1:
                     basemass=0
                     strength=0
@@ -1044,13 +1260,15 @@ class Creature():
                             basemass+=j.movemass+encumbrance
                             strength+=j.stats['str']*self.stamina[0]/(self.stamina[1]+1)
                         tec+=j.stats['tec']*self.focus[0]/(self.focus[1]+1)
-                    blocktime=reactiontime+0.5*(self.targetsize/7)*attack.accuracy*((self.focus[1]/(self.focus[0]+1))**0.4)*random.gauss(1/(self.stats['luc']**0.5),.1)*(2*i.mass/strength**2+1/(tec*i.radius+0.5)**2+1/(tec/(2*i.mass+basemass*0.5)+1.57*strength*i.radius**2))
+                    blocktime=reactiontime+0.3*(self.targetsize/7)*attack.accuracy*((self.focus[1]/(self.focus[0]+1))**0.4)*random.gauss(1/(self.stats['luc']**0.5),.1)*(2*i.mass/strength**2+1/(tec*i.radius+0.5)**2+1/(tec/(2*i.mass+basemass*0.5)+1.57*strength*i.radius**2))
+                elif len(i.equipped)<=0:
+                    blocktime=1000000
 
                 #print("{} block time is {}. Blocking attack of time {}".format(i.name,blocktime,attack.time))
                 if blocktime<attack.time and random.random()*attack.attacker.stats['tec']<random.random()*self.stats['per']:
                     attack.blocked=True
                     attack.target=i
-                    attack.basetarget=i
+                    #attack.basetarget=i
                     self.stamina[0]-=int(6*i.mass/strength)
                     luc=self.stats['luc']
                     attack.damagefactor=1/random.triangular(1,(luc/(10+luc))*self.stats['tec']**0.5)
@@ -1083,12 +1301,13 @@ class Creature():
                     if attack.type=='pierce':
                         attack.type='crush'
                     attack.target=i
-                    attack.basetarget=i
+                    #attack.basetarget=i
                     luc=self.stats['luc']
                     attack.damagefactor=0.05*(attack.attacker.stats['tec']/self.stats['tec'])/random.triangular(1,self.stats['tec'],(luc/(10+luc))*self.stats['tec'])
                     attack.strikearea*=5*tec**0.5
                     attack.area+=attack.area*4*tec**0.5
                     return
+        #print('reaction time',reactiontime,'attacktime',attack.time,'dodge:',dodgetime,'parry',parrytime,'blocktime',blocktime)
 
     def sense_awareness(self):
         self.can_walk=False
@@ -1115,6 +1334,8 @@ class Creature():
             if i.smell==True:
                 self.can_smell=True
                 self.smell_sense+=i.smell_sense*i.stats['per']
+        for i in self.enchantments:
+            i.sense_modification()
 
         if self.vision<=0 and self.smell_sense<=0 and self.hearing<=0 and self.esp<=0 and 'mindless' not in self.classification:
             self.conditions.append('sensory_incapacitated')
@@ -1309,7 +1530,7 @@ class Creature():
         self.visible_cells=self.floor.shadowcasting(visible_indices,self.location)
         #print(self.visible_cells)
         #self.visible_cells=set(self.visible_cells)
-        self.visible_creatures=[]
+        self.visible_creatures=[self]
         self.visible_items=[]
         for i in self.visible_cells:
             self.visible_creatures.extend(i.creatures)
@@ -1323,6 +1544,8 @@ class Creature():
                 i.seen_by_player=True
             for i in self.visible_creatures:
                 i.seen_by_player=True
+                for j in i.equipped_items:
+                    j.seen_by_player=True
         return
 
     def value_item(self,item):
@@ -1351,6 +1574,19 @@ class Creature():
                 value+=self.iprefs['I']*item.I
             if hasattr(item,'quality'):
                 value+=self.iprefs['quality']*item.quality
+        elif isinstance(item,Limb):
+            if hasattr(item,'mass'):
+                value+=self.iprefs['mass']*item.mass/5
+            if hasattr(item,'length'):
+                value+=self.iprefs['length']*item.length
+            if hasattr(item,'edge'):
+                value+=self.iprefs['edge']*1/(100000*item.edge)
+            if hasattr(item,'tip'):
+                value+=self.iprefs['tip']*1/(10000000*item.tip)
+            if hasattr(item,'I'):
+                value+=self.iprefs['I']*item.I
+            if hasattr(item,'quality'):
+                value+=self.iprefs['quality']*item.quality
         #for armor
         elif hasattr(item,'sortingtype') and item.sortingtype=='armor' and equippable==True:
             if hasattr(item,'mass'):
@@ -1360,6 +1596,9 @@ class Creature():
             if hasattr(item,'quality'):
                 value+=self.iprefs['quality']*item.quality
 
+        if hasattr(item,'enchantments'):
+            value+=self.iprefs['enchantment']*len(item.enchantments)
+
         for i in self.iprefs['type']:
             if isinstance(item,i[0]):
                 value=max(value+i[1],value*i[1])
@@ -1368,14 +1607,55 @@ class Creature():
             if hasattr(item,'material') and isinstance(item.material,i[0]):
                 value=max(value+i[1],value*i[1])
 
-        print(item.name,value)
+        #print(item.name,value)
         self.item_values[item]=value
 
-    def generate_equipment(self):
+    def generate_equipment(self,items=1,item_weights=None,hard_materials=None,soft_materials=None,scale=None):
+        if item_weights==None:
+            item_weights=self.item_weights
+        if hard_materials==None:
+            hard_materials=self.hard_material_weights
+        if soft_materials==None:
+            soft_materials=self.soft_material_weights
+        if scale==None:
+            scale=self.sizefactor
+        totalweight=sum(i[1] for i in item_weights)
+        choice_items=[]
+        equipped_weapons=0
+        for i in self.equipped_items:
+            if hasattr(i,'sortingtype') and i.sortingtype=='weapon':
+                equipped_weapons+=1
+        for i in range(0,items):
+            newitem=Items.weighted_generation(weighted_items=item_weights,totalweight=totalweight,hard_materials=hard_materials,soft_materials=soft_materials,size=scale)
+            choice_items.append(newitem)
+        print([i.name for i in choice_items])
+        for i in choice_items:
+            if isinstance(i,Item) or isinstance(i,Limb): pass
+            else: continue
+            self.value_item(i)
+            if hasattr(i,'wield') and self.movemass+i.mass<self.iprefs['weight threshold']:
+                #See if it outvalues what we currently have equipped
+                for j in self.limbs:
+                    if i.wield in j.primaryequip:
+                        if j.equipment[i.wield]==None and i.wield=='grasp':
+                            #don't wield more weapons than you want
+                            if hasattr(i,'sortingtype') and i.sortingtype=='weapon' and equipped_weapons>=self.iprefs['desired weapons']:
+                                continue
+                            #don't wield shields until you have the number of weapons you desire
+                            elif hasattr(i,'sortingtype') and i.sortingtype=='armor' and equipped_weapons<self.iprefs['desired weapons']:
+                                continue
+                        if j.equipment[i.wield]==None or self.item_values[i]>self.item_values[j.equipment[i.wield]]:
+                            self.inventory_add(i)
+                            i.location=[None,None]
+                            if j.equipment[i.wield]!=None:
+                                self.unequip(j.equipment[i.wield],log=False)
+                            self.equip(i,limb=j,log=False)
+
+    def process_new_limb(self,limb):
         pass
 
 class Material():
-    def __init__(self):
+    def __init__(self,**kwargs):
         self.wetdamage=None
         self.fluid=None
         self.identification_difficulty=15
@@ -1386,9 +1666,10 @@ class Material():
         self.heat_conduction=1
         self.burn_resistance=1
         self.note=''
+        self.plasticity=0
 
     def damageresolve(self,attack,attacker,reactionforce=False):
-        if attacker.owner.player==True: print(self.name,attack.force,attack.pressure)
+        #if attacker.owner.player==True: print(self.name,attack.force,attack.pressure)
         self.reactionforce=reactionforce
         if attack.pressure==0:
             attack.rootarea=1
@@ -1518,20 +1799,24 @@ class Material():
             rootarea=1
         else:
             rootarea=(attack.force/attack.pressure)**0.5
-        assert damagedobject.mass>=0,damagedobject
-        shearforce=attack.force*(1/(3.5*(damagedobject.thickness+0.00000000001)*rootarea)-self.density*rootarea/(3.5*damagedobject.mass))*0.0002/(0.0002+rootarea**2)
+        assert damagedobject.mass>=0,(damagedobject,damagedobject.mass)
+        shearforce=attack.force*(1/(3.5*(damagedobject.thickness+0.00000000001)*rootarea)-self.density*rootarea/(3.5*damagedobject.mass))#*0.0002/(0.0002+rootarea**2)
      #   if isinstance(attack.basetarget,Limb):
       #      assert damagedobject.mass>0,damagedobject
        #     shearforce=min(shearforce*(damagedobject.mass/attack.basetarget.movemass)**0.5,shearforce)
         if shearforce>self.shear_strength*1000000 and attack.contact==True and attack.type=='cut':
             failure_energy=((rootarea*self.thickness*self.shear*1000000000*self.shear_strength**2*self.thickness)/(self.shear_strength+80)**2)**0.5+\
                            self.fracture_energy*self.thickness*rootarea*1000
+            #failure_energy=(rootarea*self.thickness*1000*self.shear_strength**2)/self.shear+\
+            #               self.fracture_energy*self.thickness*rootarea*1000
+            #print('attack energy:',attack.energy,'failure energy:',failure_energy)
             #severity=max(random.gauss((2*attack.energy/(4000000*self.fracture_energy*damagedobject.thickness*rootarea+attack.energy))
             #                              *(attacker.stats['tec']+0.2*attacker.stats['luc'])/(defenderstats['luc']
             #                                +0.2*defenderstats['tec']),0.2),0)
             severity=max(random.gauss((attack.energy/failure_energy)*(attacker.stats['tec']+0.2*attacker.stats['luc'])/
                                       (defenderstats['luc']+0.2*defenderstats['tec']),0.2),0)
-            severity=min(severity,attack.cutlimit)
+            #print('cut severity:',severity)
+            severity=min(severity,attack.cutlimit,1)
             damagedobject.damage['cut']=(damagedobject.damage['cut']**2+severity**2)**0.5
             if damagedobject.damage['cut']>=0.8: self.contact=True
             attack.energy-=min(self.fracture_energy*attack.rootarea*self.thickness*100000,0.9*attack.energy)
@@ -1615,7 +1900,7 @@ class Material():
                 severity=0.5+random.random()
             severity=min(severity,attack.piercelimit)
             damagedobject.damage['pierce']=(damagedobject.damage['pierce']**2+severity**2)**0.5
-            damagedobject.damage['pierce']=min(damagedobject.damage['pierce'],1)
+            damagedobject.damage['pierce']=min(damagedobject.damage['pierce'],1.5)
             #print('current severity is', severity, 'failure energy is',failure_energy)
             if damagedobject.damage['pierce']>=0.2: self.contact=True
             self.bruisable=False
@@ -1674,10 +1959,15 @@ class Item():
         self.kills=[]
         self.base_thickness=0
         self.base_radius=0
+        self.in_radius=0
         self.radius=0
         self.color=(1,1,1,1)
         self.name=''
         self.sortingtype='misc'
+        if 'power' in kwargs:
+            self.power=kwargs['power']
+        else:
+            self.power=1
         self.inventory_index=None
         self.in_inventory=None
         self.location=[None,None]
@@ -1753,6 +2043,11 @@ class Item():
                 attack.results.append((i,self.damage[i]-self.olddamage[i]))
                 if self not in attack.damagedobjects: attack.damagedobjects.append(self)
 
+        if attack.basetarget.owner!=None:
+            defender=attack.basetarget.owner
+        else:
+            defender=attacker
+
 
         attack.damage_dealt+=1
 
@@ -1768,7 +2063,7 @@ class Item():
                 if self.olddamage[keys]<self.damage[keys]:
                     reactiondamage=True
             if reactiondamage==True and attack.reaction_damage_processed==False:
-                messages.append("The attacker's {} is damaged!".format(name))
+                if attacker in Shell.shell.player.visible_creatures: messages.append("The attacker's {} is damaged!".format(name))
                 attack.reaction_damage_processed=True
 
 #Handling edge dulling through chipping or bending of the blade edge
@@ -1777,25 +2072,25 @@ class Item():
                 if attack.oldtype=='cut' or attack.oldtype=='crush':
                     if self.damage['dent']>0 and hasattr(self,'edge'):
                         self.edge=self.edge*(1+self.damage['dent'])**0.5
-                        messages.append("The edge of the {} is dulled".format(self.name))
+                        if attacker in Shell.shell.player.visible_creatures: messages.append("The edge of the {} is dulled".format(self.name))
                         self.damage['edgedull']+=(1+self.damage['dent'])**0.5-1
                         self.damage['dent']=0
                         return
                     if self.damage['crack']>self.olddamage['crack'] and hasattr(self,'edge'):
                         self.edge=self.edge*(1+self.damage['dent'])**0.5
-                        messages.append("The edge of the {} is chipped".format(self.name))
+                        if attacker in Shell.shell.player.visible_creatures: messages.append("The edge of the {} is chipped".format(self.name))
                         self.damage['edgechip']+=(1+self.damage['dent'])**0.5-1
                         return
                 elif attack.oldtype=='pierce' and reactionforce==True:
                     if self.damage['dent']>0:
                         self.tip=self.tip*(1+self.damage['dent'])**0.5
-                        messages.append("The tip of the {} is dulled".format(self.name))
+                        if attacker in Shell.shell.player.visible_creatures: messages.append("The tip of the {} is dulled".format(self.name))
                         self.damage['tipdull']+=(1+self.damage['dent'])**0.5-1
                         self.damage['dent']=0
                         return
                     if self.damage['crack']>0:
                         self.tip=self.tip*(1+self.damage['crack'])**2
-                        messages.append("The tip of the {} is chipped".format(self.name))
+                        if attacker in Shell.shell.player.visible_creatures: messages.append("The tip of the {} is chipped".format(self.name))
                         self.damage['tipchip']+=(1+self.damage['crack'])**2-1
                         self.damage['crack']=self.olddamage['crack']
                         return
@@ -1805,9 +2100,9 @@ class Item():
         if self.damage['crush']>self.olddamage['crush']:
             attack.damage_dealt+=1
             if self.plural==False:
-                messages.append("The {} is crushed!".format(self.name))
+                if defender in Shell.shell.player.visible_creatures: messages.append("The {} is crushed!".format(self.name))
             if self.plural==True:
-                messages.append("The {} are crushed!".format(self.name))
+                if defender in Shell.shell.player.visible_creatures: messages.append("The {} are crushed!".format(self.name))
             if isinstance(attack.basetarget,Limb) and self in attack.basetarget.layers:
                 attack.basetarget.owner.pain+=pain*250*self.damage['crush']/attack.basetarget.owner.stats['wil']**0.5
             self.functioncheck()
@@ -1823,9 +2118,9 @@ class Item():
         if self.damage['shatter']>self.olddamage['shatter']:
             attack.damage_dealt+=1
             if self.plural==False:
-                messages.append("The {} is shattered!".format(self.name))
+                if defender in Shell.shell.player.visible_creatures: messages.append("The {} is shattered!".format(self.name))
             if self.plural==True:
-                messages.append("The {} are shattered!".format(self.name))
+                if defender in Shell.shell.player.visible_creatures: messages.append("The {} are shattered!".format(self.name))
             if isinstance(attack.basetarget,Limb) and self in attack.basetarget.layers:
                 attack.basetarget.owner.pain+=pain*250*self.damage['shatter']/attack.basetarget.owner.stats['wil']**0.5
             self.functioncheck()
@@ -1838,9 +2133,9 @@ class Item():
         if self.damage['break']>self.olddamage['break']:
             attack.damage_dealt+=1
             if self.plural==False:
-                messages.append("The {} is broken!".format(self.name))
+                if defender in Shell.shell.player.visible_creatures: messages.append("The {} is broken!".format(self.name))
             if self.plural==True:
-                messages.append("The {} are broken!".format(self.name))
+                if defender in Shell.shell.player.visible_creatures: messages.append("The {} are broken!".format(self.name))
             if isinstance(attack.basetarget,Limb) and self in attack.basetarget.layers:
                 attack.basetarget.owner.pain+=pain*175*self.damage['break']/attack.basetarget.owner.stats['wil']**0.5
             self.functioncheck()
@@ -1857,7 +2152,7 @@ class Item():
         #test for cutting. If cut all the way through, no further wounds need be processed
         if self.damage['cut']>self.olddamage['cut'] and report_type==self.damage['cut']-self.olddamage['cut']:
             if self.fluid!=None:
-                self.fluid.splatter(intensity=(attack.energy**0.5)/15,volume=self.damage['cut']*3)
+                self.fluid.splatter(intensity=(attack.energy**0.5)/15,volume=min(self.damage['cut']*3,5))
                 if attack.weapon:
                     self.fluid.add(attack.weapon)
                 else:
@@ -1872,9 +2167,9 @@ class Item():
             else:
                 statement='cut all the way through!'
             if self.plural==False:
-                messages.append("The {} is {}".format(self.name,statement))
+                if defender in Shell.shell.player.visible_creatures: messages.append("The {} is {}".format(self.name,statement))
             if self.plural==True:
-                messages.append("The {} are {}".format(self.name,statement))
+                if defender in Shell.shell.player.visible_creatures: messages.append("The {} are {}".format(self.name,statement))
             if isinstance(attack.basetarget,Limb) and self in attack.basetarget.layers:
                 attack.basetarget.owner.pain+=pain*50*self.damage['cut']/attack.basetarget.owner.stats['wil']**0.5
             if self.damage['cut']>=1:
@@ -1885,7 +2180,7 @@ class Item():
         #test for piercing. Piercing renders bruising irrelevant
         if self.damage['pierce']>self.olddamage['pierce'] and report_type==(self.damage['pierce']-self.olddamage['pierce'])*0.7:
             if self.fluid!=None:
-                self.fluid.splatter(intensity=(attack.energy**0.5)/15,volume=3*self.damage['pierce'])
+                self.fluid.splatter(intensity=(attack.energy**0.5)/15,volume=min(3*self.damage['pierce'],8))
                 if attack.weapon:
                     self.fluid.add(attack.weapon)
                 else:
@@ -1900,9 +2195,9 @@ class Item():
                 statement='skewered!'
                 self.damage['cut']+=(self.damage['pierce'])*0.01/(0.01+self.thickness)
             if self.plural==False:
-                messages.append("The {} is {}".format(self.name,statement))
+                if defender in Shell.shell.player.visible_creatures: messages.append("The {} is {}".format(self.name,statement))
             if self.plural==True:
-                messages.append("The {} are {}".format(self.name,statement))
+                if defender in Shell.shell.player.visible_creatures: messages.append("The {} are {}".format(self.name,statement))
             if isinstance(attack.basetarget,Limb) and self in attack.basetarget.layers:
                 attack.basetarget.owner.pain+=pain*30*self.damage['pierce']/attack.basetarget.owner.stats['wil']**0.5
 
@@ -1912,27 +2207,27 @@ class Item():
         if self.damage['bruise']>self.olddamage['bruise'] and report_type==0:
             if self.damage['bruise']<4:
                 if self.plural==False:
-                    messages.append('The {} is bruised'.format(self.name))
+                    if defender in Shell.shell.player.visible_creatures: messages.append('The {} is bruised'.format(self.name))
                 if self.plural==True:
-                    messages.append('The {} are bruised'.format(self.name))
+                    if defender in Shell.shell.player.visible_creatures: messages.append('The {} are bruised'.format(self.name))
             elif self.damage['bruise']<7:
                 if self.plural==False:
-                    messages.append('The {} is badly bruised!'.format(self.name))
+                    if defender in Shell.shell.player.visible_creatures: messages.append('The {} is badly bruised!'.format(self.name))
                 if self.plural==True:
-                    messages.append('The {} are badly bruised!'.format(self.name))
+                    if defender in Shell.shell.player.visible_creatures: messages.append('The {} are badly bruised!'.format(self.name))
             elif self.damage['bruise']<10:
                 if self.plural==False:
-                    messages.append('The {} is severely bruised and swells with blood!'.format(self.name))
+                    if defender in Shell.shell.player.visible_creatures: messages.append('The {} is severely bruised and swells with blood!'.format(self.name))
                 if self.plural==True:
-                    messages.append('The {} are severely bruised and swell with blood!'.format(self.name))
+                    if defender in Shell.shell.player.visible_creatures: messages.append('The {} are severely bruised and swell with blood!'.format(self.name))
             elif self.damage['bruise']>=10:
                 if self.plural==False:
-                    messages.append('The structure of the {} collapses under the impact!'.format(self.name))
+                    if defender in Shell.shell.player.visible_creatures: messages.append('The structure of the {} collapses under the impact!'.format(self.name))
                 if self.plural==True:
-                    messages.append('The structure of the {} collapse under the impact!'.format(self.name))
+                    if defender in Shell.shell.player.visible_creatures: messages.append('The structure of the {} collapse under the impact!'.format(self.name))
                 self.damage['crush']=1
                 if self.fluid!=None:
-                    self.fluid.splatter(intensity=(attack.energy**0.5)/15,volume=3)
+                    self.fluid.splatter(intensity=(attack.energy**0.5)/15,volume=4)
                     if attack.weapon:
                         self.fluid.add(attack.weapon)
                     else:
@@ -1946,9 +2241,9 @@ class Item():
         if self.damage['bend']>self.olddamage['bend'] and report_type==self.damage['bend']-self.olddamage['bend']:
             attack.damage_dealt+=1
             if self.plural==False:
-                messages.append("The {} is bent!".format(self.name))
+                if defender in Shell.shell.player.visible_creatures: messages.append("The {} is bent!".format(self.name))
             if self.plural==True:
-                messages.append("The {} are bent!".format(self.name))
+                if defender in Shell.shell.player.visible_creatures: messages.append("The {} are bent!".format(self.name))
             if isinstance(attack.basetarget,Limb) and self in attack.basetarget.layers:
                 attack.basetarget.owner.pain+=pain*200*self.damage['bend']/attack.basetarget.owner.stats['wil']**0.5
             self.functioncheck()
@@ -1961,9 +2256,9 @@ class Item():
         if self.damage['dent']>self.olddamage['dent'] and self.olddamage['dent']==0 and report_type==0:
             attack.damage_dealt+=1
             if self.plural==False:
-                messages.append("The {} is dented!".format(self.name))
+                if defender in Shell.shell.player.visible_creatures: messages.append("The {} is dented!".format(self.name))
             if self.plural==True:
-                messages.append("The {} are dented!".format(self.name))
+                if defender in Shell.shell.player.visible_creatures: messages.append("The {} are dented!".format(self.name))
             if isinstance(attack.basetarget,Limb) and self in attack.basetarget.layers:
                 attack.basetarget.owner.pain+=pain*100*self.damage['dent']/attack.basetarget.owner.stats['wil']**0.5+2
             self.functioncheck()
@@ -1971,9 +2266,9 @@ class Item():
         elif self.damage['dent']>self.olddamage['dent'] and report_type==0:
             attack.damage_dealt+=1
             if self.plural==False:
-                messages.append("The {} is further dented!".format(self.name))
+                if defender in Shell.shell.player.visible_creatures: messages.append("The {} is further dented!".format(self.name))
             if self.plural==True:
-                messages.append("The {} are further dented!".format(self.name))
+                if defender in Shell.shell.player.visible_creatures: messages.append("The {} are further dented!".format(self.name))
             if isinstance(attack.basetarget,Limb) and self in attack.basetarget.layers:
                 attack.basetarget.owner.pain+=pain*150*self.damage['dent']/attack.basetarget.owner.stats['wil']**0.5+2
             self.functioncheck()
@@ -1985,9 +2280,9 @@ class Item():
         if self.damage['crack']>self.olddamage['crack'] == 0 and report_type==self.damage['crack']-self.olddamage['crack']:
             attack.damage_dealt+=1
             if self.plural==False:
-                messages.append("The {} is cracked!".format(self.name))
+                if defender in Shell.shell.player.visible_creatures: messages.append("The {} is cracked!".format(self.name))
             if self.plural==True:
-                messages.append("The {} are cracked!".format(self.name))
+                if defender in Shell.shell.player.visible_creatures: messages.append("The {} are cracked!".format(self.name))
             if isinstance(attack.basetarget,Limb) and self in attack.basetarget.layers:
                 attack.basetarget.owner.pain+=pain*100*self.damage['crack']/attack.basetarget.owner.stats['wil']**0.5+2
             self.functioncheck()
@@ -1995,9 +2290,9 @@ class Item():
         elif self.damage['crack']>self.olddamage['crack'] and report_type==self.damage['crack']-self.olddamage['crack']:
             attack.damage_dealt+=1
             if self.plural==False:
-                messages.append("The {} cracks further!".format(self.name))
+                if defender in Shell.shell.player.visible_creatures: messages.append("The {} cracks further!".format(self.name))
             if self.plural==True:
-                messages.append("The {} crack further!".format(self.name))
+                if defender in Shell.shell.player.visible_creatures: messages.append("The {} crack further!".format(self.name))
             if isinstance(attack.basetarget,Limb) and self in attack.basetarget.layers:
                 attack.basetarget.owner.pain+=pain*100*self.damage['crack']/attack.basetarget.owner.stats['wil']**0.5+2
             self.functioncheck()
@@ -2005,13 +2300,20 @@ class Item():
         self.functioncheck()
         attack.damage_dealt-=1
 
-    def process_coatings(self,limb,log=True):
+    def process_coatings(self,limb,log=True,log_override=False):
         #This method is only called for coatings on an item which is part of a limb
         self.olddamage=self.damage.copy()
         for i in self.coatings:
             i.process(log=False,limb=limb)
         pain=self.painfactor*limb.painfactor
 
+        if not log_override:
+            if limb.owner in Shell.shell.player.visible_creatures and limb in limb.owner.limbs:
+                log=True
+            elif limb in Shell.shell.player.visible_items:
+                log=True
+            else:
+                log=False
         if self.olddamage['rust']<self.damage['rust'] and log==True:
             if self.olddamage==0:
                 if limb.owner!=Shell.shell.player:
@@ -2135,9 +2437,18 @@ class Item():
 
         self.functioncheck()
 
-    def acid_burn(self,strength,log=True):
+    def acid_burn(self,strength,log=True,log_override=False):
+        if not log_override:
+            if self in Shell.shell.player.visible_items:
+                log=True
+            elif self in Shell.shell.player.inventory and Shell.shell.player.can_see:
+                log=True
+            elif any(self in i.equipped_items for i in Shell.shell.player.visible_creatures):
+                log=True
+            else:
+                log=False
         message=''
-        if self.damage['disintegrate']>=1:
+        if self.damage['disintegrate']>=1 or self.acid_reaction=='indestructable':
             return
         if self.acid_resistance/strength<random.gauss(0.9,0.2):
             oldcorrosion=self.damage['corrode']
@@ -2195,7 +2506,26 @@ class Item():
                 elif self.equipped[0].owner!=None:
                     messages.append(message.replace(' the '," {}'s ").format(self.equipped[0].owner.name))
 
-    def burn(self,temp,intensity=1,in_limb=False,limb=None,log=True):
+    def burn(self,temp,intensity=1,in_limb=False,limb=None,log=True,log_override=False):
+        if self.heat_reaction=='indestructable': return
+        if not log_override and in_limb==False:
+            if self in Shell.shell.player.visible_items:
+                log=True
+            elif self in Shell.shell.player.inventory and Shell.shell.player.can_see:
+                log=True
+            elif any(self in i.equipped_items for i in Shell.shell.player.visible_creatures):
+                log=True
+            else:
+                log=False
+        elif not log_override and in_limb==True:
+            if limb in Shell.shell.player.limbs:
+                log=True
+            elif limb in Shell.shell.player.visible_items:
+                log=True
+            elif any(limb in i.limbs for i in Shell.shell.player.visible_creatures):
+                log=True
+            else:
+                log=False
         message=''
         ignition=False
         removed_coatings=[]
@@ -2262,8 +2592,10 @@ class Item():
             if severity>=1:
                 if in_limb==False:
                     message='the {} is melted by the heat!'.format(self.name)
+                    self.heat_conduction=500
                 else:
                     message='the {} on the {} is melted by the heat!'.format(self.name,limb.name)
+                    self.heat_conduction=500
                 self.damage['burn']=1
             elif severity>=0.7:
                 if in_limb==False:
@@ -2316,7 +2648,8 @@ class Item():
             messages.append(message)
 
     def on_equip(self):
-        pass
+        for i in self.enchantments:
+            i.on_equip()
 
     def on_turn(self):
         for i in self.enchantments:
@@ -2859,7 +3192,18 @@ class Item():
             self.identification_difficulty[i]+=random.triangular(-3,3,0)
         self.identification_set=True
 
+    def full_identify(self):
+        self.knowledge_level={'truename':1,'name':2,'material':2,'mass':2,'length':2,'moment of inertia':2,'edge':2,'tip':2,
+                              'thickness':2,'force delivery':2,'cutting effectiveness':2,'piercing effectivemess':2,'quality':2,
+                              'magic':2,'special':2,'radius':2}
+        self.generate_descriptions()
+
     def randomize(self,stdev=0.1,material_set=None):
+        old_in_inventory=self.in_inventory
+        old_inventory_index=self.inventory_index
+        touched=self.touched_by_player
+        seen=self.seen_by_player
+        loc=self.location
         r={}
         if hasattr(self,'length'): r['length']=self.length*random.triangular(1/2,1.5,1)
         else: r['length']=None
@@ -2877,7 +3221,11 @@ class Item():
         else: r['headsize']=None
         if hasattr(self,'width'): r['width']=self.width*random.triangular(2/3,1.5,1)
         else: r['width']=None
-        if hasattr(self,'in_radius'): r['in radius']=self.in_radius*random.triangular(0.5,2,1)
+        if hasattr(self,'in_radius'):
+            r['in radius']=self.in_radius*random.triangular(0.5,2,1)
+            if self.equipped!=[]:
+                self.in_radius=max(self.equipped[0].radius,self.in_radius)
+                self.in_radius=min(self.equipped[0].radius*2,self.in_radius)
         else: r['in radius']=None
         if hasattr(self,'quality'): r['quality']=self.quality*random.triangular(0.2,5,1)
         else: r['quality']=None
@@ -2887,9 +3235,17 @@ class Item():
             pass
         else:
             self.material=random.choice(material_set)
+        equipped=self.equipped.copy()
         self.__init__(painfactor=self.painfactor,length=r['length'],thickness=r['thickness'],edge=r['edge'],tip=r['tip'],
                       head=r['head'],headvolume=r['headvolume'],headsize=r['headsize'],width=r['width'],in_radius=r['in radius'],
-                      quality=r['quality'],material=self.material)
+                      quality=r['quality'],material=self.material,power=self.power)
+        self.equipped=equipped
+        self.in_inventory=old_in_inventory
+        self.inventory_index=old_inventory_index
+        self.seen_by_player=seen
+        self.touched_by_player=touched
+        self.location=loc
+        self.generate_descriptions(per=Shell.shell.player.stats['per'])
 
 
 class Fluid():
@@ -2935,6 +3291,8 @@ class Fluid():
             new.on=target
 
     def splatter(self,intensity=0,volume=1,**kwargs):
+        try: self.owner.blood[0]-=volume
+        except: pass
         targets=0
         while targets<volume:
             newsplatter=copy.copy(self)
@@ -2974,7 +3332,6 @@ class Fluid():
                 try: self.add(attack.limb)
                 except AttributeError: pass
 
-
 class Enchantment():
     def __init__(self,target,turns='permanent',**kwargs):
         self.target=target
@@ -3007,15 +3364,33 @@ class Enchantment():
     def on_destruction(self):
         pass
 
+    def on_equip(self):
+        pass
+
+    def sense_modification(self):
+        pass
+
     def attempt_identification(self,modifier=0):
-        if self.target in Shell.shell.player.inventory or self.target in Shell.shell.player.limbs or self.target==Shell.shell.player:
-            pass
-        else:
-            modifier-=10
-        if Shell.shell.player.stats['per']*random.gauss(1,0.1)+modifier>self.detection_difficulty:
-            self.detected=True
-        if self.detected==True and Shell.shell.player.stats['per']*random.gauss(1,0.1)+modifier>self.identification_difficulty:
-            self.identified=True
+        if isinstance(self.target,Item):
+            if self.target.in_inventory in Shell.shell.player.visible_creatures or self.target in Shell.shell.player.visible_items:
+                pass
+            else:
+                return
+            if self.target in Shell.shell.player.inventory or self.target in Shell.shell.player.limbs or self.target==Shell.shell.player:
+                pass
+            else:
+                modifier-=10
+            if Shell.shell.player.stats['per']*random.gauss(1,0.1)+modifier>self.detection_difficulty:
+                self.detected=True
+            if self.detected==True and Shell.shell.player.stats['per']*random.gauss(1,0.1)+modifier>self.identification_difficulty:
+                self.identified=True
+        if isinstance(self.target,Creature):
+            if self.target not in Shell.shell.player.visible_creatures:
+                return
+            if Shell.shell.player.stats['per']*random.gauss(1,0.1)+modifier>self.detection_difficulty:
+                self.detected=True
+            if self.detected==True and Shell.shell.player.stats['per']*random.gauss(1,0.1)+modifier>self.identification_difficulty:
+                self.identified=True
 
 
         
@@ -3085,6 +3460,7 @@ class Floor(Screen):
                     creature.location=attempted_location
                     self.cells[attempted_location[0]][attempted_location[1]].contents.append(creature)
                     placed=True
+                    return
                 attempted_location=[random.randint(0,self.dimensions[0]-1),random.randint(0,self.dimensions[1]-1)]
         elif retry=='near':
             while placed==False:
@@ -3103,9 +3479,35 @@ class Floor(Screen):
                     return
 
 
-        pass
+    def place_item(self,item,location=None,retry='random'):
+        attempts=0
+        placed=False
+        if location==None:
+            location=[random.randint(0,self.dimensions[0]-1),random.randint(0,self.dimensions[1]-1)]
+        if retry=='random':
+            while placed==False:
+                if self.cells[location[0]][location[1]].passable==True:
+                    item.location=location
+                    self.cells[location[0]][location[1]].contents.append(item)
+                    placed=True
+                    return
+                location=[random.randint(0,self.dimensions[0]-1),random.randint(0,self.dimensions[1]-1)]
+        elif retry=='near':
+            while placed==False:
+                if self.cells[location[0]][location[1]].passable==True:
+                    item.location=location
+                    self.cells[location[0]][location[1]].contents.append(item)
+                    placed=True
+                    return
+                for i in self.cells[location[0]][location[1]].immediate_neighbors:
+                    if i.passable:
+                        self.place_item(item,i.location)
+                location=random.choice(self.cells[location[0]][location[1]].immediate_neighbors).location
+                attempts+=1
+                if attempts>=20:
+                    print('could not place {}'.format(item.name))
+                    return
 
-    def place_item(self,item):
         pass
 
     def shadowcasting(self,visible_indices,start_location):
