@@ -33,6 +33,7 @@ from kivy.lang import Builder
 from kivy.uix.progressbar import ProgressBar
 from kivy.config import Config
 from kivy.uix.behaviors import ButtonBehavior
+from kivy.graphics.instructions import InstructionGroup
 
 import BaseClasses
 import MapTiles
@@ -1186,7 +1187,10 @@ class InventorySidebar(ScrollView):
         self.showing=''
         self.inspected_item=None
 
-    def show_player_inventory(self):
+    def show_player_inventory(self,show_only='all'):
+        if show_only=='all':
+            show_only=self.shell.player.inventory
+        self.show_only=show_only
         self.showing='inventory'
         self.shell.player.inventory_order()
         self.shell.player.mass_calc()
@@ -1205,6 +1209,7 @@ class InventorySidebar(ScrollView):
         weaponlabel.bind(size=weaponlabel.setter('text_size'))
         weapons=0
         for i in self.shell.player.inventory:
+            if i not in self.show_only: continue
             if i.sortingtype=='weapon':
                 new=InventoryItem(i,size_hint=(1,None),height=30)
                 self.selectionindex[new.item.inventory_index]=new
@@ -1219,6 +1224,7 @@ class InventorySidebar(ScrollView):
         self.list.add_widget(armorlabel)
         armor=0
         for i in self.shell.player.inventory:
+            if i not in self.show_only: continue
             if i.sortingtype=='armor':
                 new=InventoryItem(i,size_hint=(1,None),height=30)
                 self.selectionindex[new.item.inventory_index]=new
@@ -1233,6 +1239,7 @@ class InventorySidebar(ScrollView):
         misc=0
         for i in self.shell.player.inventory:
             if i.sortingtype=='misc':
+                if i not in self.show_only: continue
                 new=InventoryItem(i,size_hint=(1,None),height=30)
                 self.selectionindex[new.item.inventory_index]=new
                 self.list.add_widget(new)
@@ -1476,6 +1483,14 @@ class InventorySidebar(ScrollView):
                     self.shell.log.addtext('You have no body parts available which can wield the {}'.format(i.item.name))
         self.close()
 
+    def return_item(self,index):
+        for i in self.selectionindex:
+            if index==i and self.selectionindex[i].item in self.show_only:
+                self.shell.inventory.close()
+                return self.selectionindex[i].item
+        pass
+
+
     def unequip_selected(self):
         for i in self.selected_items:
             if not hasattr(i.item,'wield'):
@@ -1555,7 +1570,7 @@ class CreatureStatusScreen(FloatLayout):
         self.pain=DisplayBox(titletext='Pain',info=str(int(creature.pain)))
         self.ids['pain'].add_widget(self.pain)
 
-        self.tension=DisplayBox(titletext='Tension',info="{} %".format(int(100*creature.tension)))
+        self.tension=DisplayBox(titletext='Tension',info="{} %".format(int(creature.tension)))
         self.ids['tension'].add_widget(self.tension)
 
         self.note=NoteBox(titletext='Note',info=creature.note,color=(1,0,0,1))
@@ -1976,7 +1991,7 @@ class StatusScreen(FloatLayout):
 
 
 class Reticule():
-    def __init__(self,purpose=None,location=None):
+    def __init__(self,purpose=None,location=None,highlight_type='cell'):
         self.purpose=purpose
         if location==None:
             self.location=Shell.shell.player.location
@@ -1985,6 +2000,7 @@ class Reticule():
         self.floor=Shell.shell.player.floor
         self.image='./images/Reticule.png'
         self.name='targeting reticule'
+        self.highlight_type=highlight_type
 
 
     def do(self,**kwargs):
@@ -2014,12 +2030,15 @@ class Cell(Widget):
         self.immediate_neighbors=[]
         self.seen_by_player=False
         self.visible_to_player=False
+        self.detected_creatures=False
+        self.detected_items=False
         self.creatures=[]
         self.items=[]
         self.dungeon=[]
         self.fog=False
         self.recently_seen=False
         self.has_targeting_reticule=False
+        self.instructions=InstructionGroup()
 
     def place_reticule(self):
         reticule=None
@@ -2027,16 +2046,19 @@ class Cell(Widget):
             if isinstance(i,Reticule):
                 reticule=i
         if reticule==None:
+            #print("Clearing",self.location)
             self.has_targeting_reticule=False
             self.reticule.canvas.clear()
             del self.reticule
             return
-        self.reticule=Widget(pos=self.pos,size=self.size)
-        self.add_widget(self.reticule)
-        with self.reticule.canvas:
-            Color(1,1,1,1)
-            Rectangle(size=self.reticule.size,pos=self.reticule.pos,source=reticule.image)
-        self.has_targeting_reticule=True
+        if not hasattr(self,'reticule'):
+            #print("Placing",self.location)
+            self.reticule=Widget(pos=self.pos,size=self.size)
+            self.add_widget(self.reticule)
+            with self.reticule.canvas:
+                Color(1,1,1,1)
+                Rectangle(size=self.reticule.size,pos=self.reticule.pos,source=reticule.image)
+            self.has_targeting_reticule=True
 
     def highlight(self,color=(1,1,1,0.1)):
         if self.highlighted==False:
@@ -2067,6 +2089,7 @@ class Cell(Widget):
 
     def on_contents(self,instance,content):
         #print('Ah!!',instance,content)
+        #print(self.contents,self.location)
         self.recently_seen=False
         self.creatures=[]
         self.items=[]
@@ -2091,70 +2114,125 @@ class Cell(Widget):
                 self.passable=False
             if i.vision_blocking==True:
                 self.transparent=False
-        if self.visible_to_player==True:
-            self.update_graphics()
-        elif self.has_targeting_reticule==True:
+        try:
+            if any(self.location==i.location for i in Shell.shell.player.visible_cells) and self.floor.name==Shell.shell.player.floor.name:# and self.has_targeting_reticule==False:
+                #self.recently_seen=False
+                self.update_graphics()
+        except: pass
+        if self.dungeon==[]:
+            self.dungeon.append(MapTiles.DungeonFloor(screen=self.floor,x=self.location[0],y=self.location[1]))
+        if len(self.dungeon)>1:
+            dungeoncopy=self.dungeon
+            for i in dungeoncopy:
+                if isinstance(MapTiles.DungeonFloor):
+                    self.dungeon.remove(i)
+        if self.has_targeting_reticule==True:
             self.place_reticule()
-            return
+            #return
 
     def update_graphics(self,show_dungeon=True,show_items=True,show_creatures=True):
+        updatecall=False
         if self.recently_seen==True and self.has_targeting_reticule==False: return
         elif self.recently_seen==True and self.has_targeting_reticule==True:
             self.place_reticule()
             return
-        self.canvas.clear()
+        #self.canvas.clear()
         if show_dungeon==True:
+            self.instructions.remove_group('dungeon')
             self.seen_by_player=True
+            self.recently_seen=True
+            self.fog=False
+            updatecall=True
             for i in self.dungeon:
-                with self.canvas:
-                    if hasattr(i,'color')==False:
-                        Color(1,1,1,1)
-                    else:
-                        Color(i.color[0],i.color[1],i.color[2],i.color[3])
-                    Rectangle(size=self.size,pos=self.pos,source=i.image)
+                if not i.color: self.instructions.add(Color(1,1,1,1,group='dungeon'))
+                else: self.instructions.add(Color(i.color[0],i.color[1],i.color[2],i.color[3],group='dungeon'))
+                self.instructions.add(Rectangle(size=self.size,pos=self.pos,source=i.image,group='dungeon'))
+
         if show_items==True:
+            self.instructions.remove_group('items')
+            updatecall=True
             for i in self.items:
-                with self.canvas:
-                    if hasattr(i,'color')==False:
-                        Color(1,1,1,1)
-                    else:
-                        Color(i.color[0],i.color[1],i.color[2],i.color[3])
-                    Rectangle(size=self.size,pos=self.pos,source=i.image)
+                if self.recently_seen==False: self.detected_items=True
+                if not i.color: self.instructions.add(Color(1,1,1,1,group='items'))
+                else: self.instructions.add(Color(i.color[0],i.color[1],i.color[2],i.color[3],group='items'))
+                self.instructions.add(Rectangle(size=self.size,pos=self.pos,source=i.image,group='items'))
+
         if show_creatures==True:
+            self.instructions.remove_group('creatures')
+            updatecall=True
             for i in self.creatures:
-                with self.canvas:
-                    if not i.color:
-                        pass
-                    else:
-                        Color(i.color[0],i.color[1],i.color[2],i.color[3])
-                    Rectangle(size=self.size,pos=self.pos,source=i.image)
+                if i not in Shell.shell.player.detected_creatures: continue
+                if self.recently_seen==False: self.detected_creatures=True
+                self.recently_seen=True
+                if not i.color: pass
+                else: self.instructions.add(Color(i.color[0],i.color[1],i.color[2],i.color[3],group='creatures'))
+                self.instructions.add(Rectangle(size=self.size,pos=self.pos,source=i.image,group='creatures'))
+
         self.fog=False
-        self.recently_seen=True
+        if updatecall==True:
+            self.canvas.clear()
+            self.canvas.add(self.instructions)
         if self.has_targeting_reticule==True:
             self.place_reticule()
             return
 
     def on_turn(self):
         for i in self.contents:
-            if isinstance(i,BaseClasses.Item) or isinstance(i,MapTiles.DungeonFeature) or isinstance(i,BaseClasses.Fluid):
+            if isinstance(i,MapTiles.DungeonFeature) or isinstance(i,BaseClasses.Fluid):
                 i.on_turn()
+            elif isinstance(i,BaseClasses.Item) or isinstance(i,BaseClasses.Limb):
+                i.on_turn()
+                self.floor.itemlist.append(i)
         if self.seen_by_player==True and self.visible_to_player==False and self.fog==False:
             self.fog=True
             self.recently_seen=False
             with self.canvas:
                 Color(0.5,0.5,0.5,0.5)
                 Rectangle(size=self.size,pos=self.pos)
+        if len(self.instructions.get_group('creatures'))>0 and self.recently_seen==False:
+
+            '''self.instructions.remove_group('creatures')
+            self.detected_creatures=False'''
+            self.update_graphics(show_dungeon=False,show_items=False)
+            if self.fog==False and self.seen_by_player==True and self.visible_to_player==False:
+                self.fog=True
+                with self.canvas:
+                    Color(0.5,0.5,0.5,0.5)
+                    Rectangle(size=self.size,pos=self.pos)
         self.visible_to_player=False
+        self.recently_seen=False
 
     def distance_to(self,cell):
-        if cell.floor!=self.floor:
+        if cell.floor.name!=self.floor.name:
             return False
         xloc=self.location[0]-cell.location[0]
         yloc=self.location[1]-cell.location[1]
         distance=(xloc*xloc+yloc*yloc)**0.5
         return distance
 
+    def animate_flash(self,color=(1,1,1,1),color_variance=(0.1,0.1,0.1,0.1),duration=10,*args,**kwargs):
+        self.flashcolor=color
+        self.flashvariance=color_variance
+        self.flash=Widget(pos=self.pos,size=self.size)
+        self.add_widget(self.flash)
+        with self.flash.canvas:
+            Color(color[0],color[1],color[2],color[3])
+            Rectangle(pos=self.flash.pos,size=self.flash.size)
+        Clock.schedule_interval(self.flash_color_change,1/60)
+        Clock.schedule_once(self.endflash,duration/60)
 
+    def flash_color_change(self,*args,**kwargs):
+        self.flash.canvas.clear()
+        with self.flash.canvas:
+            Color(self.flashcolor[0]+(random.random()-0.5)*self.flashvariance[0],self.flashcolor[1]+(random.random()-0.5)*self.flashvariance[1],
+                  self.flashcolor[2]+(random.random()-0.5)*self.flashvariance[2],self.flashcolor[3]+(random.random()-0.5)*self.flashvariance[3])
+            Rectangle(pos=self.flash.pos,size=self.flash.size)
+
+    def endflash(self,*args,**kwargs):
+        Clock.unschedule(self.flash_color_change)
+        self.flash.canvas.clear()
+        self.remove_widget(self.flash)
+        pass
 
 cellsize=16
 

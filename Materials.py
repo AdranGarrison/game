@@ -1,7 +1,8 @@
 __author__ = 'Alan'
 
 
-from BaseClasses import *
+#from BaseClasses import *
+import BaseClasses
 import random
 
 
@@ -22,7 +23,7 @@ import random
 
 ##############################################MATERIALS###############################################################
 
-class Bone_Material(Material):
+class Bone_Material(BaseClasses.Material):
     def __init__(self,thickness=1,quality=1,**kwargs):
         super().__init__(**kwargs)
         self.color=(0.8,0.8,0.8,1)
@@ -42,6 +43,7 @@ class Bone_Material(Material):
         self.fracture_toughness=(self.youngs*self.fracture_energy)**0.5
         self.shear=3.3
         self.shear_strength=30*self.quality
+        self.poisonable=True
         self.electric_conduction=True
         self.heat_conduction=0.5
         self.dissipationfactor=4
@@ -123,7 +125,7 @@ class Bone_Material(Material):
 
 '''
 
-class Keratin(Material):
+class Keratin(BaseClasses.Material):
     def __init__(self,thickness=1,quality=1,**kwargs):
         super().__init__(**kwargs)
         self.color=(0.8,0.8,0.8,1)
@@ -152,7 +154,7 @@ class Keratin(Material):
         self.magic_affinity=7
         self.identification_difficulty=5
 
-class Flesh_Material(Material):
+class Flesh_Material(BaseClasses.Material):
     def __init__(self,thickness=1,quality=1,**kwargs):
         super().__init__(**kwargs)
         self.color=(0.86,0.66,0.52,1)
@@ -175,6 +177,7 @@ class Flesh_Material(Material):
         self.fracture_toughness=(self.youngs*self.fracture_energy)**0.5
         self.shear=0.02
         self.shear_strength=0.6*self.quality
+        self.poisonable=True
         self.electric_conduction=True
         self.heat_conduction=0.25
         self.burn_resistance=80
@@ -230,7 +233,7 @@ class Flesh_Material(Material):
             attack.contact=False
 '''
 
-class Slime(Material):
+class Slime(BaseClasses.Material):
     def __init__(self,thickness=1,quality=1,**kwargs):
         super().__init__(**kwargs)
         self.color=(0.30,0.59,0.30,1)
@@ -251,6 +254,7 @@ class Slime(Material):
         self.fracture_toughness=(self.youngs*self.fracture_energy)**0.5
         self.shear=0.01
         self.shear_strength=0.6*self.quality
+        self.poisonable=True
         self.electric_conduction=True
         self.heat_reaction='burn'
         self.burn_temp=800
@@ -262,7 +266,7 @@ class Slime(Material):
         self.magic_affinity=8
         self.identification_difficulty=5
 
-class Iron(Material):
+class Iron(BaseClasses.Material):
     def __init__(self,thickness=1,quality=1,**kwargs):
         super().__init__(**kwargs)
         self.color=(0.64,0.64,0.64,1)
@@ -358,7 +362,7 @@ class Iron(Material):
 #-----------------------------------------------------------------------------
 '''
 
-class Steel(Material):
+class Steel(BaseClasses.Material):
     def __init__(self,thickness=1,quality=1,**kwargs):
         super().__init__(**kwargs)
         self.color=(0.64,0.64,0.64,1)
@@ -388,7 +392,7 @@ class Steel(Material):
         self.magic_affinity=2
         self.identification_difficulty=15
 
-class Copper(Material):
+class Copper(BaseClasses.Material):
     def __init__(self,thickness=1,quality=1,**kwargs):
         super().__init__(**kwargs)
         self.color=(0.96,0.56,0.2,1)
@@ -417,7 +421,7 @@ class Copper(Material):
         self.magic_affinity=5
         self.identification_difficulty=12
 
-class Bronze(Material):
+class Bronze(BaseClasses.Material):
     def __init__(self,thickness=1,quality=1,**kwargs):
         super().__init__(**kwargs)
         self.color=(0.96,0.56,0.2,1)
@@ -447,7 +451,7 @@ class Bronze(Material):
         self.magic_affinity=6
         self.identification_difficulty=12
 
-class Brass(Material):
+class Brass(BaseClasses.Material):
     def __init__(self,thickness=1,quality=1,**kwargs):
         super().__init__(**kwargs)
         self.color=(0.96,0.56,0.2,1)
@@ -477,7 +481,7 @@ class Brass(Material):
         self.magic_affinity=4
         self.identification_difficulty=12
 
-class Titanium(Material):
+class Titanium(BaseClasses.Material):
     def __init__(self,thickness=1,quality=1,**kwargs):
         super().__init__(**kwargs)
         self.color=(0.7,0.7,0.7,1)
@@ -507,7 +511,7 @@ class Titanium(Material):
         self.magic_affinity=2
         self.identification_difficulty=17
 
-class Silver(Material):
+class Silver(BaseClasses.Material):
     def __init__(self,thickness=1,quality=1,**kwargs):
         super().__init__(**kwargs)
         self.color=(0.7,0.7,0.7,1)
@@ -536,7 +540,7 @@ class Silver(Material):
         self.magic_affinity=10
         self.identification_difficulty=17
 
-class Aluminum(Material):
+class Aluminum(BaseClasses.Material):
     def __init__(self,thickness=1,quality=1,**kwargs):
         super().__init__(**kwargs)
         self.color=(0.7,0.7,0.7,1)
@@ -566,7 +570,7 @@ class Aluminum(Material):
         self.magic_affinity=4
         self.identification_difficulty=16
 
-class Duraluminum(Material):
+class Duraluminum(BaseClasses.Material):
     #Copper Aluminum alloy
     def __init__(self,thickness=1,quality=1,**kwargs):
         super().__init__(**kwargs)
@@ -597,7 +601,7 @@ class Duraluminum(Material):
         self.magic_affinity=3
         self.identification_difficulty=18
 
-class Zicral(Material):
+class Zicral(BaseClasses.Material):
     #Zinc Aluminum alloy also called ergal
     def __init__(self,thickness=1,quality=1,**kwargs):
         super().__init__(**kwargs)
@@ -628,7 +632,7 @@ class Zicral(Material):
         self.magic_affinity=3.5
         self.identification_difficulty=19
 
-class Wood(Material):
+class Wood(BaseClasses.Material):
     def __init__(self,thickness=1,quality=1,**kwargs):
         super().__init__(**kwargs)
         self.color=(0.69,0.42,0.19,1)
@@ -659,7 +663,7 @@ class Wood(Material):
         self.identification_difficulty=7
 
 
-class Leather(Material):
+class Leather(BaseClasses.Material):
     def __init__(self,thickness=1,quality=1,**kwargs):
         super().__init__(**kwargs)
         self.color=(0.47,0.29,.05,1)
@@ -689,7 +693,7 @@ class Leather(Material):
         self.magic_affinity=6
         self.identification_difficulty=7
 
-class Cotton(Material):
+class Cotton(BaseClasses.Material):
     #Cotton's material properties depend strongly on how it is woven. Tight weaves result in much higher youngs and shear moduli and higher density.
     #Maximal youngs modulus is about 7. Maximal density is about 820.
     def __init__(self,thickness=1,quality=1,weave=1,**kwargs):
@@ -722,7 +726,7 @@ class Cotton(Material):
         self.magic_affinity=7
         self.identification_difficulty=12
 
-class Wool(Material):
+class Wool(BaseClasses.Material):
     #See note on Cotton. Much to do here in terms of weave
     def __init__(self,thickness=1,quality=1,weave=1,**kwargs):
         super().__init__(**kwargs)
@@ -772,7 +776,7 @@ class Fur(Wool):
         self.density=300
         self.identification_difficulty=5
 
-class Silk(Material):
+class Silk(BaseClasses.Material):
     #See note on Cotton. Much to do here in terms of weave
     def __init__(self,thickness=1,quality=1,weave=1,**kwargs):
         super().__init__(**kwargs)
@@ -804,7 +808,7 @@ class Silk(Material):
         self.magic_affinity=8
         self.identification_difficulty=17
 
-class Spider_Silk(Material):
+class Spider_Silk(BaseClasses.Material):
     #See note on Cotton. Much to do here in terms of weave
     def __init__(self,thickness=1,quality=1,weave=1,**kwargs):
         super().__init__(**kwargs)
@@ -836,7 +840,7 @@ class Spider_Silk(Material):
         self.magic_affinity=9
         self.identification_difficulty=17
 
-class Basalt_Fiber(Material):
+class Basalt_Fiber(BaseClasses.Material):
     #See note on Cotton. Much to do here in terms of weave
     def __init__(self,thickness=1,quality=1,weave=1,**kwargs):
         super().__init__(**kwargs)
@@ -868,7 +872,7 @@ class Basalt_Fiber(Material):
         self.identification_difficulty=18
 
 
-class Demonic_Material(Material):
+class Demonic_Material(BaseClasses.Material):
     def __init__(self,thickness=1,quality=1,power=3,**kwargs):
         super().__init__(**kwargs)
         self.color=(random.random(),random.random(),random.random(),1)
@@ -912,7 +916,7 @@ class Demonic_Material(Material):
         self.identification_difficulty=30
         self.default_thickness=random.random()/self.density**0.5
 
-class Aether(Material):
+class Aether(BaseClasses.Material):
     def __init__(self,thickness=1,quality=1,power=3,**kwargs):
         super().__init__(**kwargs)
         self.color=(0,0.8,0.8,0.5)

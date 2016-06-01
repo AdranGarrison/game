@@ -12,8 +12,6 @@ import pstats
 
 
 
-
-
 class ActualGame(Shell.App):
     def on_start(self):
         self.profile=cProfile.Profile()

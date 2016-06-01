@@ -1,8 +1,10 @@
 __author__ = 'Alan'
 
 
-from Materials import *
-from BaseClasses import *
+#from Materials import *
+#from BaseClasses import *
+import Materials as M
+import BaseClasses
 from Attacks import *
 
 
@@ -16,27 +18,24 @@ import Enchantments
 
 
 
-#Attacktype can be None, stab, slash, bludgeon, or whip
-#damagetype indicates damage types the object can sustain in addition to material damage
 
 
 ##############################################ITEMS###################################################################
 
 
 ############################################BodyParts#######################################
-#TODO: Vital organs should have a separate entry here, with different effects for being damaged (eg. bruising the brain should greatly reduce focus or cause loss of conciousness. Lung damage should greatly increase stamina costs, etc)
 
-class Bone(Item):
+class Bone(BaseClasses.Item):
     #length is bone length in meters
     #radius is bone radius in meters
-    def __init__(self,length=0.5,radius=0.03,in_radius=0,material=Bone_Material,name='bone',plural=False,quality=1,threshold=0,**kwargs):
+    def __init__(self,length=0.5,radius=0.03,in_radius=0,material=M.Bone_Material,name='bone',plural=False,quality=1,threshold=0,**kwargs):
         super().__init__(**kwargs)
         self.base_descriptor='A bone from some creature or another'
         self.plural=plural
         self.material=material(quality=quality,power=self.power)
         self.names=['bone']
         self.knowledge_level['truename']=1
-        if isinstance(self.material,Bone_Material):
+        if isinstance(self.material,M.Bone_Material):
             self.truename=name
             self.name=name
         else:
@@ -54,11 +53,11 @@ class Bone(Item):
         self.threshold=threshold
         self.recalc()
 
-class Flesh(Item):
+class Flesh(BaseClasses.Item):
     #length is limb length in meters
     #in_radius is the inner radius of the flesh
     #out_radius is the radius of the skin
-    def __init__(self,length=0.5,in_radius=0.03,out_radius=0.05,material=Flesh_Material,name='flesh',plural=False,quality=1,threshold=0,**kwargs):
+    def __init__(self,length=0.5,in_radius=0.03,out_radius=0.05,material=M.Flesh_Material,name='flesh',plural=False,quality=1,threshold=0,**kwargs):
         super().__init__(**kwargs)
         self.base_descriptor='Flesh carved from some creature or another'
         self.plural=plural
@@ -66,7 +65,7 @@ class Flesh(Item):
         except: self.material=material
         self.names=['flesh']
         self.knowledge_level['truename']=1
-        if isinstance(self.material,Flesh_Material):
+        if isinstance(self.material,M.Flesh_Material):
             self.name=name
             self.truename=name
         else:
@@ -84,11 +83,11 @@ class Flesh(Item):
         self.function=1
         self.recalc()
 
-class Hair(Item):
+class Hair(BaseClasses.Item):
     #length is limb length in meters
     #in_radius is the inner radius of the flesh
     #out_radius is the radius of the skin
-    def __init__(self,length=0.5,in_radius=0.03,out_radius=0.05,material=Hair_Material,name='hair',plural=False,quality=1,threshold=0,**kwargs):
+    def __init__(self,length=0.5,in_radius=0.03,out_radius=0.05,material=M.Hair_Material,name='hair',plural=False,quality=1,threshold=0,**kwargs):
         super().__init__(painfactor=0,**kwargs)
         self.base_descriptor='Hair from some creature or another'
         self.coverage=0.1
@@ -96,7 +95,7 @@ class Hair(Item):
         self.material=material(quality=quality,power=self.power)
         self.names=['hair']
         self.knowledge_level['truename']=1
-        if isinstance(self.material,Hair_Material) or isinstance(self.material,Fur):
+        if isinstance(self.material,M.Hair_Material) or isinstance(self.material,M.Fur):
             self.name=name
             self.truename=name
         else:
@@ -114,8 +113,57 @@ class Hair(Item):
         self.function=1
         self.recalc()
 
-class Magic_Rune(Item):
-    def __init__(self,length=0.01,in_radius=0,out_radius=0.08,material=Aether,name='rune',plural=False,quality=1,threshold=0,**kwargs):
+class Corpse(BaseClasses.Item):
+    def __init__(self,creature=None,**kwargs):
+        super().__init__(**kwargs)
+        self.base_descriptor="The deceased body of a once-living creature"
+        self.creature=creature
+        self.image=self.creature.image
+        self.color=self.creature.color
+        self.mass=self.creature.mass
+        self.movemass=self.creature.movemass
+        self.thickness=1
+        self.sortingtype='misc'
+        self.truename="Corpse of {}".format(self.creature.name)
+        self.names=["A corpse","Corpse of {}".format(self.creature.name)]
+        self.name="The corpse of {}".format(self.creature.name)
+        self.length=1
+        self.radius=1
+        self.material=BaseClasses.Material()
+        self.material.name=''
+        self.material.basicname=""
+        self.youngs=1
+        self.shear=1
+        self.density=1000
+        self.wetdamage=None
+        self.quality=1
+        self.acid_reaction='None'
+        self.heat_reaction='None'
+        self.burn_temp=10000
+        self.burn_resistance=100
+        #TODO: acid should react with corpses as it reacts with creatures
+        #TODO: should be able to burn like a creature
+
+
+    def recalc(self):
+        pass
+
+    def damageresolve(self,attack,attacker,reactionforce=False):
+        if self.creature.limbs==[]:
+            return
+        if self in Shell.shell.player.visible_items:
+            Shell.shell.player.visible_creatures.append(self.creature)
+        random.choice(self.creature.limbs).damageresolve(attack,attacker,reactionforce=reactionforce)
+        self.mass=self.creature.mass
+        self.movemass=self.creature.movemass
+
+    def on_turn(self):
+        super().on_turn()
+        self.creature.location=self.location
+        self.creature.floor=self.floor
+
+class Magic_Rune(BaseClasses.Item):
+    def __init__(self,length=0.01,in_radius=0,out_radius=0.08,material=M.Aether,name='rune',plural=False,quality=1,threshold=0,**kwargs):
         super().__init__(**kwargs)
         self.base_descriptor='A rune for binding magic to matter'
         self.plural=plural
@@ -138,16 +186,16 @@ class Magic_Rune(Item):
 
 
 ############################################Weapons#########################################
-#TODO: Blade edge should wear with use, especially upon striking hard targets. Needs to be sharpenable as well.
+#TODO: Blade edge needs to be sharpenable.
 
 
-class LongSword(Item):
+class LongSword(BaseClasses.Item):
     #length is blade length in meters
     #edge is edge width in meters
     #tip is tip surface area in square meters
     #width is blade width in meters
     #thickness is blade thickness in meters
-    def __init__(self,length=1,edge=0.00001,tip=0.0000001,width=0.035,thickness=0.007,material=Iron,quality=1,**kwargs):
+    def __init__(self,length=1,edge=0.00001,tip=0.0000001,width=0.035,thickness=0.007,material=M.Iron,quality=1,**kwargs):
         super().__init__(**kwargs)
         self.names=['weapon','sword','long sword']
         self.base_descriptor='A straight, double-edged sword with a long blade. A well-balanced and versatile weapon for cutting and thrusting'
@@ -183,13 +231,13 @@ class LongSword(Item):
         if self.base_radius==0:
             self.base_radius=self.radius
 
-class Gladius(Item):
+class Gladius(BaseClasses.Item):
     #length is blade length in meters
     #edge is edge width in meters
     #tip is tip surface area in square meters
     #width is blade width in meters
     #thickness is blade thickness in meters
-    def __init__(self,length=0.6,edge=0.00001,tip=0.0000001,width=0.035,thickness=0.007,material=Iron,quality=1,**kwargs):
+    def __init__(self,length=0.6,edge=0.00001,tip=0.0000001,width=0.035,thickness=0.007,material=M.Iron,quality=1,**kwargs):
         super().__init__(**kwargs)
         self.names=['weapon','sword','gladius']
         self.base_descriptor='A two-edged short sword balanced for cutting, chopping, or thrusting'
@@ -225,13 +273,13 @@ class Gladius(Item):
         if self.base_radius==0:
             self.base_radius=self.radius
 
-class Knife(Item):
+class Knife(BaseClasses.Item):
     #length is blade length in meters
     #edge is edge width in meters
     #tip is tip surface area in square meters
     #width is blade width in meters
     #thickness is blade thickness in meters
-    def __init__(self,length=0.3,edge=0.000005,tip=0.000000025,width=0.035,thickness=0.01,material=Iron,quality=1,**kwargs):
+    def __init__(self,length=0.3,edge=0.000005,tip=0.000000025,width=0.035,thickness=0.01,material=M.Iron,quality=1,**kwargs):
         super().__init__(**kwargs)
         self.names=['weapon','dagger']
         self.base_descriptor='A short, bladed weapon with a very sharp point. Suitable for throwing, slashing, or stabbing'
@@ -268,13 +316,13 @@ class Knife(Item):
         if self.base_radius==0:
             self.base_radius=self.radius
 
-class Saber(Item):
+class Saber(BaseClasses.Item):
     #length is blade length in meters
     #edge is edge width in meters
     #tip is tip surface area in square meters
     #width is blade width in meters
     #thickness is blade thickness in meters
-    def __init__(self,length=1,edge=0.000005,tip=0.0000002,width=0.035,thickness=0.006,material=Iron,quality=1,**kwargs):
+    def __init__(self,length=1,edge=0.000005,tip=0.0000002,width=0.035,thickness=0.006,material=M.Iron,quality=1,**kwargs):
         super().__init__(**kwargs)
         self.names=['weapon','sword','saber']
         self.base_descriptor='A curved, single-edge sword optimized for cutting'
@@ -310,13 +358,13 @@ class Saber(Item):
         if self.base_radius==0:
             self.base_radius=self.radius
 
-class Claymore(Item):
+class Claymore(BaseClasses.Item):
     #length is blade length in meters
     #edge is edge width in meters
     #tip is tip surface area in square meters
     #width is blade width in meters
     #thickness is blade thickness in meters
-    def __init__(self,length=1.3,edge=0.00001,tip=0.0000001,width=0.04,thickness=0.008,material=Iron,quality=1,**kwargs):
+    def __init__(self,length=1.3,edge=0.00001,tip=0.0000001,width=0.04,thickness=0.008,material=M.Iron,quality=1,**kwargs):
         super().__init__(**kwargs)
         self.names=['weapon','sword','claymore']
         self.base_descriptor='A broad, heavy longsword suitable only for those strong enough to effectively wield it'
@@ -352,10 +400,10 @@ class Claymore(Item):
         if self.base_radius==0:
             self.base_radius=self.radius
 
-class Mace(Item):
+class Mace(BaseClasses.Item):
     #length is length of mace in meters
     #head is head radius in meters
-    def __init__(self,length=0.8,head=0.06,material=Iron,quality=1,**kwargs):
+    def __init__(self,length=0.8,head=0.06,material=M.Iron,quality=1,**kwargs):
         super().__init__(**kwargs)
         self.names=['weapon','club','mace']
         self.base_descriptor='A heavy, blunt weapon for delivering powerful blows'
@@ -378,7 +426,7 @@ class Mace(Item):
         self.mass=self.density*(self.length*3.14*0.005**2+1.33*3.14*self.head**3)
         self.centermass=self.length*0.8
         self.I=self.mass*self.centermass**2
-        self.contactarea=0.25*(1-self.curvature)*3.14*self.head**2
+        self.contactarea=0.15*(1-self.curvature)*3.14*self.head**2
         self.radius=self.head
         self.thickness=0.02
         self.r=0.015
@@ -388,11 +436,11 @@ class Mace(Item):
         if self.base_radius==0:
             self.base_radius=self.radius
 
-class FlangedMace(Item):
+class FlangedMace(BaseClasses.Item):
     #length is length of mace in meters
     #head is head radius in meters
     #contactarea is the contact area of a flange or spike in square meters
-    def __init__(self,length=0.8,head=0.06,contactarea=.0008,material=Iron,quality=1,**kwargs):
+    def __init__(self,length=0.8,head=0.06,contactarea=.0008,material=M.Iron,quality=1,**kwargs):
         super().__init__(**kwargs)
         self.names=['weapon','club','flanged mace']
         self.sortingtype='weapon'
@@ -410,13 +458,13 @@ class FlangedMace(Item):
         self.damagetype.append('blunt')
         self.movemass=self.mass
 
-class WarHammer(Item):
+class WarHammer(BaseClasses.Item):
     #length is length of war hammer in meters
     #headvolume is the volume of the head of the warhammer
     #headsize is the area of the head in square meters
     #tip is the contact area of the spike in square meters
     #contactarea is the contact area of the hammer in square meters
-    def __init__(self,length=1.1,headvolume=.0002,headsize=0.0005,tip=0.00005,material=Iron,quality=1,**kwargs):
+    def __init__(self,length=1.1,headvolume=.0002,headsize=0.0005,tip=0.00005,material=M.Iron,quality=1,**kwargs):
         super().__init__(**kwargs)
         self.names=['weapon','club','war hammer']
         self.base_descriptor='A long, heavy hammer with a head for bashing attacks and a spike for piercing through armor'
@@ -452,11 +500,11 @@ class WarHammer(Item):
             self.base_radius=self.radius
         #print('warhammer mass, I',self.mass,self.I)
 
-class Spear(Item):
+class Spear(BaseClasses.Item):
     #length is spear length in meters
     #tip is tip surface area in square meters
     #thickness is shaft thickness in meters
-    def __init__(self,length=2,tip=0.000000025,thickness=0.01,material=Iron,quality=1,**kwargs):
+    def __init__(self,length=2,tip=0.000000025,thickness=0.01,material=M.Iron,quality=1,**kwargs):
         super().__init__(**kwargs)
         self.names=['weapon','polearm','spear']
         self.base_descriptor='A long pole weapon with a sharp tip for piercing attacks.'
@@ -491,8 +539,8 @@ class Spear(Item):
             self.base_radius=self.radius
         #print(self.mass)
 
-class Axe(Item):
-    def __init__(self,length=0.8,edge=0.00004,width=0.2,thickness=0.01,material=Iron,quality=1,**kwargs):
+class Axe(BaseClasses.Item):
+    def __init__(self,length=0.8,edge=0.00004,width=0.2,thickness=0.01,material=M.Iron,quality=1,**kwargs):
         super().__init__(**kwargs)
         self.names=['weapon','axe']
         self.base_descriptor='A heavy, broad-headed bladed weapon. Somewhat clumsier than a sword but capable of delivering considerably more force.'
@@ -527,8 +575,8 @@ class Axe(Item):
         if self.base_radius==0:
             self.base_radius=self.radius
 
-class QuarterStaff(Item):
-    def __init__(self,length=2,thickness=0.02,material=Wood,quality=1,**kwargs):
+class QuarterStaff(BaseClasses.Item):
+    def __init__(self,length=2,thickness=0.02,material=M.Wood,quality=1,**kwargs):
         super().__init__(**kwargs)
         self.names=['weapon','polearm','quarterstaff']
         self.base_descriptor='A long staff capable of delivering quick blows while keeping adversaries at range.'
@@ -562,13 +610,12 @@ class QuarterStaff(Item):
 
 
 
-
 ############################################Armor####################################################################
 
-class Chest(Item):
+class Chest(BaseClasses.Item):
     #length is bone length in meters
     #radius is bone radius in meters
-    def __init__(self,length=0.9,thickness='default',in_radius=0.1,material=Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1,**kwargs):
+    def __init__(self,length=0.9,thickness='default',in_radius=0.1,material=M.Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1,**kwargs):
         super().__init__(**kwargs)
         self.sortingtype='armor'
         self.plural=plural
@@ -610,10 +657,10 @@ class Chest(Item):
         if self.base_radius==0:
             self.base_radius=self.radius
 
-class Glove(Item):
+class Glove(BaseClasses.Item):
     #length is bone length in meters
     #radius is bone radius in meters
-    def __init__(self,length=0.4,thickness='default',in_radius=0.022,material=Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1,**kwargs):
+    def __init__(self,length=0.4,thickness='default',in_radius=0.022,material=M.Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1,**kwargs):
         super().__init__(**kwargs)
         self.sortingtype='armor'
         self.plural=plural
@@ -646,8 +693,8 @@ class Glove(Item):
         super().recalc()
         self.r=self.length/2
 
-class Legging(Item):
-    def __init__(self,length=0.8,thickness='default',in_radius=0.085,material=Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1,**kwargs):
+class Legging(BaseClasses.Item):
+    def __init__(self,length=0.8,thickness='default',in_radius=0.085,material=M.Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1,**kwargs):
         super().__init__(**kwargs)
         self.sortingtype='armor'
         self.plural=plural
@@ -680,8 +727,8 @@ class Legging(Item):
         super().recalc()
         self.r=self.radius
 
-class Armlet(Item):
-    def __init__(self,length=0.375,thickness='default',in_radius=0.052,material=Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1,**kwargs):
+class Armlet(BaseClasses.Item):
+    def __init__(self,length=0.375,thickness='default',in_radius=0.052,material=M.Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1,**kwargs):
         super().__init__(**kwargs)
         self.sortingtype='armor'
         self.plural=plural
@@ -718,10 +765,10 @@ class Armlet(Item):
         self.movemass=self.mass
         self.r=self.radius
 
-class Boot(Item):
+class Boot(BaseClasses.Item):
     #length is bone length in meters
     #radius is bone radius in meters
-    def __init__(self,length=0.35,thickness='default',in_radius=0.035,material=Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1,**kwargs):
+    def __init__(self,length=0.35,thickness='default',in_radius=0.035,material=M.Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1,**kwargs):
         super().__init__(**kwargs)
         self.names=['armor','footwear','boot']
         self.base_descriptor='Footwear worn for protection of the foot and ankle'
@@ -749,8 +796,8 @@ class Boot(Item):
         super().recalc()
         self.r=self.length
 
-class Helm(Item):
-    def __init__(self,length=0.1,thickness='default',in_radius=0.08,material=Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1,**kwargs):
+class Helm(BaseClasses.Item):
+    def __init__(self,length=0.1,thickness='default',in_radius=0.08,material=M.Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1,**kwargs):
         super().__init__(**kwargs)
         self.sortingtype='armor'
         self.plural=plural
@@ -783,8 +830,8 @@ class Helm(Item):
         super().recalc()
         self.r=self.length
 
-class GreatHelm(Item):
-    def __init__(self,length=0.2,thickness='default',in_radius=0.08,material=Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1,**kwargs):
+class GreatHelm(BaseClasses.Item):
+    def __init__(self,length=0.2,thickness='default',in_radius=0.08,material=M.Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1,**kwargs):
         super().__init__(**kwargs)
         self.sortingtype='armor'
         self.plural=plural
@@ -823,8 +870,8 @@ class GreatHelm(Item):
         super().recalc()
         self.r=self.length
 
-class Shield(Item):
-    def __init__(self,length=0.02,radius=0.36,in_radius=0,material=Iron,plural=False,quality=1,**kwargs):
+class Shield(BaseClasses.Item):
+    def __init__(self,length=0.02,radius=0.36,in_radius=0,material=M.Iron,plural=False,quality=1,**kwargs):
         super().__init__(**kwargs)
         self.names=['armor','shield']
         self.base_descriptor='A large, heavy shield for absorbing and deflecting blows'
@@ -869,8 +916,8 @@ class Shield(Item):
         if self.base_radius==0:
             self.base_radius=self.radius
 
-class Buckler(Item):
-    def __init__(self,length=0.02,radius=0.1,in_radius=0,material=Iron,plural=False,quality=1,**kwargs):
+class Buckler(BaseClasses.Item):
+    def __init__(self,length=0.02,radius=0.1,in_radius=0,material=M.Iron,plural=False,quality=1,**kwargs):
         super().__init__(**kwargs)
         self.names=['armor','shield','buckler']
         self.base_descriptor='A small shield ideal for dueling which can be quickly moved to wherever it is needed most'
@@ -919,7 +966,7 @@ class Buckler(Item):
 
 
 class ExperimentalMace(Mace):
-    def __init__(self,material=Iron,quality=1):
+    def __init__(self,material=M.Iron,quality=1):
         super().__init__(material=material,quality=quality)
         self.attacks=[Experimental_Bash]
 
@@ -928,8 +975,8 @@ default_item_weights=[(Bone,0),(Flesh,0),(Hair,0),(LongSword,10),(Gladius,5),(Kn
                 (Boot,12),(Helm,8),(GreatHelm,3),(Shield,6),(Buckler,6)]
 total_item_weight=sum(i[1] for i in default_item_weights)
 
-hard_material_weights=[(Iron,10),(Bone_Material,7),(Wood,10),(Copper,10),(Brass,6),(Bronze,5),(Steel,4),(Aluminum,3),(Silver,2),(Duraluminum,1),(Zicral,1)]
-soft_material_weights=[(Leather,10),(Cotton,10),(Wool,9),(Silk,5),(Spider_Silk,2),(Basalt_Fiber,1),(Fur,3),(Flesh_Material,1)]
+hard_material_weights=[(M.Iron,10),(M.Bone_Material,7),(M.Wood,10),(M.Copper,10),(M.Brass,6),(M.Bronze,5),(M.Steel,4),(M.Aluminum,3),(M.Silver,2),(M.Duraluminum,1),(M.Zicral,1)]
+soft_material_weights=[(M.Leather,10),(M.Cotton,10),(M.Wool,9),(M.Silk,5),(M.Spider_Silk,2),(M.Basalt_Fiber,1),(M.Fur,3),(M.Flesh_Material,1)]
 
 def weighted_choice(pairs):
     total=0
@@ -944,12 +991,15 @@ def weighted_choice(pairs):
 def weighted_generation(weighted_items=default_item_weights,totalweight=total_item_weight,hard_materials=hard_material_weights,soft_materials=soft_material_weights,size=1):
     chosen_material=None
     choicenumber=random.random()*totalweight
+    '''
     for i in weighted_items:
         if choicenumber<=i[1]:
             itemtype=i[0]
             break
         else:
             choicenumber-=i[1]
+    '''
+    itemtype=weighted_choice(weighted_items)
     if itemtype in (LongSword,Gladius,Knife,Saber,Claymore,Mace,WarHammer,Spear,Axe,QuarterStaff,Shield,Buckler):
         if random.random()<0.99:
             chosen_material=weighted_choice(hard_materials)
@@ -964,5 +1014,5 @@ def weighted_generation(weighted_items=default_item_weights,totalweight=total_it
 
 
 
-allitems=[Bone,Flesh,Hair,Limb,LongSword,Gladius,Knife,Saber,Claymore,Mace,WarHammer,Spear,Axe,QuarterStaff,
+allitems=[Bone,Flesh,Hair,BaseClasses.Limb,LongSword,Gladius,Knife,Saber,Claymore,Mace,WarHammer,Spear,Axe,QuarterStaff,
           Chest,Glove,Legging,Armlet,Boot,Helm,GreatHelm,Shield,Buckler]

@@ -4,7 +4,8 @@ __author__ = 'Alan'
 
 import kivy
 from kivy.properties import ListProperty, DictProperty
-from BaseClasses import *
+#from BaseClasses import *
+import BaseClasses
 from Materials import *
 from Items import *
 
@@ -46,7 +47,7 @@ self.attacktype is the type of attack the limb grants. It depends upon current e
 
 buildfromtorso=False
 
-class Finger(Limb):
+class Finger(BaseClasses.Limb):
     def __init__(self,stats,name='finger',scale=1,length=0.1,radius=0.01,natural=True,owner=None,**kwargs):
         super().__init__(stats,**kwargs)
         self.painfactor=0.5
@@ -93,7 +94,8 @@ class Finger(Limb):
             self.armor=self.equipment['glove']
             item.on_equip()
 
-        self.youngscalc()
+        super().equip(item)
+
 
     def on_limbs(self,*args):
         pass
@@ -101,7 +103,7 @@ class Finger(Limb):
     def on_stats(self,*args):
         pass
 
-class Claw(Limb):
+class Claw(BaseClasses.Limb):
     def __init__(self,stats,name='claw',scale=1,length=0.1,radius=0.01,tip=0.00005,natural=True,owner=None,**kwargs):
         super().__init__(stats,**kwargs)
         self.painfactor=0.5
@@ -144,7 +146,7 @@ class Claw(Limb):
             self.owner.equipped_items.append(item)
             item.on_equip()
 
-        self.youngscalc()
+        super().equip(item)
 
     def on_limbs(self,*args):
         pass
@@ -152,7 +154,7 @@ class Claw(Limb):
     def on_stats(self,*args):
         pass
 
-class Hand(Limb):
+class Hand(BaseClasses.Limb):
     def __init__(self,stats,name='hand',scale=1,length=0.1,radius=0.022,natural=True,owner=None,**kwargs):
         super().__init__(stats,**kwargs)
         self.sizefactor=10
@@ -225,14 +227,14 @@ class Hand(Limb):
                 for i in item.attacks:
                     try: self.attacks.append(i(item,self))
                     except TypeError:
-                        if isinstance(item,Limb):
+                        if isinstance(item,BaseClasses.Limb):
                             item.attacks=[Strike_1H,Strike_2H]
                             for j in item.attacks: self.attacks.append(j(item,self))
                             break
                 self.owner.equipped_items.append(item)
                 item.on_equip()
 
-        self.youngscalc()
+        super().equip(item)
 
     def on_wounds(self,*args):
         self.ability=max(self.ability,0)
@@ -292,7 +294,7 @@ class Hand(Limb):
         else:
             self.grasp=True
 
-class Arm(Limb):
+class Arm(BaseClasses.Limb):
     def __init__(self,stats,name='',scale=1,length=0.75,boneradius=0.013,natural=True,owner=None,**kwargs):
         super().__init__(stats,**kwargs)
         self.sizefactor=50
@@ -352,7 +354,7 @@ class Arm(Limb):
             self.owner.equipped_items.append(item)
             item.on_equip()
 
-        self.youngscalc()
+        super().equip(item)
 
     def on_limbs(self,*args):
         pass
@@ -362,7 +364,7 @@ class Arm(Limb):
             if i.natural==True:
                 i.stats=self.stats
 
-    def recover(self,turns=1,**kwargs):
+    def recover(self,turns=1,fullheal=False,**kwargs):
         if self.ability<=0:
             for i in self.limbs:
                 i.inoperable=True
@@ -371,9 +373,9 @@ class Arm(Limb):
             for i in self.limbs:
                 i.inoperable=False
                 i.updateability()
-        super().recover(turns=turns)
+        super().recover(turns=turns,fullheal=fullheal)
 
-class Torso(Limb):
+class Torso(BaseClasses.Limb):
 
     def __init__(self,stats,name,scale=1,length=0.9,radius=0.1,natural=True,owner=None,**kwargs):
         super().__init__(stats,**kwargs)
@@ -437,7 +439,7 @@ class Torso(Limb):
             self.owner.equipped_items.append(item)
             item.on_equip()
 
-        self.youngscalc()
+        super().equip(item)
 
     def on_wounds(self,*args):
         self.ability=1
@@ -451,7 +453,7 @@ class Torso(Limb):
             if i.natural==True:
                 i.stats=self.stats
 
-class Toe(Limb):
+class Toe(BaseClasses.Limb):
     def __init__(self,stats,name='toe',scale=1,length=0.05,radius=0.005,natural=True,owner=None,**kwargs):
         super().__init__(stats,**kwargs)
         self.painfactor=0.5
@@ -488,7 +490,7 @@ class Toe(Limb):
         if item.wield=='boot':
             self.equipment['boot']=item
             self.armor=self.equipment['boot']
-        self.youngscalc()
+        super().equip(item)
 
     def on_wounds(self,*args):
         self.ability=1
@@ -502,7 +504,7 @@ class Toe(Limb):
             if i.natural==True:
                 i.stats=self.stats
 
-class Foot(Limb):
+class Foot(BaseClasses.Limb):
     def __init__(self,stats,name='foot',scale=1,length=0.22,radius=0.035,natural=True,owner=None,**kwargs):
         super().__init__(stats,**kwargs)
         self.length=length*scale
@@ -559,7 +561,7 @@ class Foot(Limb):
                     i.equip(item)
             self.owner.equipped_items.append(item)
             item.on_equip()
-        self.youngscalc()
+        super().equip(item)
 
     def on_wounds(self,*args):
         self.ability=1
@@ -617,7 +619,7 @@ class Foot(Limb):
         else:
             self.defaultattacks=[Kick(self)]
 
-class Leg(Limb):
+class Leg(BaseClasses.Limb):
     def __init__(self,stats,name='',scale=1,length=0.8,boneradius=0.018,natural=True,owner=None,**kwargs):
         super().__init__(stats,**kwargs)
         self.painfactor=0.8
@@ -668,7 +670,7 @@ class Leg(Limb):
             self.owner.equipped_items.append(item)
             item.on_equip()
 
-        self.youngscalc()
+        super().equip(item)
 
     def on_wounds(self,*args):
         self.ability=1
@@ -683,7 +685,7 @@ class Leg(Limb):
             if i.natural==True:
                 i.stats=self.stats
 
-class Ear(Limb):
+class Ear(BaseClasses.Limb):
     def __init__(self,stats,name='',scale=1,length=0.008,radius=0.02,natural=True,owner=None,**kwargs):
         super().__init__(stats,**kwargs)
         self.painfactor=0.7
@@ -717,7 +719,7 @@ class Ear(Limb):
         if item.wield=='helmet':
             self.equipment['helmet']=item
             self.armor=self.equipment['helmet']
-        self.youngscalc()
+        super().equip(item)
 
     def on_wounds(self,*args):
         self.ability=1
@@ -729,7 +731,7 @@ class Ear(Limb):
     def on_stats(self,*args):
         pass
 
-class Nose(Limb):
+class Nose(BaseClasses.Limb):
     def __init__(self,stats,name='nose',scale=1,length=0.01,radius=0.02,natural=True,owner=None,**kwargs):
         super().__init__(stats,**kwargs)
         self.radius=radius*scale
@@ -763,7 +765,7 @@ class Nose(Limb):
             self.equipment['helmet']=item
             self.armor=self.equipment['helmet']
 
-        self.youngscalc()
+        super().equip(item)
 
     def on_wounds(self,*args):
         self.ability=1
@@ -775,7 +777,7 @@ class Nose(Limb):
     def on_stats(self,*args):
         pass
 
-class Eye(Limb):
+class Eye(BaseClasses.Limb):
     def __init__(self,stats,name='',scale=1,length=None,radius=0.013,natural=True,owner=None,**kwargs):
         super().__init__(stats,**kwargs)
         self.painfactor=2
@@ -812,7 +814,7 @@ class Eye(Limb):
             self.equipment['helmet']=item
             self.armor=self.equipment['helmet']
 
-        self.youngscalc()
+        super().equip(item)
 
     def on_wounds(self,*args):
         self.ability=1
@@ -824,7 +826,7 @@ class Eye(Limb):
     def on_stats(self,*args):
         pass
 
-class Teeth(Limb):
+class Teeth(BaseClasses.Limb):
     def __init__(self,stats,name='teeth',scale=1,length=0.12,radius=0.005,natural=True,owner=None,biting_surface=0.0006,**kwargs):
         super().__init__(stats,**kwargs)
         self.sizefactor=1
@@ -863,7 +865,7 @@ class Teeth(Limb):
         if item.wield=='helmet':
             self.equipment['helmet']=item
             self.armor=self.equipment['helmet']
-        self.youngscalc()
+        super().equip(item)
 
     def on_wounds(self,*args):
         self.ability=1
@@ -877,7 +879,7 @@ class Teeth(Limb):
             if i.natural==True:
                 i.stats=self.stats
 
-class Jaw(Limb):
+class Jaw(BaseClasses.Limb):
     def __init__(self,stats,name='jaw',scale=1,length=0.2,radius=0.018,natural=True,owner=None, can_bite=True,**kwargs):
         super().__init__(stats,**kwargs)
         self.sizefactor=3
@@ -919,7 +921,7 @@ class Jaw(Limb):
         if item.wield=='helmet':
             self.equipment['helmet']=item
             self.armor=self.equipment['helmet']
-        self.youngscalc()
+        super().equip(item)
 
     def on_limbs(self,*args):
         pass
@@ -929,7 +931,7 @@ class Jaw(Limb):
             if i.natural==True:
                 i.stats=self.stats
 
-class Head(Limb):
+class Head(BaseClasses.Limb):
     def __init__(self,stats,name='head',scale=1,length=0.2,radius=0.08,natural=True,owner=None,**kwargs):
         super().__init__(stats,**kwargs)
         self.painfactor=1.5
@@ -1005,7 +1007,7 @@ class Head(Limb):
             if isinstance(item,GreatHelm):
                 self.attachpoint.equip(item)
 
-        self.youngscalc()
+        super().equip(item)
 
     def on_wounds(self,*args):
         self.ability=1
@@ -1019,7 +1021,7 @@ class Head(Limb):
             if i.natural==True:
                 i.stats=self.stats
 
-class Neck(Limb):
+class Neck(BaseClasses.Limb):
     def __init__(self,stats,name='neck',scale=1,length=0.1,boneradius=0.013,radius=0.1,natural=True,owner=None,**kwargs):
         super().__init__(stats,**kwargs)
         self.sizefactor=1
@@ -1078,7 +1080,7 @@ class Neck(Limb):
             self.equipment['helmet']=item
             self.armor=self.equipment['helmet']
 
-        self.youngscalc()
+        super().equip(item)
 
     def on_limbs(self,*args):
         pass
@@ -1088,7 +1090,7 @@ class Neck(Limb):
             if i.natural==True:
                 i.stats=self.stats
 
-class Abdomen(Limb):
+class Abdomen(BaseClasses.Limb):
     def __init__(self,stats,name='lower torso',scale=1,length=0.4,radius=0.1,natural=True,owner=None,**kwargs):
         super().__init__(stats,**kwargs)
         self.sizefactor=20
@@ -1133,7 +1135,7 @@ class Abdomen(Limb):
         if item.wield=='chest':
             self.equipment['chest']=item
             self.armor=self.equipment['chest']
-        self.youngscalc()
+        super().equip(item)
 
     def on_wounds(self,*args):
         self.ability=1
@@ -1188,7 +1190,7 @@ class Abdomen(Limb):
                 i.updateability()
         super().recover(turns=turns)
 
-class Upper_Torso(Limb):
+class Upper_Torso(BaseClasses.Limb):
     def __init__(self,stats,name='chest',scale=1,length=0.5,radius=0.1,natural=True,owner=None,**kwargs):
         super().__init__(stats,**kwargs)
         self.sizefactor=20
@@ -1247,7 +1249,7 @@ class Upper_Torso(Limb):
             self.owner.equipped_items.append(item)
             item.on_equip()
 
-        self.youngscalc()
+        super().equip(item)
 
     def on_wounds(self,*args):
         self.ability=1
@@ -1283,7 +1285,7 @@ class Upper_Torso(Limb):
         self.youngscalc()
         super().damageresolve(attack,attacker,reactionforce=reactionforce)
 
-class Wing(Limb):
+class Wing(BaseClasses.Limb):
     def __init__(self,stats,name='wing',scale=1,length=0.06,radius=0.2,natural=True,owner=None,**kwargs):
         super().__init__(stats,**kwargs)
         self.length=length*scale
@@ -1317,7 +1319,7 @@ class Wing(Limb):
         self.armortype=None
 
     def equip(self,item):
-        self.youngscalc()
+        super().equip(item)
 
     def on_wounds(self,*args):
         self.ability=1
@@ -1369,7 +1371,7 @@ class Wing(Limb):
         else:
             self.support=True
 
-class Tentacle(Limb):
+class Tentacle(BaseClasses.Limb):
     def __init__(self,stats,name='tentacle',scale=1,length=0.75,radius=0.06,natural=True,owner=None,**kwargs):
         super().__init__(stats,**kwargs)
         self.sizefactor=50
@@ -1429,7 +1431,7 @@ class Tentacle(Limb):
             self.owner.equipped_items.append(item)
             item.on_equip()
 
-        self.youngscalc()
+        super().equip(item)
 
     def on_limbs(self,*args):
         pass
@@ -1471,7 +1473,7 @@ class Tentacle(Limb):
         else:
             self.grasp=True
 
-class Blob_Body(Limb):
+class Blob_Body(BaseClasses.Limb):
     def __init__(self,stats,name='body',scale=1,length=0.5,radius=0.5,natural=True,owner=None,material=Slime,**kwargs):
         super().__init__(stats,**kwargs)
         self.sizefactor=50
@@ -1503,7 +1505,7 @@ class Blob_Body(Limb):
         self.armortype=None
 
     def equip(self,item):
-        self.youngscalc()
+        super().equip(item)
 
     def on_limbs(self,*args):
         pass
@@ -1521,7 +1523,7 @@ class Blob_Body(Limb):
         self.layers[0].damage=damage
         self.layers[0].functioncheck()
 
-class Pseudopod(Limb):
+class Pseudopod(BaseClasses.Limb):
     def __init__(self,stats,name='pseudopod',scale=1,length=0.1,radius=0.1,natural=True,owner=None,material=Slime,**kwargs):
         super().__init__(stats,**kwargs)
         self.sizefactor=10
@@ -1556,7 +1558,7 @@ class Pseudopod(Limb):
 
     def equip(self,item):
 
-        self.youngscalc()
+        super().equip(item)
 
     def on_limbs(self,*args):
         pass
@@ -1584,7 +1586,7 @@ class Pseudopod(Limb):
         self.layers[0].damage=damage
         self.layers[0].functioncheck()
 
-class Snout(Limb):
+class Snout(BaseClasses.Limb):
     def __init__(self,stats,name='snout',scale=1,length=0.15,radius=0.03,natural=True,owner=None,**kwargs):
         super().__init__(stats,**kwargs)
         self.radius=radius*scale
@@ -1620,7 +1622,7 @@ class Snout(Limb):
             self.equipment['helmet']=item
             self.armor=self.equipment['helmet']
 
-        self.youngscalc()
+        super().equip(item)
 
     def on_wounds(self,*args):
         self.ability=1
@@ -1632,7 +1634,7 @@ class Snout(Limb):
     def on_stats(self,*args):
         pass
 
-class Balancing_Tail(Limb):
+class Balancing_Tail(BaseClasses.Limb):
     def __init__(self,stats,name='tail',scale=1,length=0.25,radius=0.01,natural=True,owner=None,**kwargs):
         super().__init__(stats,**kwargs)
         self.sizefactor=3
@@ -1690,7 +1692,7 @@ class Balancing_Tail(Limb):
                 self.movemass+=item.mass
             self.owner.equipped_items.append(item)
 
-        self.youngscalc()
+        super().equip(item)
 
     def on_limbs(self,*args):
         pass
@@ -1705,7 +1707,7 @@ class Balancing_Tail(Limb):
 
 #For creating basic structures for layering or making golems
 
-class Material_Leg(Limb):
+class Material_Leg(BaseClasses.Limb):
     def __init__(self,stats,name='',scale=1,length=0.8,radius=0.08,natural=True,owner=None,material=Flesh_Material,**kwargs):
         super().__init__(stats,**kwargs)
         self.painfactor=0.8
@@ -1752,7 +1754,7 @@ class Material_Leg(Limb):
             self.owner.equipped_items.append(item)
             item.on_equip()
 
-        self.youngscalc()
+        super().equip(item)
 
     def on_wounds(self,*args):
         self.ability=1
@@ -1822,7 +1824,7 @@ class Material_Arm(Material_Leg):
             self.owner.equipped_items.append(item)
             item.on_equip()
 
-        self.youngscalc()
+        super().equip(item)
 
     def recover(self,turns=1,**kwargs):
         if self.ability<=0:
@@ -1835,7 +1837,7 @@ class Material_Arm(Material_Leg):
                 i.updateability()
         super().recover(turns=turns)
 
-class Material_Foot(Limb):
+class Material_Foot(BaseClasses.Limb):
     def __init__(self,stats,name='foot',scale=1,length=0.22,radius=0.035,natural=True,owner=None,material=Flesh_Material,**kwargs):
         super().__init__(stats,**kwargs)
         self.length=length*scale
@@ -1899,7 +1901,7 @@ class Material_Foot(Limb):
                     i.equip(item)
             self.owner.equipped_items.append(item)
             item.on_equip()
-        self.youngscalc()
+        super().equip(item)
 
     def on_wounds(self,*args):
         self.ability=1
@@ -1957,7 +1959,7 @@ class Material_Foot(Limb):
         else:
             self.defaultattacks=[Kick(self)]
 
-class Material_Hand(Limb):
+class Material_Hand(BaseClasses.Limb):
     def __init__(self,stats,name='hand',scale=1,length=0.1,radius=0.022,natural=True,owner=None,material=Flesh_Material,**kwargs):
         super().__init__(stats,**kwargs)
         self.sizefactor=10
@@ -2021,14 +2023,14 @@ class Material_Hand(Limb):
                 for i in item.attacks:
                     try: self.attacks.append(i(item,self))
                     except TypeError:
-                        if isinstance(item,Limb):
+                        if isinstance(item,BaseClasses.Limb):
                             item.attacks=[Strike_1H,Strike_2H]
                             for j in item.attacks: self.attacks.append(j(item,self))
                             break
                 self.owner.equipped_items.append(item)
                 item.on_equip()
 
-        self.youngscalc()
+        super().equip(item)
 
     def on_wounds(self,*args):
         self.ability=max(self.ability,0)
@@ -2106,7 +2108,7 @@ class Material_Hand(Limb):
         self.mass_calc()
         self.youngscalc()
 
-class Material_Finger(Limb):
+class Material_Finger(BaseClasses.Limb):
     def __init__(self,stats,name='finger',scale=1,length=0.1,radius=0.01,natural=True,owner=None,material=Flesh_Material,**kwargs):
         super().__init__(stats,**kwargs)
         self.painfactor=0.5
@@ -2153,7 +2155,7 @@ class Material_Finger(Limb):
             self.armor=self.equipment['glove']
             item.on_equip()
 
-        self.youngscalc()
+        super().equip(item)
 
     def on_limbs(self,*args):
         pass
@@ -2179,7 +2181,7 @@ class Material_Finger(Limb):
         self.mass_calc()
         self.youngscalc()
 
-class Material_Head(Limb):
+class Material_Head(BaseClasses.Limb):
     def __init__(self,stats,name='head',scale=1,length=0.2,radius=0.08,natural=True,owner=None,material=Flesh_Material,**kwargs):
         super().__init__(stats,**kwargs)
         self.painfactor=1.5
@@ -2231,7 +2233,7 @@ class Material_Head(Limb):
             if isinstance(item,GreatHelm):
                 self.attachpoint.equip(item)
 
-        self.youngscalc()
+        super().equip(item)
 
     def on_wounds(self,*args):
         self.ability=1
@@ -2263,7 +2265,7 @@ class Material_Head(Limb):
         self.mass_calc()
         self.youngscalc()
 
-class Material_Upper_Torso(Limb):
+class Material_Upper_Torso(BaseClasses.Limb):
     def __init__(self,stats,name='chest',scale=1,length=0.5,radius=0.1,natural=True,owner=None,material=Flesh_Material,**kwargs):
         super().__init__(stats,**kwargs)
         self.sizefactor=20
@@ -2310,7 +2312,7 @@ class Material_Upper_Torso(Limb):
             self.owner.equipped_items.append(item)
             item.on_equip()
 
-        self.youngscalc()
+        super().equip(item)
 
     def on_wounds(self,*args):
         self.ability=1
@@ -2342,7 +2344,7 @@ class Material_Upper_Torso(Limb):
         self.mass_calc()
         self.youngscalc()
 
-class Material_Abdomen(Limb):
+class Material_Abdomen(BaseClasses.Limb):
     def __init__(self,stats,name='lower torso',scale=1,length=0.4,radius=0.1,natural=True,owner=None,material=Flesh_Material,**kwargs):
         super().__init__(stats,**kwargs)
         self.sizefactor=20
@@ -2377,7 +2379,7 @@ class Material_Abdomen(Limb):
         if item.wield=='chest':
             self.equipment['chest']=item
             self.armor=self.equipment['chest']
-        self.youngscalc()
+        super().equip(item)
 
     def on_wounds(self,*args):
         self.ability=1
@@ -2410,9 +2412,83 @@ class Material_Abdomen(Limb):
         self.youngscalc()
 
 
+class Animated_Item_Limb(BaseClasses.Limb):
+    def __init__(self,stats=None,item=None,natural=False,owner=None,sizefactor=None,name=None,**kwargs):
+        if item==None:
+            return
+        super().__init__(stats,**kwargs)
+        if stats==None:
+            try: stats=item.stats
+            except:
+                try: stats=owner.stats
+                except: stats={'s':10,'str':10,'t':10,'tec':10,'p':10,'per':10,'w':10,'wil':10,'l':10,'luc':10}
+        if sizefactor==None:
+            self.sizefactor=20*item.length*item.radius
+        else:
+            self.sizefactor=sizefactor
+        self.target_class=['item','animated','enchanted','nonvital']
+        self.owner=owner
+        self.owner.limbs.append(self)
+        self.natural=natural
+        if name==None:
+            try:
+                self.name=' '.join(['enchanted',item.name])
+            except:
+                self.name='enchanted limb'
+        else:
+            self.name=name
+        self.length=item.length
+        self.grasp=False
+        self.support=False
+        self.ability=1
+        self.stats=stats
+        self.radius=item.radius
+        self.primaryequip=[]
+        self.equiptype=[]
+        self.equipment={}
+        self.armor=None
+        self.scars=[]
+        self.attachpoint=None
+        self.descriptor='This is a magically animated {}, belonging to {}'.format(item.name,self.owner.indefinitename)
+        self.attacktype=None
+        self.layers=[item]
+        self.mass_calc()
+        self.youngscalc()
+        self.defaultattacks=[]
+        self.armortype=None
+        self.severage_item=item
+        if item.wield=='glove':
+            self.defaultattacks=[Punch(self)]
+        elif item.wield=='boot':
+            self.defaultattacks=[Kick(self)]
+        elif item.wield=='grasp':
+            self.defaultattacks=[]
+            self.dexterity=self.stats['tec']
+            for i in item.attacks:
+                self.defaultattacks.append(i(weapon=item,limb=self))
+        self.attacks=self.defaultattacks
+
+    def equip(self,item):
+        super().equip(item)
+
+    def on_limbs(self,*args):
+        pass
+
+    def on_stats(self,*args):
+        pass
+
+    def sever(self, primary=True,log=True):
+        for i in self.limbs: i.sever(primary=True,log=False)
+        super().sever(primary=primary,log=log)
 
 
-class Bound_Item_Limb(Limb):
+
+
+
+
+
+
+class Bound_Item_Limb(BaseClasses.Limb):
     def __init__(self,stats=None,item=None,natural=False,owner=None,**kwargs):
         if item==None or item.equipped==[]:
             return
@@ -2455,7 +2531,7 @@ class Bound_Item_Limb(Limb):
         self.attachpoint.limbs.append(self)
 
     def equip(self,item):
-        self.youngscalc()
+        super().equip(item)
 
     def on_limbs(self,*args):
         pass
