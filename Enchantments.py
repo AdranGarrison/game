@@ -7,6 +7,7 @@ import Shell
 import Materials as Mats
 from kivy.clock import Clock
 import functools
+from kivy.graphics import Color,Rectangle
 
 
 #Item enchantments
@@ -16,6 +17,7 @@ class Acidic(BaseClasses.Enchantment):
         if not isinstance(target,BaseClasses.Item):
             return
         super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='acidic'
         self.strength=strength
         self.old_acid_resistance=self.target.acid_resistance
         self.old_mat_acid_resistance=self.target.material.acid_resistance
@@ -68,6 +70,7 @@ class Burning(BaseClasses.Enchantment):
         if not isinstance(target,BaseClasses.Item):
             return
         super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='burning'
         self.strength=strength
         self.old_burn_resistance=self.target.burn_resistance
         self.old_mat_burn_resistance=self.target.material.burn_resistance
@@ -116,11 +119,12 @@ class Burning(BaseClasses.Enchantment):
         self.target.burn_resistance=self.old_burn_resistance
         self.target.material.burn_resistance=self.old_mat_burn_resistance
 
-class BloodDrinking(BaseClasses.Enchantment):
+class Vampiric(BaseClasses.Enchantment):
     def __init__(self,target,turns='permanent',strength=6,**kwargs):
         if not isinstance(target,BaseClasses.Item):
             return
         super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='vampiric'
         self.strength=strength
         self.blood=100
         if hasattr(target,'edge'):
@@ -178,8 +182,6 @@ class BloodDrinking(BaseClasses.Enchantment):
             damagetype=random.choice(['dent','crack','rust','corrode','deform'])
             self.target.damage[damagetype]+=self.strength*random.random()/self.blood
 
-
-
     def on_strike(self,attack):
         super().on_strike(attack)
         luc=attack.attacker.stats['luc']
@@ -207,7 +209,6 @@ class BloodDrinking(BaseClasses.Enchantment):
             self.target.damage['deform']=max(0,self.target.damage['deform']-0.0001*self.blood)
         self.attempt_identification(10)
 
-
     def on_struck(self,attack):
         super().on_struck(attack)
         if not 'melee' in attack.classification:
@@ -227,7 +228,6 @@ class BloodDrinking(BaseClasses.Enchantment):
                 attack.attacker.focus[0]-=self.strength
                 attack.attacker.pain+=self.strength
 
-
     def on_destruction(self):
         if self.target.location==[None,None]:
             self.magma=Fluids.Blood(self.target.in_inventory,temp=random.gauss(self.strength*200,100))
@@ -235,7 +235,6 @@ class BloodDrinking(BaseClasses.Enchantment):
         else:
             self.magma=Fluids.Blood(self.target,temp=random.gauss(self.strength*200,100))
             self.magma.splatter(intensity=3,volume=self.strength*2)
-
 
     def on_dispel(self):
         if self.has_edge:
@@ -248,6 +247,7 @@ class Unstable(BaseClasses.Enchantment):
         if not isinstance(target,BaseClasses.Item):
             return
         super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='unstable'
         self.strength=strength
 
 
@@ -259,8 +259,10 @@ class Unstable(BaseClasses.Enchantment):
             self.target.functioncheck()
             if self.target.in_inventory==Shell.shell.player or self.target in Shell.shell.player.visible_items:
                 Shell.shell.log.addtext('The {} returns to the void'.format(self.target.name))
-                try: Shell.shell.player.inventory.remove(self.target)
-                except: pass
+                #try: Shell.shell.player.inventory.remove(self.target)
+                #except: pass
+            try: self.target.in_inventory.inventory.remove(self.target)
+            except: pass
             pass
 
 class Bound(BaseClasses.Enchantment):
@@ -268,6 +270,7 @@ class Bound(BaseClasses.Enchantment):
         if not isinstance(target,BaseClasses.Item):
             return
         super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='bound'
         self.strength=strength
         self.target=target
         self.limb=None
@@ -276,9 +279,9 @@ class Bound(BaseClasses.Enchantment):
         if self.limb!=None: return
         attach=self.target.equipped[0]
         self.limb=Shell.Limbs.Bound_Item_Limb(item=self.target,owner=attach.owner)
-        if self.target.in_inventory!=None:
-            self.target.in_inventory.inventory.remove(self.target)
-            self.target.in_inventory=None
+        #if self.target.in_inventory!=None:
+         #   self.target.in_inventory.inventory.remove(self.target)
+          #  self.target.in_inventory=None
         if attach.owner==Shell.shell.player:
             Shell.shell.log.addtext('The {} fuses itself to your {}!'.format(self.target.name,attach.name))
         elif attach.owner in Shell.shell.player.visible_creatures:
@@ -311,6 +314,7 @@ class Indestructable(BaseClasses.Enchantment):
         if not isinstance(target,BaseClasses.Item):
             return
         super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='indestructable'
         self.strength=strength
         self.old_mode=self.target.mode
         self.old_mat_mode=self.target.material.mode
@@ -345,6 +349,7 @@ class Shifting(BaseClasses.Enchantment):
         if not isinstance(target,BaseClasses.Item):
             return
         super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='shifting'
         self.strength=strength
         r={}
         if hasattr(self.target,'length'): r['length']=self.target.length
@@ -430,6 +435,7 @@ class Blinking(BaseClasses.Enchantment):
         if not isinstance(target,BaseClasses.Item):
             return
         super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='blinking'
         self.strength=strength
 
 
@@ -564,6 +570,7 @@ class Numbing(BaseClasses.Enchantment):
         if not isinstance(target,BaseClasses.Item):
             return
         super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='numbing'
         self.strength=strength
         self.oldpainfactors={}
 
@@ -644,8 +651,11 @@ class Bleeding(BaseClasses.Enchantment):
         if target.in_limb.owner==None or target.in_limb.owner.alive==False:
             return
         super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='bleeding'
         self.strength=strength
         self.attempt_identification(10*strength)
+        self.category="physical"
+        self.classification=["physical","negative"]
 
     def on_turn(self):
         self.target.fluid.splatter(volume=self.strength,intensity=0.5)
@@ -655,11 +665,68 @@ class Bleeding(BaseClasses.Enchantment):
             #self.on_dispel()
             self.target.enchantments.remove(self)
 
+class Rot(BaseClasses.Enchantment):
+    def __init__(self,target,turns='permanent',strength=6,**kwargs):
+        if not isinstance(target,BaseClasses.Item):
+            return
+        if target.rottable==False:
+            return
+        super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='rot'
+        self.strength=strength
+        self.minimum_damage=target.damage.copy()
+        self.attempt_identification(10*strength)
+        self.loggable=True
+
+    def on_turn(self):
+        if self.target.in_limb!=None:
+            luc=self.target.in_limb.stats['luc']
+        elif self.target.in_inventory!=None:
+            luc=self.target.in_inventory.stats['luc']
+        else:
+            luc=10
+        luc*=(self.target.rot_resistance+1)
+        if self.strength/(luc+self.strength)>random.random():
+            for i in self.minimum_damage:
+                if self.target.damage[i]<self.minimum_damage[i]:
+                    self.target.damage[i]+=(self.minimum_damage[i]-self.target.damage[i])*random.random()*random.random()
+                    self.target.damage[i]=min(self.target.damage[i],self.minimum_damage[i])
+                else:
+                    self.minimum_damage[i]=self.target.damage[i]
+            oldrot=self.target.damage['rot']
+            self.target.damage['rot']+=(self.target.damage['cut']+self.target.damage['pierce']+self.target.damage['crack']*0.6+
+                                        self.target.damage['burn']+self.target.damage['corrode']+self.target.damage['crush']
+                                        )*random.random()*self.strength/(10*max(luc-self.strength,1))
+            self.target.damage['rot']=min(1,self.target.damage['rot'])
+            try:
+                self.target.in_limb.owner.pain+=(1-self.target.damage['rot'])*self.target.damage['rot']*10/self.target.in_limb.owner.stats['wil']**0.5
+            except:
+                pass
+            if random.random()>0.75 and self.loggable==True and oldrot<1 and self.target.damage['rot']>oldrot:
+                if self.target.in_limb!=None:
+                    if self.target.in_limb.owner==Shell.shell.player:
+                        Shell.messages.append("The {} on your {} rots!".format(self.target.name,self.target.in_limb.name))
+                    elif self.target.in_limb.owner in Shell.shell.player.visible_creatures:
+                        Shell.messages.append("The {} on {}'s {} rots!".format(self.target.name,self.target.in_limb.owner.name,self.target.in_limb.name))
+                elif self.target.in_inventory==Shell.shell.player:
+                    Shell.messages.append("Your {} decays".format(self.target.name))
+        if random.random()*luc*(0.5)>random.random()*(self.strength+10*self.target.damage['rot']):
+            self.strength-=1
+        if self.strength<=0:
+            self.on_removal()
+            self.target.enchantments.remove(self)
+
+
+
+
+
+
 class Magic_Eating(BaseClasses.Enchantment):
     def __init__(self,target,turns='permanent',strength=6,**kwargs):
         if not isinstance(target,BaseClasses.Item):
             return
         super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='magic eating'
         self.strength=strength
         self.magic_consumed=target.magic_contamination.copy()
         target.magic_contamination={'dark':0,'elemental':0,'summoning':0,'transmutation':0,'arcane':0,'total':0}
@@ -710,8 +777,6 @@ class Magic_Eating(BaseClasses.Enchantment):
                     self.magic_consumed[i]-=power
                     power=int(1.5*power**0.5+1)
                     Creature_Stat_Modification(self.target.equipped[0].owner,turns=self.strength,strength=power,stat='w')
-
-
 
     def on_strike(self,attack):
         super().on_strike(attack)
@@ -806,6 +871,7 @@ class Numb(BaseClasses.Enchantment):
             new=True
         else: new=False
         super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='numb'
         self.strength=strength
         self.oldpainfactor=self.target.painfactor
         self.target.painfactor=0
@@ -817,6 +883,7 @@ class Numb(BaseClasses.Enchantment):
                 Shell.messages.append("{}'s {} goes numb".format(self.target.owner.name,self.target.name))
 
     def on_turn(self):
+        super().on_turn()
         self.target.ability-=(self.strength-0.9)/(self.strength+1)
         self.target.ability=max(self.target.ability,0)
 
@@ -831,6 +898,7 @@ class Magical_Grasp(BaseClasses.Enchantment):
         if 'grasp' in target.equipment:
             return
         super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='magical grasp'
         self.strength=strength
         if 'grasp' not in self.target.equipment:
             self.added_equipment_slot=True
@@ -869,6 +937,7 @@ class Magical_Balance(BaseClasses.Enchantment):
         if not isinstance(target,BaseClasses.Limb):
             return
         super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='magical balance'
         self.strength=strength
         if not self.target.support:
             self.target.support=True
@@ -880,13 +949,72 @@ class Magical_Balance(BaseClasses.Enchantment):
 
     def on_turn(self):
         self.target.balance=self.strength*self.target.ability
-        if self.target.balance>0: self.target.support=True
+        if self.target.balance>0:
+            self.target.support=True
+            self.target.movement['walk']+=self.target.balance
         else: self.target.support=False
 
     def on_dispel(self,**kwargs):
         if self.granted_support==True:
             self.target.support=False
             del self.target.balance
+
+class Limb_Stat_Modification(BaseClasses.Enchantment):
+    def __init__(self,target,turns='permanent',strength=6,stat='s',**kwargs):
+        if not isinstance(target,BaseClasses.Limb):
+            return
+        super().__init__(target,turns=turns,strength=strength,combine=False,**kwargs)
+        self.classname='limb stat modification'
+        self.display=False
+        self.stat_modified=stat
+        self.strength=strength
+        self.target.statmodifiers[stat]+=strength
+        self.oldmodifier=strength
+
+    def on_turn(self):
+        if self.strength!=self.oldmodifier:
+            self.target.statmodifiers[self.stat_modified]-=self.oldmodifier
+            self.oldmodifier=self.strength
+            self.target.statmodifiers[self.stat_modified]+=self.strength
+        super().on_turn()
+
+    def on_removal(self,**kwargs):
+        self.target.statmodifiers[self.stat_modified]-=self.oldmodifier
+        super().on_removal(**kwargs)
+
+class Grasping(BaseClasses.Enchantment):
+    def __init__(self,target,turns='permanent',strength=6,**kwargs):
+        if not isinstance(target,BaseClasses.Limb):
+            return
+        super().__init__(target,turns=turns,strength=strength,combination_type='max',**kwargs)
+        self.classname='holding on'
+        self.strength=strength
+        self.category='physical'
+        self.classification=["physical","grasp","movement impairing"]
+        self.held=None
+
+    def on_turn(self):
+        self.target.ability=0
+
+    def limb_function_modification(self):
+        self.target.ability=0
+
+class Held(BaseClasses.Enchantment):
+    def __init__(self,target,turns='permanent',strength=6,**kwargs):
+        if not isinstance(target,BaseClasses.Limb):
+            return
+        super().__init__(target,turns=turns,strength=strength,combination_type='max',**kwargs)
+        self.classname='held'
+        self.strength=strength
+        self.category='physical'
+        self.classification=["physical","grasp","movement impairing"]
+        self.held=None
+
+    def on_turn(self):
+        self.target.ability=0
+
+    def limb_function_modification(self):
+        self.target.ability=0
 
 
 #Creature enchantments
@@ -896,7 +1024,10 @@ class Psychic_Detection(BaseClasses.Enchantment):
         if not isinstance(target,BaseClasses.Creature):
             return
         super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='psychic detection'
         self.strength=strength
+        self.category="psychic"
+        self.classification=["psychic","sensory"]
 
     def sense_modification(self):
         self.target.focus[0]=max(0,self.target.focus[0])
@@ -915,15 +1046,28 @@ class Psychic_Detection(BaseClasses.Enchantment):
             for i in self.target.psychic_detected_creatures:
                 i.floor.cells[i.location[0]][i.location[1]].update_graphics(show_items=False,show_dungeon=False)
 
+    def sense_specific_creature(self,creature):
+        if not isinstance(creature,BaseClasses.Creature):
+            return False
+        if 'mindless' in creature.classification or creature.alive==False or creature==self.target or creature.location==[None,None]:
+            return False
+        distance=((self.target.location[0]-creature.location[0])*(self.target.location[0]-creature.location[0])+
+            (self.target.location[1]-creature.location[1])*(self.target.location[1]-creature.location[1]))**0.5
+        radius=(self.strength*self.target.stats['per']*self.target.focus[0]/self.target.focus[1])**0.5
+        if radius*radius>distance:
+            return True
+
 class Magical_Sense(BaseClasses.Enchantment):
     def __init__(self,target,turns='permanent',strength=6,vision=True,hearing=True,smell=True,**kwargs):
         if not isinstance(target,BaseClasses.Creature):
             return
         super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='magical sense'
         self.strength=strength
         self.vision=vision
         self.hearing=hearing
         self.smell=smell
+        self.classification.append("sensory")
 
     def sense_modification(self):
         if self.vision==True:
@@ -941,17 +1085,20 @@ class Levitation(BaseClasses.Enchantment):
         if not isinstance(target,BaseClasses.Creature):
             return
         super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='levitation'
         self.strength=strength
 
 
     def sense_modification(self):
         self.target.balance+=self.strength
+        self.target.movement['float']+=self.strength
 
 class Stealth(BaseClasses.Enchantment):
     def __init__(self,target,turns='permanent',strength=6,**kwargs):
         if not isinstance(target,BaseClasses.Creature):
             return
         super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='stealth'
         self.strength=strength
         self.detection_bonuses={}
 
@@ -984,22 +1131,44 @@ class Silenced(BaseClasses.Enchantment):
         if not isinstance(target,BaseClasses.Creature):
             return
         super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='silenced'
         self.strength=strength
+
+    def magic_modification(self,magic,**kwargs):
+        super().magic_modification(magic,**kwargs)
+        magic.abort=True
+        if self.target==Shell.shell.player:
+            Shell.shell.log.addtext("Your magical abilities are sealed!")
 
 class Spell_Failure(BaseClasses.Enchantment):
     def __init__(self,target,turns='permanent',strength=6,**kwargs):
         if not isinstance(target,BaseClasses.Creature):
             return
         super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='spell failure'
         self.display=False
         self.strength=strength
-        print(strength)
+
+    def magic_modification(self,magic,**kwargs):
+        super().magic_modification(magic,**kwargs)
+        if self.strength>random.random()*self.target.stats['wil'] or magic.power<self.strength:
+            magic.abort=True
+            if self.target==Shell.shell.player:
+                Shell.messages.append("Something disrupts your spell!")
+                Shell.shell.turn+=1
+            elif self.target in Shell.shell.detected_creatures:
+                Shell.messages.append("{} attempts to cast a spell, but something disrupts the magic!".format(self.target.name))
+        magic.power-=self.strength
+
+
+
 
 class Creature_Stat_Modification(BaseClasses.Enchantment):
     def __init__(self,target,turns='permanent',strength=6,stat='s',**kwargs):
         if not isinstance(target,BaseClasses.Creature):
             return
         super().__init__(target,turns=turns,strength=strength,combine=False,**kwargs)
+        self.classname='creature stat modification'
         self.display=False
         self.stat_modified=stat
         self.strength=strength
@@ -1016,6 +1185,160 @@ class Creature_Stat_Modification(BaseClasses.Enchantment):
     def on_removal(self,**kwargs):
         self.target.statmodifiers[self.stat_modified]-=self.oldmodifier
         super().on_removal(**kwargs)
+
+class Held_In_Grasp(BaseClasses.Enchantment):
+    def __init__(self,target,turns="permanent",strength=6,holding_limb=None,held_limb=None,mobile_grabber=False,**kwargs):
+        if not isinstance(target,BaseClasses.Creature):
+            return
+        try:
+            self.held_limb=held_limb
+            self.holding_limb=holding_limb
+            self.normal_balance=0
+            self.mobile_grabber=mobile_grabber
+            self.grabber_location=holding_limb.owner.location
+        except:
+            return
+        super().__init__(target,turns=turns,strength=strength,combine=False,**kwargs)
+        self.classname='held in grasp'
+        self.category='physical'
+        self.classification=['physical','grasp','root','movement impairing']
+        self.strength=strength
+
+    def on_turn(self):
+        if self.held_limb not in self.target.limbs or self.holding_limb==None or self.target.alive==False:
+            self.on_removal()
+            self.target.enchantments.remove(self)
+            return
+        if self.mobile_grabber==False:
+            if self.grabber_location!=self.holding_limb.owner.location:
+                if self.holding_limb.owner==Shell.shell.player:
+                    Shell.messages.append("You release your grip on {}'s {}".format(self.target.name,self.held_limb.name))
+                elif self.target==Shell.shell.player:
+                    Shell.messages.append("{} releases its grip on your {}".format(
+                        self.holding_limb.owner.name,self.held_limb.name))
+                elif self.target in Shell.shell.player.visible_creatures:
+                    Shell.messages.append("{} releases its grip on {}'s {}".format(
+                        self.holding_limb.owner.name,self.target.name,self.held_limb.name))
+                self.on_removal()
+                self.target.enchantments.remove(self)
+                return
+        self.grasping=Grasping(self.holding_limb)
+        self.held=Held(self.held_limb)
+
+    def sense_modification(self):
+        self.normal_balance=self.target.balance
+        self.target.balance=0
+
+    def attempt_movement(self):
+        super().attempt_movement()
+        if self.held_limb not in self.target.limbs or self.holding_limb==None:
+            self.on_removal()
+            self.target.enchantments.remove(self)
+            return True
+        self.holding_limb.updateability(include_enchantments=False)
+        gripsize=self.holding_limb.length
+        if hasattr(self.holding_limb,'dexterity'):
+            for i in self.holding_limb.limbs:
+                gripsize+=i.length
+        chance=self.target.stats['str']*self.held_limb.radius/(
+            self.holding_limb.stats['str']*self.holding_limb.ability*gripsize*self.held_limb.length+0.01)
+        self.holding_limb.ability=0
+        if chance>random.random():
+            if self.target==Shell.shell.player:
+                Shell.messages.append("You wrest your {} free from {}'s {}".format(
+                    self.held_limb.name,self.holding_limb.owner.name,self.holding_limb.name))
+            elif self.holding_limb.owner==Shell.shell.player:
+                Shell.messages.append("{} struggles free of your {}'s grasp on its {}".format(
+                    self.target.name,self.holding_limb.name,self.held_limb.name))
+            elif self.target in Shell.shell.player.visible_creatures:
+                Shell.messages.append("{} breaks out of {}'s grasp!".format(self.target.name,self.holding_limb.owner.name))
+            self.on_removal()
+            self.target.enchantments.remove(self)
+            self.target.stamina[0]-=int(random.random()*random.random()*self.holding_limb.stats['str']+2)
+            return True
+        else:
+            if self.target==Shell.shell.player:
+                Shell.messages.append("You struggle, but are unable to break your {} free!".format(self.held_limb.name))
+            elif self.target in Shell.shell.player.visible_creatures:
+                Shell.messages.append("{} struggles to break free of the grasp on its {}".format(self.target.name,self.held_limb.name))
+            self.target.stamina[0]-=int(random.random()*self.holding_limb.stats['str']+5)
+            return False
+
+    def on_removal(self,**kwargs):
+        self.target.balance=self.normal_balance
+        marked_for_removal=[]
+        for i in self.held_limb.enchantments:
+            if isinstance(i,Held):
+                i.on_removal()
+                marked_for_removal.append(i)
+        for i in marked_for_removal:
+            self.held_limb.enchantments.remove(i)
+        marked_for_removal=[]
+        for i in self.holding_limb.enchantments:
+            if isinstance(i,Grasping):
+                i.on_removal()
+                marked_for_removal.append(i)
+        for i in marked_for_removal:
+            self.holding_limb.enchantments.remove(i)
+
+class Familiar_Spirit(BaseClasses.Enchantment):
+    def __init__(self,target,turns='permanent',strength=1,owner=None,**kwargs):
+        if not isinstance(target,BaseClasses.Creature):
+            return
+        super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='familiar spirit'
+        self.strength=strength
+        self.category="magic"
+        self.classification=["magic","summoning"]
+        self.owner=owner
+        self.companion_enchantment=Familiar_Guidance(self.owner,familiar=self.target)
+        self.companion_enchantment.compantion_enchantment=self
+        self.powergifts=[]
+        
+
+    def on_turn(self):
+        super().on_turn()
+
+    def add_graphical_instructions(self,cell,**kwargs):
+        if self.owner==Shell.shell.player:
+            cell.instructions.add(Color(1,0,0,0.9,group="creatures"))
+            cell.instructions.add(Rectangle(size=[cell.size[0]*0.4,cell.size[1]*0.4],pos=[cell.pos[0]+cell.size[0]*0.6,
+                                                                                  cell.pos[1]+cell.size[1]*0.6],
+                                        source="./images/Heartoutline.png",group='creatures'))
+
+
+class Familiar_Guidance(BaseClasses.Enchantment):
+    def __init__(self,target,turns='permanent',strength=1,familiar=None,**kwargs):
+        if not isinstance(target,BaseClasses.Creature):
+            return
+        super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='familiar guidance'
+        self.strength=strength
+        self.category="magic"
+        self.classification=["magic","summoning"]
+        self.familiar=familiar
+
+    def on_turn(self):
+        if self.familiar.alive==False:
+            self.target.enchantments.remove(self)
+        super().on_turn()
+        if self.compantion_enchantment.strength*self.target.magic_contamination['total']>random.randint(0,200):
+            key=random.choice(list(self.target.magic_contamination.keys()))
+            if key!="total" and self.target.magic_contamination[key]>0:
+                self.target.magic_contamination[key]-=1
+                self.familiar.magic_contamination[key]+=1
+
+    def magic_modification(self,magic,**kwargs):
+        super().magic_modification(magic,**kwargs)
+        magic.power+=self.familiar.magic_contamination['total']
+
+    def sense_modification(self):
+        super().sense_modification()
+        self.familiar.check_visible_cells(send_to=self.target)
+
+
+
+
 
 
 

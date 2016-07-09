@@ -50,7 +50,7 @@ class Shell(FloatLayout):
     exp=ListProperty((0,100))
     name=StringProperty('Sir Face')
     charlevel=NumericProperty(1)
-    turn=NumericProperty(turn)
+    turn=NumericProperty(-1)
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
 
@@ -142,6 +142,7 @@ class Shell(FloatLayout):
 
 
         player=Creatures.Human(color=(0,1,0,0.8),player=True,stats={'s':15,'t':15,'p':15,'w':15,'l':15},name="Sir Bugsmasher")
+        #player=Creatures.Giant(color=(0,1,0,0.8),player=True,name="Sir Bugsmasher")
         #placing a player character
         self.player=player
 
@@ -201,10 +202,7 @@ class Shell(FloatLayout):
                                            Creatures.Acid_Blob,Creatures.Wolf,Creatures.Dog,Creatures.Cat,Creatures.Animated_Weapon])
             creature=newcreaturetype(color=(random.random(),random.random(),random.random(),0.8))
             creature.abilities.extend([Abilities.Conjur_Weapon(creature),Abilities.Psychokinesis(creature),Abilities.Throw(creature),
-                                       Abilities.Charge(creature),Abilities.Divine_Healing(creature)])
-            creature.inventory_add(Items.Knife())
-            creature.inventory_add(Items.Knife())
-            creature.inventory_add(Items.Knife())
+                                       Abilities.Charge(creature),Abilities.Divine_Healing(creature),Abilities.Grab(creature)])
             for i in creature.inventory:
                 creature.value_item(i)
             self.dungeonmanager.current_screen.place_creature(creature)
@@ -285,21 +283,29 @@ class Shell(FloatLayout):
 
             #The below bindings are for real
             if keycode[1]=='numpad7':
-                self.move(self.player,[-1,1])
+                self.player.move([-1,1])
+                #self.move(self.player,[-1,1])
             elif keycode[1]=='numpad8' or keycode[1]=='up':
-                self.move(self.player,[0,1])
+                self.player.move([0,1])
+                #self.move(self.player,[0,1])
             elif keycode[1]=='numpad9':
-                self.move(self.player,[1,1])
+                self.player.move([1,1])
+                #self.move(self.player,[1,1])
             elif keycode[1]=='numpad4' or keycode[1]=='left':
-                self.move(self.player,[-1,0])
+                self.player.move([-1,0])
+                #self.move(self.player,[-1,0])
             elif keycode[1]=='numpad6' or keycode[1]=='right':
-                self.move(self.player,[1,0])
+                self.player.move([1,0])
+                #self.move(self.player,[1,0])
             elif keycode[1]=='numpad1':
-                self.move(self.player,[-1,-1])
+                self.player.move([-1,-1])
+                #self.move(self.player,[-1,-1])
             elif keycode[1]=='numpad2' or keycode[1]=='down':
-                self.move(self.player,[0,-1])
+                self.player.move([0,-1])
+                #self.move(self.player,[0,-1])
             elif keycode[1]=='numpad3':
-                self.move(self.player,[1,-1])
+                self.player.move([1,-1])
+                #self.move(self.player,[1,-1])
             elif keycode[1]=='numpad5' or (keycode[1]=='.' and self.shift==False):
                 self.turn+=1
             elif keycode[1]=='.' and self.shift==True:
@@ -347,11 +353,7 @@ class Shell(FloatLayout):
                 self.keyboard_mode='status screen'
                 return
             elif keycode[1]=='l' and self.shift==False:
-                self.reticule=Reticule()
-                self.reticule.location=self.player.location
-                self.reticule.floor=self.player.floor
-                self.dungeonmanager.current_screen.cells[self.player.location[0]][self.player.location[1]].contents.append(self.reticule)
-                self.keyboard_mode='targeting'
+                Abilities.Look(self.player).select_target()
                 return
             elif keycode[1]=='p' and self.shift==False:
                 psychokenesis=Abilities.Psychokinesis(self.player)
@@ -362,7 +364,8 @@ class Shell(FloatLayout):
                 throw.select_target()
                 return
             elif keycode[1]=='s' and self.shift==True:
-                Abilities.Summon_Demonic_Weapon(self.player)
+                conjur_weapon=Abilities.Conjur_Weapon(self.player)
+                conjur_weapon.select_target()
             elif keycode[1]=='c' and self.shift==False:
                 charge=Abilities.Charge(self.player)
                 charge.select_target()
@@ -378,8 +381,18 @@ class Shell(FloatLayout):
             elif keycode[1]=='f' and self.shift==False:
                 fireball=Abilities.Fireball(self.player)
                 fireball.select_target()
+            elif keycode[1]=='f' and self.shift==True:
+                summon=Abilities.Summon_Familiar(self.player)
+                summon.select_target()
             elif keycode[1]=='m' and self.shift==False:
                 print(self.player.magic_contamination)
+            elif keycode[1]=='g' and self.shift==False:
+                grasp=Abilities.Psychic_Grab(self.player)
+                grasp.select_target()
+            elif keycode[1]=='x':
+                blood=Fluids.Blood(self.player)
+                blood.splatter(5,99)
+                self.player.blood=[100,100]
 
 
         if self.keyboard_mode=='inventory sidebar':
@@ -597,16 +610,17 @@ class Shell(FloatLayout):
         initialinventory.append(Items.LongSword(material=Steel,id=True))
         initialinventory.append(Items.WarHammer(material=Steel,id=True))
         initialinventory.append(Items.Axe(material=Steel,id=True))
+        initialinventory.append(Items.Spear(material=Steel,id=True))
         initialinventory.append(Items.Glove(material=Steel,id=True))
         initialinventory.append(Items.Glove(material=Steel,id=True))
-        initialinventory.append(Items.Chest(material=Steel,id=True))
-        initialinventory.append(Items.Armlet(material=Steel,id=True))
-        initialinventory.append(Items.Armlet(material=Steel,id=True))
+        initialinventory.append(Items.Chainmail(material=Steel,id=True))
+        initialinventory.append(Items.Chain_Armlet(material=Steel,id=True))
+        initialinventory.append(Items.Chain_Armlet(material=Steel,id=True))
         initialinventory.append(Items.Boot(material=Steel,id=True))
         initialinventory.append(Items.Boot(material=Steel,id=True))
         initialinventory.append(Items.Helm(material=Steel,id=True))
-        initialinventory.append(Items.Legging(material=Steel,id=True))
-        initialinventory.append(Items.Legging(material=Steel,id=True))
+        initialinventory.append(Items.Chain_Legging(material=Steel,id=True))
+        initialinventory.append(Items.Chain_Legging(material=Steel,id=True))
         #self.player.equip(LongSword(material=Steel,id=True),log=False)
         #self.player.equip(Glove(material=Steel,id=True),log=False)
         #self.player.equip(Glove(material=Steel,id=True),log=False)
@@ -643,20 +657,20 @@ class Shell(FloatLayout):
 
         #Some objects to play around with
         currentscreen.creaturelist=[Creatures.Human(color=(1,0,0,0.8),stats={'s':15,'t':15,'p':15,'w':15,'l':15})]
-        adversarymaterial=Wool
+        adversarymaterial=Steel
 
         foe=Creatures.Human(color=(0,1,0,0.8))
         #currentscreen.creaturelist.append(foe)
         adversary=currentscreen.creaturelist[0]
         adversary.disabled_attack_types=[Attacks.Slash_1H,Attacks.Stab_1H,Attacks.Kick,Attacks.Punch,Attacks.Bludgeon_1H,Attacks.Bite]
 
-        dummyarmor=Items.Chest(material=adversarymaterial)
+        dummyarmor=Items.Chainmail(material=adversarymaterial)
 
         currentscreen.creaturelist[0].equip(dummyarmor,log=False)
         currentscreen.creaturelist[0].equip(Items.Glove(material=adversarymaterial),log=False)
         currentscreen.creaturelist[0].equip(Items.Glove(material=adversarymaterial),log=False)
-        currentscreen.creaturelist[0].equip(Items.Armlet(material=adversarymaterial),log=False)
-        currentscreen.creaturelist[0].equip(Items.Armlet(material=adversarymaterial),log=False)
+        currentscreen.creaturelist[0].equip(Items.Chain_Armlet(material=adversarymaterial),log=False)
+        currentscreen.creaturelist[0].equip(Items.Chain_Armlet(material=adversarymaterial),log=False)
         currentscreen.creaturelist[0].equip(Items.Boot(material=adversarymaterial),log=False)
         currentscreen.creaturelist[0].equip(Items.Boot(material=adversarymaterial),log=False)
         currentscreen.creaturelist[0].equip(Items.Helm(material=adversarymaterial),log=False)
@@ -664,8 +678,8 @@ class Shell(FloatLayout):
         adversary.equip(Items.Mace(material=adversarymaterial),log=False)
         adversary.equip(Items.Shield(material=adversarymaterial),log=False)
         adversary.equip(Items.Buckler(material=adversarymaterial),log=False)
-        adversary.equip(Items.Legging(material=adversarymaterial),log=False)
-        adversary.equip(Items.Legging(material=adversarymaterial),log=False)
+        adversary.equip(Items.Chain_Legging(material=adversarymaterial),log=False)
+        adversary.equip(Items.Chain_Legging(material=adversarymaterial),log=False)
 
         for i in adversary.equipped_items:
             if i not in adversary.inventory:
@@ -748,8 +762,9 @@ class Shell(FloatLayout):
         for i in currentscreen.creaturelist:
             #Enchantments.Stealth(i)
             pass
-        Enchantments.Stealth(self.player)
-        # Enchantments.Psychic_Detection(self.player)
+        #Enchantments.Stealth(self.player)
+        Enchantments.Psychic_Detection(self.player)
+
 
 
 

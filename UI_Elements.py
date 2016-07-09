@@ -1548,7 +1548,7 @@ class CreatureStatusScreen(FloatLayout):
         if creature.stats['luc']==creature.stats['l']:
             self.luck=DisplayBox(titletext='Luck',info=str(creature.stats['luc']))
         else:
-            self.will=DisplayBox(titletext='Luck',info='{} ({})'.format(creature.stats['luc'],creature.stats['l']))
+            self.luck=DisplayBox(titletext='Luck',info='{} ({})'.format(creature.stats['luc'],creature.stats['l']))
         self.ids['attributes'].add_widget(self.strength)
         self.ids['attributes'].add_widget(self.technique)
         self.ids['attributes'].add_widget(self.perception)
@@ -1749,7 +1749,7 @@ class AttackManagementScreen(FloatLayout):
                 for i in k.attacks:
                     if type(i) not in typelist:
                         typelist.append(type(i))
-                    if i.weapon==None:
+                    if i.weapon==None or i.weapon==i.limb:
                         attacklist.append(i)
                     elif not hasattr(i.weapon,'equipped'):
                         attacklist.append(i)
@@ -2020,8 +2020,11 @@ class Cell(Widget):
         self.size_hint=(None,None)
         self.size=(cellsize,cellsize)
         self.passable=True
+        self.passage={'walk':1,'crawl':1,'fly':1,'float':1,'swim':0,'climb':0,'phase':1}
+        self.walkable=True
         self.flyable=True
-        self.swimable=True
+        self.swimable=False
+        self.climbable=False
         self.movementcost_to=1
         self.movementcost_from=0
         self.transparent=True
@@ -2090,6 +2093,7 @@ class Cell(Widget):
     def on_contents(self,instance,content):
         #print('Ah!!',instance,content)
         #print(self.contents,self.location)
+        self.passage={'walk':1,'crawl':1,'fly':1,'float':1,'swim':0,'climb':0,'phase':1}
         self.recently_seen=False
         self.creatures=[]
         self.items=[]
@@ -2108,6 +2112,11 @@ class Cell(Widget):
                 self.items.append(i)
             if isinstance(i,MapTiles.DungeonFeature):
                 self.dungeon.append(i)
+                for j in i.passage:
+                    if j in ('swim','climb'):
+                        self.passage[j]=max(self.passage[j],i.passage[j])
+                    elif i.passage[j]:
+                        self.passage[j]=min(self.passage[j],i.passage[j])
             i.location=self.location
             i.floor=self.floor
             if i.passable==False:
@@ -2118,7 +2127,9 @@ class Cell(Widget):
             if any(self.location==i.location for i in Shell.shell.player.visible_cells) and self.floor.name==Shell.shell.player.floor.name:# and self.has_targeting_reticule==False:
                 #self.recently_seen=False
                 self.update_graphics()
-        except: pass
+        except:
+            print(self.location)
+            pass
         if self.dungeon==[]:
             self.dungeon.append(MapTiles.DungeonFloor(screen=self.floor,x=self.location[0],y=self.location[1]))
         if len(self.dungeon)>1:
@@ -2132,7 +2143,8 @@ class Cell(Widget):
 
     def update_graphics(self,show_dungeon=True,show_items=True,show_creatures=True):
         updatecall=False
-        if self.recently_seen==True and self.has_targeting_reticule==False: return
+        if self.recently_seen==True and self.has_targeting_reticule==False:
+            return
         elif self.recently_seen==True and self.has_targeting_reticule==True:
             self.place_reticule()
             return
@@ -2156,17 +2168,21 @@ class Cell(Widget):
                 if not i.color: self.instructions.add(Color(1,1,1,1,group='items'))
                 else: self.instructions.add(Color(i.color[0],i.color[1],i.color[2],i.color[3],group='items'))
                 self.instructions.add(Rectangle(size=self.size,pos=self.pos,source=i.image,group='items'))
+                i.add_graphical_instructions(self)
 
         if show_creatures==True:
             self.instructions.remove_group('creatures')
             updatecall=True
             for i in self.creatures:
-                if i not in Shell.shell.player.detected_creatures: continue
+                if i not in Shell.shell.player.detected_creatures:
+                    print(i)
+                    continue
                 if self.recently_seen==False: self.detected_creatures=True
                 self.recently_seen=True
                 if not i.color: pass
                 else: self.instructions.add(Color(i.color[0],i.color[1],i.color[2],i.color[3],group='creatures'))
                 self.instructions.add(Rectangle(size=self.size,pos=self.pos,source=i.image,group='creatures'))
+                i.add_graphical_instructions(self)
 
         self.fog=False
         if updatecall==True:

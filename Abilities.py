@@ -9,8 +9,44 @@ import Enchantments
 import Attacks
 import MapTiles
 import BaseClasses
+import Creatures
 from kivy.clock import Clock
 import functools
+import NameGen
+
+#generic abilities
+
+class Look():
+    def __init__(self,caster,**kwargs):
+        self.classification=['generic']
+        self.attacker=caster
+        self.caster=Shell.shell.player
+
+    def select_target(self):
+        if self.caster==Shell.shell.player:
+            shell=Shell.shell
+            player=Shell.shell.player
+            shell.reticule=Shell.Reticule(purpose=self)
+            shell.reticule.floor=player.floor
+            shell.reticule.location=player.location
+            player.floor.cells[player.location[0]][player.location[1]].contents.append(shell.reticule)
+            shell.keyboard_mode='targeting'
+
+    def do(self,location=None,**kwargs):
+        target=None
+        for i in location.creatures:
+            target=i
+        if target!=None and target in Shell.shell.player.detected_creatures:
+            Shell.shell.status_screen=Shell.StatusScreen(target)
+            Shell.shell.status_screen.creature_status()
+            Shell.shell.add_widget(Shell.shell.status_screen)
+            Shell.shell.keyboard_mode='status screen'
+        else:
+            Shell.shell.keyboard_mode='play'
+        try:
+            Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
+            Shell.shell.reticule=None
+        except: pass
 
 #Magic abilities
 def Summon_Demonic_Weapon(summoner):
@@ -99,36 +135,104 @@ class Conjur_Weapon():
     def __init__(self,caster,**kwargs):
         self.caster=caster
         self.classification=['magic','summoning']
+        self.contamination_cost={'summoning':2}
 
     def select_target(self):
         self.do()
 
     def do(self,**kwargs):
-        for i in self.caster.enchantments:
-            if isinstance(i,Enchantments.Silenced):
-                if self.caster==Shell.shell.player:
-                    Shell.shell.log.addtext("Your magical abilities are sealed")
-                    try:
-                        Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
-                        Shell.shell.reticule=None
-                        Shell.shell.keyboard_mode='play'
-                    except: pass
-                    return
-            if isinstance(i,Enchantments.Spell_Failure):
-                if i.strength/self.caster.stats['wil']>random.random():
-                    if self.caster==Shell.shell.player:
-                        Shell.shell.log.addtext("Something disrupts your spell!")
-                        Shell.shell.turn+=1
-                        try:
-                            Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
-                            Shell.shell.reticule=None
-                            Shell.shell.keyboard_mode='play'
-                        except: pass
-                    return
+        self.abort=False
         if self.test_usability()==False:
             return
+        summoner=self.caster
+        #determine power
+        will=self.caster.stats['wil']
+        magic=self.caster.magic_contamination['total']
+        luck=summoner.stats['luc']
+        self.power=(will**0.5+1.05**magic)**2+self.caster.magic_contamination['summoning']
+        for i in self.caster.enchantments:
+            i.magic_modification(self)
+        if self.abort:
+            return
+        #determine type of weapon to create
+        weighted_weapons=[(Items.LongSword,10),(Items.Gladius,5),(Items.Knife,7),(Items.Saber,4),(Items.Claymore,4),(Items.Mace,8),
+                     (Items.WarHammer,3),(Items.Spear,5),(Items.Axe,6),(Items.QuarterStaff,3)]
+        #most of the time
+        if random.random()>0.03:
+            #choose a weapon and continue with the process
+            weapontype=Items.weighted_choice(weighted_weapons)
+            weapon=weapontype(material=Materials.Demonic_Material,id=id,power=self.power/5)
+            weapon.randomize()
+            weapon.generate_descriptions(per=Shell.shell.player.stats['per'])
+            summoner.inventory_add(weapon)
+            if summoner.player:
+                name,s='You',''
+                weapon.seen_by_player=True
+                weapon.touched_by_player=True
+                for i in summoner.limbs:
+                    if 'grasp' in i.primaryequip and i.equipment['grasp']==None:
+                        i.equip(weapon)
+                        break
+                 #if you are lucky, the object will be fully identified
+                if luck/(luck+30)>random.random():
+                    weapon.full_identify()
+            else:
+                name,s=summoner.name,'s'
+                summoner.value_item(weapon)
+                equipped_weapons=[]
+                for i in summoner.limbs:
+                    if 'grasp' in i.primaryequip:
+                        if i.equipment['grasp']!=None:
+                            equipped_weapons.append(i.equipment['grasp'])
+                        elif weapon.equipped==[]:
+                            i.equip(weapon)
+                            equipped_weapons.append(weapon)
+                #If the summoner hates it, they will unequip it in favor of empty hands
+                if summoner.item_values[weapon]<0 and weapon.equipped!=[]:
+                    summoner.action_queue.append(['unequip',weapon,weapon.equipped[0]])
+                #If the summoner has too many weapons equipped, they will unequip the least desirable weapon
+                elif len(equipped_weapons)>summoner.iprefs['desired weapons']:
+                    least_desired_weapon=equipped_weapons[0]
+                    for i in equipped_weapons:
+                        if summoner.item_values[i]<summoner.item_values[least_desired_weapon]:
+                            least_desired_weapon=i
+                    for i in least_desired_weapon.equipped:
+                        summoner.action_queue.append(['unequip',least_desired_weapon,i])
+                #If the summoned item went to the inventory, but the summoner WANTS to equip it
+                elif weapon not in equipped_weapons:
+                    least_desired_weapon=weapon
+                    for i in equipped_weapons:
+                        if summoner.item_values[i]<summoner.item_values[least_desired_weapon]:
+                            least_desired_weapon=i
+                    if least_desired_weapon!=weapon:
+                        for i in least_desired_weapon.equipped:
+                            summoner.action_queue.append(['unequip',least_desired_weapon,i])
+                            limb=i
+                        summoner.action_queue.append(['equip',weapon,limb])
+
+
+
+
+            if summoner in Shell.shell.player.visible_creatures:
+                Shell.messages.append('{} summon{} a {}'.format(name,s,weapon.name))
+
+            Enchantments.Unstable(weapon,strength=self.power/5+luck**0.5)
+            Enchantments.Bound(weapon)
+        if weapon.equipped!=[]:
+            weapon.on_equip()
+
+
+        #but sometimes you summon a limb instead
+        elif random.random()>0.1:
+            pass
+        #and if you are unlucky, you'll summon a hostile horror
+        else:
+            pass
+        summoner.magic_contamination['summoning']+=2
+
+
+
         self.caster.on_ability_use(self)
-        Summon_Demonic_Weapon(self.caster)
         if self.caster==Shell.shell.player:
             Shell.shell.turn+=1
 
@@ -161,6 +265,7 @@ class Controlled_Teleport():
         self.classification=['magic','arcane','ranged']
         self.target_type='select'
         self.targets=[]
+        self.contamination_cost={'arcane':5}
 
     def select_target(self):
         if self.caster==Shell.shell.player:
@@ -177,28 +282,18 @@ class Controlled_Teleport():
             shell.keyboard_mode='targeting'
 
     def do(self,location=None,**kwargs):
-        for i in self.caster.enchantments:
-            if isinstance(i,Enchantments.Silenced):
-                if self.caster==Shell.shell.player:
-                    Shell.shell.log.addtext("Your magical abilities are sealed")
-                    try:
-                        Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
-                        Shell.shell.reticule=None
-                        Shell.shell.keyboard_mode='play'
-                    except: pass
-                    return
-            if isinstance(i,Enchantments.Spell_Failure):
-                if i.strength/self.caster.stats['wil']>random.random():
-                    if self.caster==Shell.shell.player:
-                        Shell.shell.log.addtext("Something disrupts your spell!")
-                        Shell.shell.turn+=1
-                        try:
-                            Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
-                            Shell.shell.reticule=None
-                            Shell.shell.keyboard_mode='play'
-                        except: pass
-                    return
+        self.abort=False
         if self.test_usability()==False:
+            return
+        self.power=(self.caster.stats['wil']+1.05**self.caster.magic_contamination['total'])**2+self.caster.magic_contamination['arcane']
+        for i in self.caster.enchantments:
+            if self.target_type=="location": i.magic_modification(self)
+        if self.abort:
+            try:
+                Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
+                Shell.shell.reticule=None
+                Shell.shell.keyboard_mode='play'
+            except: pass
             return
         if self.target_type=='select' and self.caster==Shell.shell.player:
             self.startpos=location
@@ -211,7 +306,7 @@ class Controlled_Teleport():
             return
         if location==None:
             location=random.choice(self.caster.floor.nonindexedcells)
-        accuracy=(self.caster.stats['wil']+self.caster.magic_contamination['total'])**0.5
+        accuracy=self.power/4
         distance=location.distance_to(self.startpos)
         targetloc=location.location.copy()
         self.caster.on_ability_use(self)
@@ -267,6 +362,7 @@ class Pain():
     def __init__(self,caster,**kwargs):
         self.caster=caster
         self.classification=['magic','dark','ranged']
+        self.contamination_cost={'dark':1}
 
     def select_target(self):
         if self.caster==Shell.shell.player:
@@ -279,32 +375,21 @@ class Pain():
             shell.keyboard_mode='targeting'
 
     def do(self,location=None,**kwargs):
-        for i in self.caster.enchantments:
-            if isinstance(i,Enchantments.Silenced):
-                if self.caster==Shell.shell.player:
-                    Shell.shell.log.addtext("Your magical abilities are sealed")
-                    try:
-                        Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
-                        Shell.shell.reticule=None
-                        Shell.shell.keyboard_mode='play'
-                    except: pass
-                    return
-            if isinstance(i,Enchantments.Spell_Failure):
-                if i.strength/self.caster.stats['wil']>random.random():
-                    if self.caster==Shell.shell.player:
-                        Shell.shell.log.addtext("Something disrupts your spell!")
-                        Shell.shell.turn+=1
-                        try:
-                            Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
-                            Shell.shell.reticule=None
-                            Shell.shell.keyboard_mode='play'
-                        except: pass
-                    return
+        self.abort=False
         rootpower=self.caster.stats['wil']**0.5+1.05**self.caster.magic_contamination['total']
-        power=rootpower*rootpower+self.caster.magic_contamination['dark']
+        self.power=rootpower*rootpower+self.caster.magic_contamination['dark']
+        for i in self.caster.enchantments:
+            i.magic_modification(self)
+        if self.abort:
+            try:
+                Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
+                Shell.shell.reticule=None
+                Shell.shell.keyboard_mode='play'
+            except: pass
+            return
         startcell=self.caster.floor.cells[self.caster.location[0]][self.caster.location[1]]
         distance=location.distance_to(startcell)
-        if distance>3*power:
+        if distance>3*self.power:
             Shell.shell.log.addtext("That is too far away")
             return
         if location.creatures==[] or not any(i in Shell.shell.player.detected_creatures for i in location.creatures):
@@ -318,7 +403,7 @@ class Pain():
         for i in location.creatures:
             i.magic_contamination['dark']+=0.5
             if i.feels_pain:
-                i.pain+=abs(random.gauss(2*power*self.caster.stats['wil']/i.stats['luc'],self.caster.magic_contamination['total']))
+                i.pain+=abs(random.gauss(3*self.power*self.caster.stats['wil']/(i.stats['wil']*i.stats['luc'])**0.5,self.caster.magic_contamination['total']))
                 if i==Shell.shell.player:
                     Shell.messages.append("".join([message,"Pain shoots through your body!"]))
                 if i in Shell.shell.player.visible_creatures:
@@ -368,29 +453,18 @@ class Fireball():
             shell.keyboard_mode='targeting'
 
     def do(self,location=None,**kwargs):
-        for i in self.caster.enchantments:
-            if isinstance(i,Enchantments.Silenced):
-                if self.caster==Shell.shell.player:
-                    Shell.shell.log.addtext("Your magical abilities are sealed")
-                    try:
-                        Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
-                        Shell.shell.reticule=None
-                        Shell.shell.keyboard_mode='play'
-                    except: pass
-                    return
-            if isinstance(i,Enchantments.Spell_Failure):
-                if i.strength/self.caster.stats['wil']>random.random():
-                    if self.caster==Shell.shell.player:
-                        Shell.shell.log.addtext("Something disrupts your spell!")
-                        Shell.shell.turn+=1
-                        try:
-                            Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
-                            Shell.shell.reticule=None
-                            Shell.shell.keyboard_mode='play'
-                        except: pass
-                    return
+        self.abort=False
         self.killingblow=False
-        power=(self.caster.stats['wil']**0.5+1.05**self.caster.magic_contamination['total'])**2+self.caster.magic_contamination['elemental']
+        self.power=(self.caster.stats['wil']**0.5+1.05**self.caster.magic_contamination['total'])**2+self.caster.magic_contamination['elemental']
+        for i in self.caster.enchantments:
+            i.magic_modification(self)
+        if self.abort:
+            try:
+                Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
+                Shell.shell.reticule=None
+                Shell.shell.keyboard_mode='play'
+            except: pass
+            return
         line=BaseClasses.get_line(self.caster.location,location.location)
         #if len(line)>1: line.pop(0)
         for position in line:
@@ -405,10 +479,10 @@ class Fireball():
                 break
 
         distance_to=location.distance_to(self.caster.floor.cells[self.caster.location[0]][self.caster.location[1]])
-        blast_radius=power**(1/3)
+        blast_radius=self.power**(1/3)
         circle=self.caster.floor.get_circle(location.location,blast_radius,require_los=True)
-        temperature=(400*(power)**0.5)*abs(random.gauss(self.caster.stats['wil'],self.caster.magic_contamination['total']**0.5)/(self.caster.stats['wil']+distance_to))
-        heat=(power**0.5)/(random.triangular(1,1+distance_to,1))
+        temperature=(400*(self.power)**0.5)*abs(random.gauss(self.caster.stats['wil'],self.caster.magic_contamination['total']**0.5)/(self.caster.stats['wil']+distance_to))
+        heat=(self.power**0.5)/(random.triangular(1,1+distance_to,1))
 
         travel_line=BaseClasses.get_line(self.caster.location,location.location)
         if any(self.caster.floor.cells[i[0]][i[1]] in Shell.shell.player.visible_cells for i in travel_line):
@@ -449,6 +523,64 @@ class Fireball():
         self.caster.on_ability_use(self)
         self.caster.magic_contamination['elemental']+=3
 
+
+
+        try:
+            Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
+            Shell.shell.reticule=None
+            Shell.shell.keyboard_mode='play'
+        except: pass
+        if self.caster==Shell.shell.player: Shell.shell.turn+=1
+
+class Summon_Familiar():
+    def __init__(self,caster,**kwargs):
+        self.caster=caster
+        self.classification=['magic','summoning']
+        self.contamination_cost={'summoning':5}
+
+    def select_target(self):
+        if any(isinstance(i,Enchantments.Familiar_Guidance) for i in self.caster.enchantments):
+            if self.caster==Shell.shell.player:
+                Shell.shell.log.addtext("You already have a familiar!")
+            return
+        self.do()
+
+    def do(self,location=None,**kwargs):
+        self.abort=False
+        self.killingblow=False
+        self.power=(self.caster.stats['wil']**0.5+1.05**self.caster.magic_contamination['total'])**2+self.caster.magic_contamination['summoning']
+
+        for i in self.caster.enchantments:
+            i.magic_modification(self)
+        if self.abort:
+            return
+
+        possible_familiars={Creatures.Owl:25,Creatures.Rat:5,Creatures.Falcon:15,Creatures.Hawk:15,Creatures.Cat:20,
+                            Creatures.Dog:25,Creatures.Giant_Rat:30,Creatures.Giant_Ant:30,Creatures.Wolf:35,
+                            Creatures.Giant_Spider:45, Creatures.Dire_Wolf:50,Creatures.Ostrich:60,
+                            Creatures.Elephant_Bird:80}
+        familiar=None
+        while familiar==None:
+            n=random.randint(0,int(self.power))
+            f=random.choice(list(possible_familiars.keys()))
+            if possible_familiars[f]<n:
+                if self.caster==Shell.shell.player: familiar=f(name=NameGen.namegen(random.choice(['m','f'])))
+                else: familiar=f()
+        familiar.master=self.caster
+        self.caster.minions.append(familiar)
+        self.caster.floor.place_creature(familiar,location=self.caster.location,retry='near')
+        self.caster.floor.creaturelist.append(familiar)
+        Enchantments.Familiar_Spirit(familiar,owner=self.caster)
+
+        self.caster.on_ability_use(self)
+        self.caster.magic_contamination['summoning']+=5
+
+        if self.caster==Shell.shell.player:
+            Shell.messages.append("You summon {}, the {} from the void!".format(familiar.name,familiar.basicname))
+        elif self.caster in Shell.shell.player.visible_creatures:
+            Shell.messages.append("{} summons a companion from the void!".format(self.caster.name))
+            if familiar in Shell.shell.player.visible_creatures:
+                Shell.messages.append("{} suddenly appears!".format(familiar.name))
 
 
         try:
@@ -587,6 +719,8 @@ class Psychokinesis():
             value=0.7*5/distance
         value*=self.caster.focus[0]/self.caster.focus[1]
         if 'psychic' in self.caster.classification: value*=1/0.7
+        pref=self.caster.ai_preferences['psychic']*self.caster.ai_preferences['ranged']
+        value=value*pref/(value+pref)
         return (value,self)
 
     def test_usability(self):
@@ -595,6 +729,89 @@ class Psychokinesis():
     def enemy_activation(self):
         self.do(location=self.caster.target.floor.cells[self.caster.target.location[0]][self.caster.target.location[1]])
 
+class Psychic_Grab():
+    def __init__(self,caster,**kwargs):
+        self.caster=caster
+        self.classification=['physical']
+
+    def select_target(self):
+        if self.caster==Shell.shell.player:
+            shell=Shell.shell
+            player=Shell.shell.player
+            shell.reticule=Shell.Reticule(purpose=self)
+            shell.reticule.floor=player.floor
+            shell.reticule.location=player.location
+            player.floor.cells[player.location[0]][player.location[1]].contents.append(shell.reticule)
+            shell.keyboard_mode='targeting'
+
+    def do(self,location=None,**kwargs):
+        self.damagefactor=1
+        self.holding_limb=Limbs.Psychic_Grasp(self.caster.stats,name="mind",owner=self.caster)
+        if location.creatures!=[]:
+            target=location.creatures[0]
+            attempts=0
+            limb_to_grab=BaseClasses.targetchoice(target)
+            while attempts<self.caster.stats['tec'] and 'graspable' not in limb_to_grab.target_class:
+                limb_to_grab=BaseClasses.targetchoice(target)
+            self.target=limb_to_grab.owner
+            self.held_limb=limb_to_grab
+            gripsize=self.holding_limb.stats['tec']/10
+            chance=self.target.stats['str']*self.held_limb.radius/(self.damagefactor*
+                self.holding_limb.stats['str']*self.holding_limb.ability*gripsize*self.held_limb.length+0.01)
+            if chance<random.random():
+                grasp=Enchantments.Held_In_Grasp(self.target,holding_limb=self.holding_limb,held_limb=self.held_limb,mobile_grabber=True)
+                grasp.on_turn()
+                self.holding_limb.vanish_case=grasp.grasping
+                if self.caster==Shell.shell.player:
+                    Shell.messages.append("You grab {}'s {} with your {}".format(
+                        self.target.name,self.held_limb.name,self.holding_limb.name))
+                elif self.target==Shell.shell.player:
+                    Shell.messages.append("{} grabs your {} with its {}".format(self.caster.name,self.held_limb.name,self.holding_limb.name))
+                elif self.caster in Shell.shell.player.visible_creatures and self.target in Shell.shell.player.visible_creatures:
+                    Shell.messages.apend("{} grabs {}'s {} with its {}".format(self.caster.name,self.target.name,
+                                                                               self.held_limb.name,self.holding_limb.name))
+            else:
+                if self.caster==Shell.shell.player:
+                    Shell.messages.append("You attempt to grab {}'s {} with your {}, but {} struggles free!".format(
+                        self.target.name,self.held_limb.name,self.holding_limb.name,self.target.name))
+                elif self.target==Shell.shell.player:
+                    Shell.messages.append("{} attempts to grab your {} with its {}, but you break free!".format(
+                        self.caster.name,self.held_limb.name,self.holding_limb.name))
+                elif self.caster in Shell.shell.player.visible_creatures and self.target in Shell.shell.player.visible_creatures:
+                    Shell.messages.apend("{} attempts to grab {}'s {} with its {}, but cannot hold fast!".format(
+                        self.caster.name,self.target.name,self.held_limb.name,self.holding_limb.name))
+
+        try:
+            Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
+            Shell.shell.reticule=None
+            Shell.shell.keyboard_mode='play'
+        except: pass
+        self.target.hostilitycheck(self.caster)
+        self.target.affinity[self.caster]-=1
+        if self.caster==Shell.shell.player: Shell.shell.turn+=1
+
+    def decide(self):
+        if self.test_usability()==False:
+            return (0,self)
+        value=0
+        if not isinstance(self.caster.target,BaseClasses.Creature) or self.caster.hostilitycheck(self.caster.target)==False:
+            return (value,self)
+        s_adv=self.caster.stats['per']/self.caster.target.stats['str']
+        value=s_adv/(2+s_adv)
+        for i in self.caster.target.enchantments:
+            if isinstance(i,Enchantments.Held_In_Grasp) and i.holding_limb in self.caster.limbs:
+                value=value/5
+        value=value*self.caster.ai_preferences['psychic']/(value+self.caster.ai_preferences['psychic'])
+        return (value,self)
+
+    def test_usability(self):
+        if self.caster.focus[0]<30:
+            return False
+        else:
+            return True
+
+    def enemy_activation(self):
+        self.do(location=self.caster.target.floor.cells[self.caster.target.location[0]][self.caster.target.location[1]])
 
 #Physical skills are handled just like attacks. They must have basetarget and target attributes, force, pressure, etc
 class Throw():
@@ -902,9 +1119,12 @@ class Throw():
             return(0,self)
         if len(self.caster.equipped_items)>=len(self.caster.inventory):
             return(0,self)
-        line=BaseClasses.get_line(self.caster.location,self.caster.target.location)
-        line.pop(0)
-        line.pop(len(line)-1)
+        try:
+            line=BaseClasses.get_line(self.caster.location,self.caster.target.location)
+            line.pop(0)
+            line.pop(len(line)-1)
+        except:
+            return(0,self)
         if any(self.caster.floor.cells[i[0]][i[1]].passable==False for i in line):
             return(0,self)
         #We have established that we have unequipped items and the means to throw them
@@ -913,9 +1133,9 @@ class Throw():
         distance=targetcell.distance_to(castercell)
         rootstrength=self.caster.stats['str']**0.5
         if distance<1.42:
-            value+=0.05
+            value+=0.1
         elif distance<=self.caster.stats['str']:
-            value+=rootstrength/distance
+            value+=2*rootstrength/distance
         item_idealness=-50
         for i in self.caster.inventory:
             if i not in self.caster.equipped_items:
@@ -926,10 +1146,11 @@ class Throw():
                 item_idealness=max(item_idealness,new_idealness)
                 if new_idealness==item_idealness:
                     self.enemyweapon=i
-        value+=item_idealness/10
-        value*=self.caster.stamina[0]/self.caster.stamina[1]
+        value+=item_idealness
+        pref=self.caster.ai_preferences['throw']*self.caster.ai_preferences['ranged']
+        value=value*pref/(value+pref)
         if 'thrower' in self.caster.classification: value*=2
-        print('throwing likelihood is ',value)
+        #print('throwing likelihood is ',value)
         return (value,self)
 
     def enemy_activation(self):
@@ -1008,6 +1229,7 @@ class Charge():
             shell.keyboard_mode='targeting'
 
     def do(self,location=None,**kwargs):
+        animate=False
         abort=False
         line=BaseClasses.get_line(self.caster.location,location.location)
         #if len(line)>1: line.pop(0)
@@ -1022,7 +1244,9 @@ class Charge():
                 for i in range(lineindex+1,len(line)):
                     line.pop(len(line)-1)
                 break
-
+        floor=self.caster.floor
+        if any(floor.cells[i[0]][i[1]] in Shell.shell.player.visible_cells for i in line):
+            animate=True
 
         strikeables=[]
         target=None
@@ -1119,7 +1343,10 @@ class Charge():
             elif self.caster in Shell.shell.player.visible_creatures: Shell.messages.append("{} rushes the {} and attacks with {}".format(self.caster.name,target.name,attack.name))
             attack.do(target,parryable=0,blockable=0,call_before_evasion=self.call_before_evasion)
 
-
+        if self.caster in Shell.shell.player.detected_creatures:
+            self.old_detected=True
+        else:
+            self.old_detected=False
         self.caster.stamina[0]-=staminacost
         self.caster.focus[0]-=3
         self.caster.combataction=True
@@ -1130,10 +1357,15 @@ class Charge():
         endcell=self.caster.floor.cells[line[lineindex-1][0]][line[lineindex-1][1]]
         self.endcell=endcell
         endcell.passable=False
-        self.caster.floor.animate_travel(self.caster,startcell,endcell,slowness=15)
-        Clock.schedule_once(lambda dx: endcell.contents.append(self.caster),1/5)
-        self.caster.location=endcell.location
-        Clock.schedule_once(lambda dx: self.wrapup(),1/4)
+        if animate==True:
+            self.caster.floor.animate_travel(self.caster,startcell,endcell,slowness=15)
+            Clock.schedule_once(lambda dx: endcell.contents.append(self.caster),1/5)
+            self.caster.location=endcell.location
+            Clock.schedule_once(lambda dx: self.wrapup(),13/60)
+        else:
+            endcell.contents.append(self.caster)
+            self.caster.location=endcell.location
+            self.wrapup()
 
 
 
@@ -1189,6 +1421,8 @@ class Charge():
         #We have established that we are able to charge the target
         value=1
         value-=staminacost/self.caster.stamina[0]
+        pref=self.caster.ai_preferences['melee']*self.caster.ai_preferences['approach']
+        value=value*pref/(value+pref)
         return (value, self)
 
         return (value,self)
@@ -1199,6 +1433,8 @@ class Charge():
     def wrapup(self,*args):
         if self.caster in self.startcell.contents: self.startcell.contents.remove(self.caster)
         self.startcell.on_contents(None,None)
+        Shell.shell.player.sense_awareness()
+        self.caster.floor.cells[self.caster.location[0]][self.caster.location[1]].on_contents(None,None)
         if self.caster==Shell.shell.player:
             Shell.shell.keyboard_mode='play'
             Shell.shell.turn+=1
@@ -1216,6 +1452,128 @@ class Charge():
         attack.energy+=0.5*self.caster.movemass*self.chargespeed*self.chargespeed
         attack.time*=0.5
 
+class Grab():
+    def __init__(self,caster,**kwargs):
+        self.caster=caster
+        self.classification=['physical']
+
+    def select_target(self):
+        if self.caster==Shell.shell.player:
+            shell=Shell.shell
+            player=Shell.shell.player
+            shell.reticule=Shell.Reticule(purpose=self)
+            shell.reticule.floor=player.floor
+            shell.reticule.location=player.location
+            player.floor.cells[player.location[0]][player.location[1]].contents.append(shell.reticule)
+            shell.keyboard_mode='targeting'
+
+    def do(self,location=None,**kwargs):
+        possible_limbs=[]
+        self.damagefactor=1
+        for i in self.caster.limbs:
+            if i.grasp==True and i.equipment['grasp']==None and i.ability>0:
+                possible_limbs.append(i)
+            elif 'grasping' in i.target_class and i.ability>0:
+                possible_limbs.append(i)
+        if location.creatures!=[] and possible_limbs!=[]:
+            self.holding_limb=random.choice(possible_limbs)
+            target=location.creatures[0]
+            attempts=0
+            limb_to_grab=BaseClasses.targetchoice(target)
+            while attempts<self.caster.stats['tec'] and 'graspable' not in limb_to_grab.target_class:
+                limb_to_grab=BaseClasses.targetchoice(target)
+            self.target=limb_to_grab.owner
+            self.held_limb=limb_to_grab
+            gripsize=self.holding_limb.length
+            if hasattr(self.holding_limb,'dexterity'):
+                gripsize*=gripsize
+                for i in self.holding_limb.limbs:
+                    gripsize+=i.length*i.length
+                gripsize=gripsize**0.5
+            self.caster.stamina[0]-=self.caster.movemass/self.caster.stats['str']
+            self.time=self.caster.movemass/(self.caster.balance*self.caster.stats['str'])
+            self.attacker=self.caster
+            self.arpen=-1
+            self.basetarget=self.held_limb
+            self.accuracy=self.caster.stats['tec']
+            self.dodged=False
+            self.target.evasion(self,blockable=0,parryable=0,surprisable=0,exploitable=0)
+            chance=self.target.stats['str']*self.held_limb.radius/(self.damagefactor*
+                self.holding_limb.stats['str']*self.holding_limb.ability*gripsize*self.held_limb.length+0.01)
+            if self.dodged==True:
+                if self.caster==Shell.shell.player:
+                    Shell.messages.append("You attempt to grab {} with your {}, but {} avoids the grab!".format(
+                        self.target.name,self.holding_limb.name,self.target.name))
+                elif self.target==Shell.shell.player:
+                    Shell.messages.append("{} attempts to grab you with its {}, but you dodge!".format(
+                        self.caster.name,self.holding_limb.name))
+                elif self.caster in Shell.shell.player.visible_creatures and self.target in Shell.shell.player.visible_creatures:
+                    Shell.messages.apend("{} attempts to grab {} with its {}, but the grab is avoided!".format(
+                        self.caster.name,self.target.name,self.holding_limb.name))
+            elif chance<random.random():
+                grasp=Enchantments.Held_In_Grasp(self.target,holding_limb=self.holding_limb,held_limb=self.held_limb)
+                grasp.on_turn()
+                if self.caster==Shell.shell.player:
+                    Shell.messages.append("You grab {}'s {} with your {}".format(
+                        self.target.name,self.held_limb.name,self.holding_limb.name))
+                elif self.target==Shell.shell.player:
+                    Shell.messages.append("{} grabs your {} with its {}".format(self.caster.name,self.held_limb.name,self.holding_limb.name))
+                elif self.caster in Shell.shell.player.visible_creatures and self.target in Shell.shell.player.visible_creatures:
+                    Shell.messages.apend("{} grabs {}'s {} with its {}".format(self.caster.name,self.target.name,
+                                                                               self.held_limb.name,self.holding_limb.name))
+            else:
+                if self.caster==Shell.shell.player:
+                    Shell.messages.append("You attempt to grab {}'s {} with your {}, but {} struggles free!".format(
+                        self.target.name,self.held_limb.name,self.holding_limb.name,self.target.name))
+                elif self.target==Shell.shell.player:
+                    Shell.messages.append("{} attempts to grab your {} with its {}, but you break free!".format(
+                        self.caster.name,self.held_limb.name,self.holding_limb.name))
+                elif self.caster in Shell.shell.player.visible_creatures and self.target in Shell.shell.player.visible_creatures:
+                    Shell.messages.apend("{} attempts to grab {}'s {} with its {}, but cannot hold fast!".format(
+                        self.caster.name,self.target.name,self.held_limb.name,self.holding_limb.name))
+
+        try:
+            Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
+            Shell.shell.reticule=None
+            Shell.shell.keyboard_mode='play'
+        except: pass
+        self.target.hostilitycheck(self.caster)
+        self.target.affinity[self.caster]-=1
+        if self.caster==Shell.shell.player: Shell.shell.turn+=1
+
+    def decide(self):
+        if self.test_usability()==False:
+            return (0,self)
+        value=0
+        if not isinstance(self.caster.target,BaseClasses.Creature) or self.caster.hostilitycheck(self.caster.target)==False:
+            return (value,self)
+        if self.caster.location[0]-self.caster.target.location[0] not in [-1,0,1]:
+            return (value,self)
+        if self.caster.location[1]-self.caster.target.location[1] not in [-1,0,1]:
+            return (value,self)
+        s_adv=self.caster.stats['str']/self.caster.target.stats['str']
+        value=s_adv/(2+s_adv)
+        for i in self.caster.target.enchantments:
+            if isinstance(i,Enchantments.Held_In_Grasp) and i.holding_limb in self.caster.limbs:
+                value=value/5
+        value=value*self.caster.ai_preferences['grapple']/(value+self.caster.ai_preferences['grapple'])
+        return (value,self)
+
+
+    def test_usability(self):
+        possible_limbs=[]
+        for i in self.caster.limbs:
+            if i.grasp==True and i.equipment['grasp']==None and i.ability>0:
+                possible_limbs.append(i)
+            elif 'grasping' in i.target_class and i.ability>0:
+                possible_limbs.append(i)
+        if possible_limbs==[]:
+            return False
+        else:
+            return True
+
+    def enemy_activation(self):
+        self.do(location=self.caster.target.floor.cells[self.caster.target.location[0]][self.caster.target.location[1]])
 
 #Divine skills must have a targetcreature attribute and have a type attribute which is 'offensive' 'defensive' or 'mixed
 #Must also have a 'difficulty' attribute, with higher difficulties corresponding to greater failure rates and/or costs
@@ -1322,7 +1680,7 @@ class Divine_Healing():
         for i in self.caster.visible_creatures:
             if self.caster.hostilitycheck(i)==True:
                 continue
-            if self.caster.affinity[i]>0:
+            if self.caster.affinity[i]>0 and i.alive:
                 if i.damage_level>value:
                     self.enemytarget=i
                     value=i.damage_level
@@ -1335,6 +1693,8 @@ class Divine_Healing():
             i.favor[self.caster]=backupfavor[i]
         if test==False:
             return (0,self)
+        pref=self.caster.ai_preferences['heal']*self.caster.ai_preferences['divine']
+        value=value*pref/(value+pref)
         return (2*value,self)
 
     def test_usability(self):

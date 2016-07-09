@@ -44,6 +44,8 @@ class Bone_Material(BaseClasses.Material):
         self.shear=3.3
         self.shear_strength=30*self.quality
         self.poisonable=True
+        self.rottable=True
+        self.rot_resistance=1
         self.electric_conduction=True
         self.heat_conduction=0.5
         self.dissipationfactor=4
@@ -146,6 +148,39 @@ class Keratin(BaseClasses.Material):
         self.fracture_toughness=(self.youngs*self.fracture_energy)**0.5
         self.shear=0.8
         self.shear_strength=15*self.quality
+        self.rottable=True
+        self.rot_resistance=3
+        self.electric_conduction=True
+        self.heat_conduction=0.0005
+        self.dissipationfactor=4
+        self.maxedge=(10**-7)/self.quality
+        self.damagetype=['crack','break','crush','cut','shatter','sever']
+        self.magic_affinity=7
+        self.identification_difficulty=5
+
+class Chitin(BaseClasses.Material):
+    def __init__(self,thickness=1,quality=1,**kwargs):
+        super().__init__(**kwargs)
+        self.color=(0.8,0.8,0.8,1)
+        self.poisson=0.31
+        self.basicname='chitin'
+        self.name='chitin'
+        self.heat_reaction='burn'
+        self.burn_temp=600
+        self.maxquality=5
+        self.default_thickness=0.02
+        self.quality=min(quality,self.maxquality)
+        self.thickness=thickness
+        self.density=1425
+        self.youngs=1
+        self.fracture_energy=20*self.quality
+        self.tensile_strength=20*self.quality
+        self.mode='brittle'
+        self.fracture_toughness=(self.youngs*self.fracture_energy)**0.5
+        self.shear=0.2
+        self.shear_strength=15*self.quality
+        self.rottable=True
+        self.rot_resistance=3
         self.electric_conduction=True
         self.heat_conduction=0.0005
         self.dissipationfactor=4
@@ -178,6 +213,7 @@ class Flesh_Material(BaseClasses.Material):
         self.shear=0.02
         self.shear_strength=0.6*self.quality
         self.poisonable=True
+        self.rottable=True
         self.electric_conduction=True
         self.heat_conduction=0.25
         self.burn_resistance=80
@@ -255,6 +291,8 @@ class Slime(BaseClasses.Material):
         self.shear=0.01
         self.shear_strength=0.6*self.quality
         self.poisonable=True
+        self.rottable=True
+        self.rot_resistance=2
         self.electric_conduction=True
         self.heat_reaction='burn'
         self.burn_temp=800
@@ -652,6 +690,8 @@ class Wood(BaseClasses.Material):
         self.fracture_toughness=(self.youngs*self.fracture_energy)**0.5
         self.shear=2
         self.shear_strength=10*self.quality
+        self.rottable=True
+        self.rot_resistance=3
         self.electric_conduction=False
         self.heat_reaction='ignite'
         self.heat_conduction=0.1
@@ -683,10 +723,12 @@ class Leather(BaseClasses.Material):
         self.fracture_toughness=(self.youngs*self.fracture_energy)**0.5
         self.shear=0.1
         self.shear_strength=0.6*self.tensile_strength
+        self.rottable=True
+        self.rot_resistance=2
         self.electric_conduction=False
         self.heat_reaction='ignite'
         self.heat_conduction=0.14
-        self.burn_temp=200
+        self.burn_temp=206
         self.dissipationfactor=1
         self.maxedge=0.01
         self.damagetype=['pierce','cut']
@@ -716,6 +758,8 @@ class Cotton(BaseClasses.Material):
         self.fracture_toughness=(self.youngs*self.fracture_energy)**0.5
         self.shear=2.62*weave/(weave+20)#0.0023
         self.shear_strength=0.2*self.tensile_strength
+        self.rottable=True
+        self.rot_resistance=3
         self.electric_conduction=False
         self.heat_reaction='ignite'
         self.heat_conduction=0.05
@@ -748,6 +792,8 @@ class Wool(BaseClasses.Material):
         self.fracture_toughness=(self.youngs*self.fracture_energy)**0.5
         self.shear=1.31*weave/(weave+20) #0.00023   #1.31 for fiber
         self.shear_strength=0.2*self.tensile_strength
+        self.rottable=True
+        self.rot_resistance=3
         self.electric_conduction=False
         self.heat_reaction='ignite'
         self.heat_conduction=0.07
@@ -763,6 +809,7 @@ class Hair_Material(Wool):
         super().__init__(thickness,quality,weave=weave,**kwargs)
         self.basicname='hair'
         self.name='hair'
+        self.mode='hair'
         self.acid_resistance=5
         self.density=400
         self.identification_difficulty=5
@@ -772,8 +819,44 @@ class Fur(Wool):
         super().__init__(thickness,quality,weave=weave,**kwargs)
         self.basicname='hair'
         self.name='fur'
+        self.mode='hair'
         self.acid_resistance=5
         self.density=300
+        self.identification_difficulty=5
+
+class Feather(BaseClasses.Material):
+    #Youngs modulus of feather material maxes out at 2.5 GPa for pure feather keratin. Substantially less, of course,
+    #when the air space between feathers is accounted for. Estimating at 0.1. Research indicates a best-guess
+    #poisson ratio of 0.4
+    def __init__(self,thickness=1,quality=1,**kwargs):
+        super().__init__(**kwargs)
+        self.color=(0.9,0.9,0.9,1)
+        self.poisson=0.4
+        self.acid_resistance=6
+        self.default_thickness=0.01
+        self.basicname='feather'
+        self.name='feather'
+        self.maxquality=10
+        self.quality=min(quality,self.maxquality)
+        self.thickness=thickness
+        self.density=0.0025
+        self.youngs=0.1
+        self.fracture_energy=10*self.quality
+        self.tensile_strength=203*self.quality
+        self.mode='fabric'
+        self.fracture_toughness=(self.youngs*self.fracture_energy)**0.5
+        self.shear=0.035
+        self.shear_strength=0.2*self.tensile_strength
+        self.rottable=True
+        self.rot_resistance=3
+        self.electric_conduction=False
+        self.heat_reaction='ignite'
+        self.heat_conduction=0.05
+        self.burn_temp=400
+        self.dissipationfactor=1
+        self.maxedge=0.01
+        self.damagetype=['pierce','cut']
+        self.magic_affinity=7
         self.identification_difficulty=5
 
 class Silk(BaseClasses.Material):
@@ -798,6 +881,8 @@ class Silk(BaseClasses.Material):
         self.fracture_toughness=(self.youngs*self.fracture_energy)**0.5
         self.shear=3.81*weave/(weave+10)#0.0033  #3.81 for individual thread
         self.shear_strength=0.2*self.tensile_strength
+        self.rottable=True
+        self.rot_resistance=4
         self.electric_conduction=False
         self.heat_reaction='burn'
         self.heat_conduction=0.1
@@ -830,6 +915,8 @@ class Spider_Silk(BaseClasses.Material):
         self.fracture_toughness=(self.youngs*self.fracture_energy)**0.5
         self.shear=2.38*weave/(weave+10)#0.004  #2.38 for pure fiber
         self.shear_strength=0.2*self.tensile_strength
+        self.rottable=True
+        self.rot_resistance=5
         self.electric_conduction=False
         self.heat_reaction='burn'
         self.heat_conduction=1
@@ -879,6 +966,8 @@ class Demonic_Material(BaseClasses.Material):
         self.acid_reaction=random.choice(['embrittle','corrode'])
         self.wetdamage=random.choice(['rust',None,None])
         self.poisson=random.random()*0.49
+        self.rottable=random.choice([True,False,False])
+        self.rot_resistance=max(int(random.triangular(0,power,0)),1)
         self.name='demonic'
         self.maxquality=random.random()*power
         self.quality=min(quality,self.maxquality)
@@ -925,6 +1014,36 @@ class Aether(BaseClasses.Material):
         self.poisson=0.25
         self.name='aether'
         self.basicname='magical'
+        self.maxquality=100
+        self.quality=min(power,self.maxquality)
+        self.thickness=thickness
+        self.density=1
+        self.youngs=1
+        self.fracture_energy=5*power
+        self.tensile_strength=1
+        self.mode='brittle'
+        self.fracture_toughness=(self.youngs*self.fracture_energy)**0.5
+        self.shear=1
+        self.shear_strength=1
+        self.electric_conduction=True
+        self.heat_conduction=500
+        self.burn_temp=300*power
+        self.dissipationfactor=1
+        self.maxedge=(5*10**-8)/self.quality
+        self.damagetype=['dent','crush','bend','cut']
+        self.magic_affinity=10
+        self.identification_difficulty=30
+        self.default_thickness=0.004**power
+
+class Psionic_Energy(BaseClasses.Material):
+    def __init__(self,thickness=1,quality=1,power=3,**kwargs):
+        super().__init__(**kwargs)
+        self.color=(0,0.8,0.8,0.5)
+        self.acid_reaction='corrode'
+        self.wetdamage=None
+        self.poisson=0.25
+        self.name='psionic energy'
+        self.basicname='psionic'
         self.maxquality=100
         self.quality=min(power,self.maxquality)
         self.thickness=thickness

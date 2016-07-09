@@ -35,7 +35,7 @@ class Bone(BaseClasses.Item):
         self.material=material(quality=quality,power=self.power)
         self.names=['bone']
         self.knowledge_level['truename']=1
-        if isinstance(self.material,M.Bone_Material):
+        if isinstance(self.material,M.Bone_Material) or name!='bone':
             self.truename=name
             self.name=name
         else:
@@ -65,7 +65,7 @@ class Flesh(BaseClasses.Item):
         except: self.material=material
         self.names=['flesh']
         self.knowledge_level['truename']=1
-        if isinstance(self.material,M.Flesh_Material):
+        if isinstance(self.material,M.Flesh_Material) or name!='flesh':
             self.name=name
             self.truename=name
         else:
@@ -101,6 +101,62 @@ class Hair(BaseClasses.Item):
         else:
             self.name=name
             self.truename=''.join((self.material.name,' ',self.name))
+        self.length=length
+        self.radius=out_radius
+        self.in_radius=in_radius
+        self.cross_section_range=[3.14*(self.radius**2-in_radius**2),self.length*2*(self.radius-in_radius)]
+        self.parry=False
+        self.wield='grasp'
+        self.curvature=0
+        self.attacktype=None
+        self.threshold=threshold
+        self.function=1
+        self.minimum_function=0.9
+        self.recalc()
+
+class Feathers(BaseClasses.Item):
+    #length is limb length in meters
+    #in_radius is the inner radius of the flesh
+    #out_radius is the radius of the skin
+    def __init__(self,length=0.5,in_radius=0.03,out_radius=0.05,material=M.Feather,name='feathers',plural=True,quality=1,threshold=0,**kwargs):
+        super().__init__(painfactor=0,**kwargs)
+        self.base_descriptor='Feathers from some creature or another'
+        self.coverage=0.1
+        self.plural=plural
+        self.material=material(quality=quality,power=self.power)
+        self.names=['feathers']
+        self.knowledge_level['truename']=1
+        self.name=name
+        self.truename=name
+        self.length=length
+        self.radius=out_radius
+        self.in_radius=in_radius
+        self.cross_section_range=[3.14*(self.radius**2-in_radius**2),self.length*2*(self.radius-in_radius)]
+        self.parry=False
+        self.wield='grasp'
+        self.curvature=0
+        self.attacktype=None
+        self.threshold=threshold
+        self.function=1
+        self.minimum_function=0.5
+        self.recalc()
+
+class Scales(BaseClasses.Item):
+    #length is limb length in meters
+    #in_radius is the inner radius of the flesh
+    #out_radius is the radius of the skin
+    def __init__(self,length=0.5,in_radius=0.03,out_radius=0.05,material=M.Keratin,name='scales',plural=True,quality=1,threshold=0,**kwargs):
+        super().__init__(painfactor=0,**kwargs)
+        self.base_descriptor='Scales from some creature or another'
+        self.coverage=1
+        self.plural=plural
+        self.material=material(quality=quality,power=self.power)
+        self.material.mode="mail"
+        self.link='scale'
+        self.names=['scales']
+        self.knowledge_level['truename']=1
+        self.name=name
+        self.truename=name
         self.length=length
         self.radius=out_radius
         self.in_radius=in_radius
@@ -170,6 +226,28 @@ class Magic_Rune(BaseClasses.Item):
         self.material=material(quality=quality,power=self.power)
         self.names=['markings','rune']
         self.truename='rune'
+        self.name=name
+        self.length=length
+        self.radius=out_radius
+        self.in_radius=in_radius
+        self.cross_section_range=[3.14*(self.radius**2-in_radius**2),self.length*2*(self.radius-in_radius)]
+        self.parry=False
+        self.wield=None
+        self.curvature=0
+        self.attacktype=None
+        self.threshold=threshold
+        self.function=1
+        self.coverage=0.5
+        self.recalc()
+
+class Mind_Object(BaseClasses.Item):
+    def __init__(self,length=0.01,in_radius=0,out_radius=0.08,material=M.Aether,name='mind',plural=False,quality=1,threshold=0,**kwargs):
+        super().__init__(**kwargs)
+        self.base_descriptor='The power of a mind'
+        self.plural=plural
+        self.material=material(quality=quality,power=self.power)
+        self.names=['thoughts','mind']
+        self.truename='mind'
         self.name=name
         self.length=length
         self.radius=out_radius
@@ -657,6 +735,49 @@ class Chest(BaseClasses.Item):
         if self.base_radius==0:
             self.base_radius=self.radius
 
+class Chainmail(BaseClasses.Item):
+    def __init__(self,length=0.9,thickness='default',in_radius=0.1,material=M.Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1,**kwargs):
+        super().__init__(**kwargs)
+        self.sortingtype='armor'
+        self.plural=plural
+        self.material=material(quality=quality,power=self.power)
+        self.material.density*=0.3
+        self.material.shear*=0.02
+        self.material.mode='mail'
+        self.material.shear_strength*=0.1
+        self.material.tensile_strength*=0.1
+        self.names=['armor','chestpiece','chainmail']
+        self.truename=self.material.name+' chainmail'
+        self.base_descriptor='Chain armor which covers the torso. Protects well from edged weapons while retaining a full range of motion'
+        if thickness=='default':
+            thickness=self.material.default_thickness*thickness_factor
+        self.default_thickness=self.material.default_thickness
+        self.length=length*scale_factor
+        self.radius=scale_factor*in_radius+thickness
+        self.in_radius=in_radius*scale_factor
+        self.cross_section_range=[3.14*(self.radius**2-in_radius**2),self.length*2*(self.radius-in_radius)]
+        self.parry=False
+        self.wield='chest'
+        self.curvature=0
+        self.attacktype=[]
+        self.coverage=1
+        self.function=1
+        self.recalc()
+        self.generate_descriptions()
+
+    def recalc(self):
+        self.material_import()
+        self.mass=self.material.density*(self.length*(self.radius**2-self.in_radius**2))*3.14
+        self.centermass=self.length*0.5
+        self.thickness=self.radius-self.in_radius
+        self.r=self.radius
+        self.I=(1/12)*self.mass*self.length**2+self.mass*self.centermass**2
+        self.movemass=self.mass
+        if self.base_thickness==0:
+            self.base_thickness=self.thickness
+        if self.base_radius==0:
+            self.base_radius=self.radius
+
 class Glove(BaseClasses.Item):
     #length is bone length in meters
     #radius is bone radius in meters
@@ -673,6 +794,42 @@ class Glove(BaseClasses.Item):
             self.names=['armor','hand armor','glove']
             self.base_descriptor='Offers protection for the hand and fingers without reducing dexterity'
             self.truename=self.material.name+' glove'
+        if thickness=='default':
+            thickness=self.material.default_thickness*2*thickness_factor
+        self.default_thickness=self.material.default_thickness*2
+        self.length=length*scale_factor
+        self.radius=scale_factor*in_radius+thickness
+        self.in_radius=in_radius*scale_factor
+        self.cross_section_range=[3.14*(self.radius**2-in_radius**2),self.length*2*(self.radius-in_radius)]
+        self.parry=False
+        self.wield='glove'
+        self.curvature=0.2
+        self.attacktype=[]
+        self.coverage=0.95
+        self.function=1
+        self.recalc()
+        self.generate_descriptions()
+
+    def recalc(self):
+        super().recalc()
+        self.r=self.length/2
+
+class Chain_Glove(BaseClasses.Item):
+    #length is bone length in meters
+    #radius is bone radius in meters
+    def __init__(self,length=0.4,thickness='default',in_radius=0.022,material=M.Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1,**kwargs):
+        super().__init__(**kwargs)
+        self.sortingtype='armor'
+        self.plural=plural
+        self.material=material(quality=quality,power=self.power)
+        self.material.shear*=0.02
+        self.material.density*=0.3
+        self.material.tensile_strength*=0.1
+        self.material.shear_strength*=0.1
+        self.material.mode='mail'
+        self.names=['armor','hand armor','chain gauntlet']
+        self.base_descriptor='Heavy glove for protecting the hand from injury'
+        self.truename=self.material.name+' chain gauntlet'
         if thickness=='default':
             thickness=self.material.default_thickness*2*thickness_factor
         self.default_thickness=self.material.default_thickness*2
@@ -727,6 +884,40 @@ class Legging(BaseClasses.Item):
         super().recalc()
         self.r=self.radius
 
+class Chain_Legging(BaseClasses.Item):
+    def __init__(self,length=0.8,thickness='default',in_radius=0.085,material=M.Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1,**kwargs):
+        super().__init__(**kwargs)
+        self.sortingtype='armor'
+        self.plural=plural
+        self.material=material(quality=quality,power=self.power)
+        self.material.mode='chain'
+        self.material.shear*=0.02
+        self.material.density*=0.3
+        self.material.shear_strength*=0.1
+        self.material.tensile_strength*=0.1
+        self.names=['armor','leg armor','chain legging']
+        self.truename=self.material.name+' chain legging'
+        self.base_descriptor='Chain leg armor ideal for absorbing the blows of edged weapons.'
+        if thickness=='default':
+            thickness=self.material.default_thickness*thickness_factor
+        self.default_thickness=self.material.default_thickness
+        self.length=length*scale_factor
+        self.radius=scale_factor*in_radius+thickness
+        self.in_radius=in_radius*scale_factor
+        self.cross_section_range=[3.14*(self.radius**2-in_radius**2),self.length*2*(self.radius-in_radius)]
+        self.parry=False
+        self.wield='legging'
+        self.curvature=0.1
+        self.attacktype=[]
+        self.coverage=1
+        self.function=1
+        self.recalc()
+        self.generate_descriptions()
+
+    def recalc(self):
+        super().recalc()
+        self.r=self.radius
+
 class Armlet(BaseClasses.Item):
     def __init__(self,length=0.375,thickness='default',in_radius=0.052,material=M.Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1,**kwargs):
         super().__init__(**kwargs)
@@ -755,6 +946,44 @@ class Armlet(BaseClasses.Item):
         self.curvature=0.1
         self.attacktype=[]
         self.coverage=0.75
+        self.function=1
+        self.recalc()
+        self.generate_descriptions()
+
+    def recalc(self):
+        super().recalc()
+        self.mass=2*self.mass
+        self.movemass=self.mass
+        self.r=self.radius
+
+class Chain_Armlet(BaseClasses.Item):
+    def __init__(self,length=0.375,thickness='default',in_radius=0.052,material=M.Iron,plural=False,quality=1,scale_factor=1,thickness_factor=1,**kwargs):
+        super().__init__(**kwargs)
+        self.sortingtype='armor'
+        self.plural=plural
+        self.material=material(quality=quality,power=self.power)
+        self.material.mode='chain'
+        self.material.shear*=0.02
+        self.material.density*=0.3
+        self.material.shear_strength*=0.1
+        self.material.tensile_strength*=0.1
+        self.names=['armor','arm guard','chain vambrace']
+        self.truename=self.material.name+' chain vambrace'
+        self.base_descriptor='Flexible chain sleeve for protection of the arm.'
+        if thickness=='default':
+            thickness=self.material.default_thickness*1.1*thickness_factor
+        self.default_thickness=self.material.default_thickness*1.1
+        self.length=length*scale_factor
+        self.radius=scale_factor*in_radius+thickness
+        self.in_radius=in_radius*scale_factor
+        self.cross_section_range=[3.14*(self.radius**2-in_radius**2),self.length*2*(self.radius-in_radius)]
+        self.thickness=self.radius-in_radius
+        self.r=self.radius
+        self.parry=False
+        self.wield='armlet'
+        self.curvature=0.1
+        self.attacktype=[]
+        self.coverage=1
         self.function=1
         self.recalc()
         self.generate_descriptions()
@@ -972,7 +1201,8 @@ class ExperimentalMace(Mace):
 
 default_item_weights=[(Bone,0),(Flesh,0),(Hair,0),(LongSword,10),(Gladius,5),(Knife,7),(Saber,4),(Claymore,4),(Mace,8),
                  (WarHammer,3),(Spear,5),(Axe,6),(QuarterStaff,3),(Chest,8),(Glove,12),(Legging,12),(Armlet,12),
-                (Boot,12),(Helm,8),(GreatHelm,3),(Shield,6),(Buckler,6)]
+                (Boot,12),(Helm,8),(GreatHelm,3),(Shield,6),(Buckler,6),(Chainmail,5),(Chain_Armlet,6),(Chain_Legging,6),
+                (Chain_Glove,6)]
 total_item_weight=sum(i[1] for i in default_item_weights)
 
 hard_material_weights=[(M.Iron,10),(M.Bone_Material,7),(M.Wood,10),(M.Copper,10),(M.Brass,6),(M.Bronze,5),(M.Steel,4),(M.Aluminum,3),(M.Silver,2),(M.Duraluminum,1),(M.Zicral,1)]
@@ -1000,7 +1230,9 @@ def weighted_generation(weighted_items=default_item_weights,totalweight=total_it
             choicenumber-=i[1]
     '''
     itemtype=weighted_choice(weighted_items)
-    if itemtype in (LongSword,Gladius,Knife,Saber,Claymore,Mace,WarHammer,Spear,Axe,QuarterStaff,Shield,Buckler):
+    if itemtype in (Chain_Legging,Chain_Armlet,Chainmail):
+        chosen_material=weighted_choice(hard_materials)
+    elif itemtype in (LongSword,Gladius,Knife,Saber,Claymore,Mace,WarHammer,Spear,Axe,QuarterStaff,Shield,Buckler):
         if random.random()<0.99:
             chosen_material=weighted_choice(hard_materials)
     if chosen_material==None:

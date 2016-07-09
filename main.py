@@ -26,6 +26,8 @@ class ActualGame(Shell.App):
 
 
     def build(self):
+        Shell.shell.turn+=1
+        Shell.shell.turn+=1
         return Shell.shell
 
 if __name__=='__main__':

@@ -11,6 +11,7 @@ class DungeonFeature():
     def __init__(self,screen=None,x=None,y=None,image='./images/BlankTile.png'):
         self.location=[None,None]
         self.passable=True
+        self.passage={'walk':1,'crawl':1,'fly':1,'swim':0,'float':1,'phase':1,'climb':0}
         self.vision_blocking=False
         self.hostile=[]
         self.targetable=False
@@ -44,6 +45,7 @@ class Wall(DungeonFeature):
     def __init__(self,screen=None,x=None,y=None):
         super().__init__(screen,x,y,image='./images/Wall.png')
         self.passable=False
+        self.passage={'walk':0,'crawl':0,'fly':0,'float':0,'climb':0,'phase':1,'swim':0}
         self.vision_blocking=True
         self.name='wall'
 

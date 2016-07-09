@@ -3,6 +3,7 @@ __author__ = 'Alan'
 import BaseClasses
 import random
 import Enchantments
+import Shell
 
 
 
@@ -133,7 +134,11 @@ class Numbing_Poison(BaseClasses.Fluid):
                         else:
                             target=random.choice(potential_targets)
                             attempts+=1
-                    Enchantments.Numb(target,turns=random.randint(1,2*self.strength-attempts),strength=max(self.strength-attempts,1))
+                    effect=Enchantments.Numb(target,turns=random.randint(1,2*self.strength-attempts),strength=max(self.strength-attempts,1))
+                    effect.category="poison"
+                    effect.classification=["poison","negative","physical"]
+                    self.strength-=1
+                elif random.random()>0.8:
                     self.strength-=1
             elif self.applied==False:
                 self.strength-=1
@@ -151,5 +156,148 @@ class Numbing_Poison(BaseClasses.Fluid):
                 added=True
                 #print("added numbing poison to",i.name)
         if added==True and random.random()>0.5:
+            if self.owner!=None and 5>random.random()*self.owner.stats['luc']:
+                self.strength-=1
+        if self.strength<=0: self.remove()
+
+class Agonizing_Poison(BaseClasses.Fluid):
+    def __init__(self,owner,strength=6,**kwargs):
+        super().__init__(owner,**kwargs)
+        self.color=(0.2,0.4,0.2,0.3)
+        self.strength=strength
+        self.adjective='poisonous'
+        self.basicname='agonizing poison'
+        self.name='agonizing poison'
+        if 'applied' in kwargs:
+            self.applied=True
+        else: self.applied=False
+
+
+    def process(self,log=True,limb=None,**kwargs):
+        if self.on is not None:
+            if hasattr(self.on,'in_limb') and self.on.in_limb!=None and self.on.poisonable==True:
+                damage=self.on.damage['cut']+self.on.damage['pierce']+self.on.damage['crush']
+                if self.on.in_limb.owner!=None and damage>0:
+                    pain=(15*random.random()*self.strength*self.strength*self.on.painfactor*self.on.in_limb.painfactor)/(
+                        self.on.poison_resistance+self.on.in_limb.owner.stats['wil']**0.5)
+                    if self.on.in_limb in self.on.in_limb.owner.limbs:
+                        self.on.in_limb.owner.pain+=pain
+                    self.strength-=1
+                    if self.on.in_limb.owner==Shell.shell.player:
+                        Shell.messages.append("Pain shoots through your {}!".format(self.on.in_limb.name))
+                    elif self.on.in_limb.owner in Shell.shell.player.visible_creatures:
+                        if "{} convulses in pain!".format(self.on.in_limb.owner.name) not in Shell.messages:
+                            Shell.messages.append("{} convulses in pain!".format(self.on.in_limb.owner.name))
+                elif random.random()>0.8:
+                    self.strength-=1
+            elif self.applied==False:
+                self.strength-=1
+        else:
             self.strength-=1
+        if self.strength<=0:
+            self.remove()
+
+
+    def on_strike(self,attack,**kwargs):
+        added=False
+        for i in attack.touchedobjects:
+            if random.random()<0.9:
+                self.add(i)
+                added=True
+                #print("added numbing poison to",i.name)
+        if added==True and random.random()>0.5:
+            if self.owner!=None and 5>random.random()*self.owner.stats['luc']:
+                self.strength-=1
+        if self.strength<=0: self.remove()
+
+class Necrotic_Poison(BaseClasses.Fluid):
+    def __init__(self,owner,strength=6,**kwargs):
+        super().__init__(owner,**kwargs)
+        self.color=(0.2,0.4,0.2,0.3)
+        self.strength=strength
+        self.adjective='poisonous'
+        self.basicname='necrotic poison'
+        self.name='necrotic poison'
+        if 'applied' in kwargs:
+            self.applied=True
+        else: self.applied=False
+
+
+    def process(self,log=True,limb=None,**kwargs):
+        if self.on is not None:
+            if hasattr(self.on,'in_limb') and self.on.in_limb!=None:
+                damage=self.on.damage['cut']+self.on.damage['pierce']+self.on.damage['crush']
+                if (self.strength-self.on.rot_resistance)*random.random()*damage>=1 and self.on.rottable==True:
+                    target=self.on
+                    effect=Enchantments.Rot(target,strength=self.strength)
+                    effect.category="poison"
+                    effect.classification=["poison","negative","physical"]
+                    self.strength-=1
+                elif random.random()>0.8:
+                    self.strength-=1
+            elif self.applied==False:
+                self.strength-=1
+        else:
+            self.strength-=1
+        if self.strength<=0:
+            self.remove()
+
+
+
+    def on_strike(self,attack,**kwargs):
+        added=False
+        for i in attack.touchedobjects:
+            if random.random()<0.9:
+                self.add(i)
+                added=True
+                #print("added numbing poison to",i.name)
+        if added==True and random.random()>0.5:
+            if self.owner!=None and 5>random.random()*self.owner.stats['luc']:
+                self.strength-=1
+        if self.strength<=0: self.remove()
+
+class Debilitating_Poison(BaseClasses.Fluid):
+    def __init__(self,owner,strength=6,**kwargs):
+        super().__init__(owner,**kwargs)
+        self.color=(0.2,0.4,0.2,0.3)
+        self.strength=strength
+        self.adjective='poisonous'
+        self.basicname='debilitating poison'
+        self.name='debilitating poison'
+        if 'applied' in kwargs:
+            self.applied=True
+        else: self.applied=False
+
+
+    def process(self,log=True,limb=None,**kwargs):
+        if self.on is not None:
+            if hasattr(self.on,'in_limb') and self.on.in_limb!=None:
+                damage=self.on.damage['cut']+self.on.damage['pierce']+self.on.damage['crush']
+                if (self.strength-self.on.poison_resistance)*random.random()*damage>=1 and self.on.poisonable==True:
+                    target=self.on.in_limb
+                    turns=int(self.strength*self.strength*2*random.triangular(0,1,1/self.on.in_limb.owner.stats['luc']))
+                    effect=Enchantments.Limb_Stat_Modification(target,turns=turns,strength=self.strength,stat=random.choice(['s','t']))
+                    effect.category="poison"
+                    effect.classification=["poison","negative","physical"]
+                    self.strength-=1
+                elif random.random()>0.8:
+                    self.strength-=1
+            elif self.applied==False:
+                self.strength-=1
+        else:
+            self.strength-=1
+        if self.strength<=0:
+            self.remove()
+
+
+    def on_strike(self,attack,**kwargs):
+        added=False
+        for i in attack.touchedobjects:
+            if random.random()<0.9:
+                self.add(i)
+                added=True
+                #print("added numbing poison to",i.name)
+        if added==True and random.random()>0.5:
+            if self.owner!=None and 5>random.random()*self.owner.stats['luc']:
+                self.strength-=1
         if self.strength<=0: self.remove()
