@@ -175,7 +175,8 @@ Builder.load_string('''
     background:(0,0,0,1)
     outline:(0,0,0,1)
     text_size:self.size
-    shorten:True
+    size:self.texture_size
+    shorten:False
     halign:'center'
     valign:'middle'
     markup:True
@@ -212,7 +213,7 @@ Builder.load_string('''
         color:.6,.6,.6,.6
         text:root.titletext
         text_size:self.size
-        shorten:True
+        shorten:False
         halign:'left'
         valign:'top'
         markup:True
@@ -221,7 +222,7 @@ Builder.load_string('''
         id:information
         text:root.info
         text_size:self.size
-        shorten:True
+        shorten:False
         halign:'right'
         valign:'middle'
         markup:True
@@ -248,7 +249,7 @@ Builder.load_string('''
         text:root.info
         text_size:self.size
         foreground_color: 1,1,1,1
-        shorten:True
+        shorten:False
         halign:'right'
         valign:'middle'
         markup:True
@@ -261,7 +262,7 @@ Builder.load_string('''
         color:.6,.6,.6,.6
         text:root.titletext
         text_size:self.size
-        shorten:True
+        shorten:False
         halign:'left'
         valign:'top'
         markup:True
@@ -294,7 +295,7 @@ Builder.load_string('''
             pos: self.x+10,self.y+0.95*self.height-10
             source:self.item.image
     OutlinedTextBox:
-        shorten:True
+        shorten:False
         halign:'left'
         font_size:18
         text: '[b]      '+root.item.name+': '
@@ -361,7 +362,7 @@ Builder.load_string('''
             size: self.width,self.height
             pos: self.pos
     GridLayout:
-        cols: 7
+        cols: 8
         id: titles
         size_hint: (root.width-20)/root.width,(0.2*root.height-10)/root.height
         pos: root.x+10,root.y+root.height-self.height-15
@@ -390,17 +391,50 @@ Builder.load_string('''
             size: self.texture_size
         OutlinedTextBox:
             outline:1,0,0,1
+            text:'Average Energy'
+            size: self.texture_size
+        OutlinedTextBox:
+            outline:1,0,0,1
             text:'Stamina Cost'
             size: self.texture_size
     ScrollView:
         size_hint:(root.width-20)/root.width,(0.8*root.height-20)/root.height
         pos:root.x+10,root.y+10
+        id:scroll
         GridLayout:
-            cols:7
+            cols:8
             id:attackinfo
-            size_hint:1,50*len(self.children)/(7*root.height)
+            size_hint:1,50*len(self.children)/(scroll.height)
             pos:root.x+10,root.y+10
             row_default_height:50
+
+
+<KillList@FloatLayout>
+    canvas.before:
+        Color:
+            rgba: 0.2,0.2,0.2,0.95
+        Rectangle:
+            id: backdrop
+            size: self.width,self.height
+            pos: self.pos
+    GridLayout:
+        cols: 1
+        id: titles
+        size_hint: (root.width-20)/root.width,(0.2*root.height-10)/root.height
+        pos: root.x+10,root.y+root.height-self.height-15
+        OutlinedTextBox:
+            outline:1,0,0,1
+            text:'Kills'
+    ScrollView:
+        id:scroll
+        size_hint:(root.width-20)/root.width,(0.8*root.height-20)/root.height
+        pos:root.x+10,root.y+10
+        GridLayout:
+            cols:1
+            id:kills
+            size_hint:1,30*len(self.children)/(scroll.height)
+            pos:root.x+10,root.y+10
+            row_default_height:30
 
 <AttackManagementScreen@FloatLayout>
     size_hint:0.65,0.87
@@ -418,7 +452,7 @@ Builder.load_string('''
         pos:root.x,root.y
         size_hint:1,0.5
         GridLayout:
-            cols: 9
+            cols: 10
             id: titles
             size_hint: (attackwindow.width-20)/attackwindow.width,(0.1*attackwindow.height-10)/attackwindow.height
             pos: attackwindow.x+10,attackwindow.y+attackwindow.height-self.height-10
@@ -451,6 +485,10 @@ Builder.load_string('''
             OutlinedTextBox:
                 outline:1,0,0,1
                 text:'Average Pressure'
+                size: self.texture_size
+            OutlinedTextBox:
+                outline:1,0,0,1
+                text:'Average Energy'
                 size: self.texture_size
             OutlinedTextBox:
                 outline:1,0,0,1
@@ -512,7 +550,7 @@ Builder.load_string('''
 
 
 <AttackInfo@GridLayout>
-    cols:9
+    cols:10
     size_hint:1,1
     OutlinedTextBox:
         text:str(root.information['Index'])
@@ -537,6 +575,9 @@ Builder.load_string('''
         color:root.color
     OutlinedTextBox:
         text:str(root.information['Average Pressure'])
+        color:root.color
+    OutlinedTextBox:
+        text:str(root.information['Average Energy'])
         color:root.color
     OutlinedTextBox:
         text:str(root.information['Stamina Cost'])
@@ -738,6 +779,193 @@ Builder.load_string('''
         size_hint:(root.width-20)/root.width,(root.height*0.05-10)/root.height
         text:'Press[b][color=ffff00] Enter[/color][/b] for further options'
 
+
+<AdvancedTargetingScreen@FloatLayout>
+    size_hint:0.52,0.87
+    pos_hint_x:0.065
+    pos_hint_y:0.13
+    canvas.before:
+        Color:
+            rgba:0.2,0.2,0.2,0.95
+        Rectangle:
+            id:backdrop
+            size:self.width,self.height
+            pos:self.pos
+
+    OutlinedTextBox:
+        size_hint:1,0.1
+        pos:root.x,root.y+root.height-self.height
+        text:'Attack What?'
+        outline:(1,0,0,1)
+        font_size:20
+
+    GridLayout:
+        cols:3
+        size_hint:0.3,0.08-20/root.height
+        pos: root.x+0.025*root.width,root.y+0.9*root.height-self.height-20
+        OutlinedTextBox:
+            text:'Index'
+            color:1,0,0,0.5
+        OutlinedTextBox:
+            text:'Name'
+            color:1,0,0,0.5
+        OutlinedTextBox:
+            text:'Weapon'
+            color:1,0,0,0.5
+
+
+    ScrollView:
+        id:attackscroll
+        size_hint:0.3,0.5-10/root.height
+        pos: root.x+0.025*root.width,root.y+0.85*root.height-self.height-20
+        canvas.before:
+            Color:
+                rgba:0,0,0,0.95
+            Rectangle:
+                size:self.width,self.height
+                pos:self.pos
+        GridLayout:
+            cols:1
+            id:attacks
+            size_hint:1,len(self.children)/10
+
+    GridLayout:
+        cols:3
+        size_hint:0.3,0.08-20/root.height
+        pos: root.x+0.35*root.width,root.y+0.9*root.height-self.height-20
+        OutlinedTextBox:
+            text:'Index'
+            color:1,0,0,0.5
+        OutlinedTextBox:
+            text:'Name'
+            color:1,0,0,0.5
+        OutlinedTextBox:
+            text:'Hostile?'
+            color:1,0,0,0.5
+
+    ScrollView:
+        id:coarsetargetscroll
+        size_hint:0.3,0.5-10/root.height
+        pos: root.x+0.35*root.width,root.y+0.85*root.height-self.height-20
+        canvas.before:
+            Color:
+                rgba:0,0,0,0.95
+            Rectangle:
+                size:self.width,self.height
+                pos:self.pos
+        GridLayout:
+            cols:1
+            id:coarsetargets
+            size_hint:1,len(self.children)/10
+
+    GridLayout:
+        cols:2
+        size_hint:0.3,0.08-20/root.height
+        pos: root.x+0.675*root.width,root.y+0.9*root.height-self.height-20
+        OutlinedTextBox:
+            text:'Name'
+            color:1,0,0,0.5
+        OutlinedTextBox:
+            text:'Difficulty'
+            color:1,0,0,0.5
+
+    ScrollView:
+        id:finetargetscroll
+        size_hint:0.3,0.5-10/root.height
+        pos: root.x+0.675*root.width,root.y+0.85*root.height-self.height-20
+        canvas.before:
+            Color:
+                rgba:0,0,0,0.95
+            Rectangle:
+                size:self.width,self.height
+                pos:self.pos
+        GridLayout:
+            cols:1
+            id:finetargets
+            size_hint:1,len(self.children)/10
+
+    FloatLayout:
+        id:limbinfo
+        size_hint:1-30/root.width,0.3-30/root.height
+        pos:root.x+15,root.y+10+0.05*root.height
+        canvas.before:
+            Color:
+                rgba:0,0,0,0.95
+            Rectangle:
+                size:self.width,self.height
+                pos:self.pos
+        GridLayout:
+            cols:1
+            id:limbgraphic
+            size_hint:0.032,0.1
+            pos:limbinfo.x,limbinfo.y+limbinfo.height-self.height
+        GridLayout:
+            cols:1
+            id:limbname
+            size_hint:0.968,0.1
+            pos:limbinfo.x+0.032*limbinfo.width,limbinfo.y+limbinfo.height-self.height
+        GridLayout:
+            cols:1
+            id:limbdata
+            size_hint:0.282,0.7
+            pos:limbinfo.x,limbinfo.y+0.2*limbinfo.height
+        GridLayout:
+            cols:1
+            id:limbdata2
+            size_hint:0.718,0.3
+            pos:limbinfo.x+0.282*limbinfo.width,limbinfo.y+0.9*limbinfo.height-self.height
+        GridLayout:
+            cols:1
+            id:limbinjuries
+            size_hint:0.718,0.244
+            pos:limbinfo.x+0.282*limbinfo.width,limbinfo.y+0.356*limbinfo.height
+        GridLayout:
+            cols:1
+            id:limbnote
+            size_hint:0.718,0.2
+            pos:limbinfo.x+0.282*limbinfo.width,limbinfo.y+0.2*limbinfo.height
+        GridLayout:
+            rows:1
+            id:limbstats
+            size_hint:1,0.1
+            pos:limbinfo.x,limbinfo.y+0.1*limbinfo.height
+        GridLayout:
+            cols:1
+            id:limbattacks
+            size_hint:1,0.1
+            pos:limbinfo.x,limbinfo.y
+
+<AbilityScreen@FloatLayout>
+    size_hint:0.52,0.87
+    pos_hint_x:0.065
+    pos_hint_y:0.13
+    canvas.before:
+        Color:
+            rgba:0.2,0.2,0.2,0.95
+        Rectangle:
+            id:backdrop
+            size:self.width,self.height
+            pos:self.pos
+    OutlinedTextBox:
+        id:title
+        size_hint: 0.95,0.05
+        pos:root.x+0.025*root.width,root.y+0.95*root.height-self.height
+        text:"Abilities"
+        outline:1,0,0,1
+    ScrollView:
+        id:abilityscroll
+        size_hint:0.95,0.85
+        pos:root.x+root.width*0.025,root.y+root.height*0.025
+        canvas.before:
+            Color:
+                rgba:0,0,0,0.95
+            Rectangle:
+                size:self.width,self.height
+                pos:self.pos
+        GridLayout:
+            cols:1
+            id:abilities
+
     ''')
 '''
     canvas:
@@ -800,18 +1028,19 @@ class Combatlog(ScrollView):
         self.size_hint=(0.33,0.43)
         self.scroll_y=0
 
-#TODO: Combat log needs to be more readable. Format needs to be implemented for ease of scanning to draw the eyes quickly to important pieces of information
+
 
 class Log(BoxLayout):
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
         self.orientation='vertical'
         self.size_hint=(1,None)
-        self.words=Label(text='',size_hint=(1,None),font_size=12,halign='left',valign='bottom',text_size=(self.width,None),markup=True,shorten=True,strip=True)
+        self.words=Label(text='',size_hint=(1,None),font_size=12,halign='left',valign='bottom',text_size=(self.width,None),markup=True)#,shorten=True,strip=True)
         self.add_widget(self.words)
         self.words.texture_update()
         self.bind(size=self.words.setter('text_size'))
         self.words.bind(size=self.words.setter('text_size'))
+        self.indentation_level=0
 
 
 
@@ -820,7 +1049,8 @@ class Log(BoxLayout):
             truncatelength=len(self.words.text)-8000
             self.words.text=self.words.text[truncatelength:]
         if newturn==False:
-            self.words.text="".join([self.words.text,'\n   -'+message])
+            self.words.text="".join([self.words.text,'\n','      '*self.indentation_level,'    -',message])
+
   #          self.words.texture_update()
             self.height=max(self.words.texture_size[1],2000)
             self.words.height=self.height
@@ -835,6 +1065,13 @@ class Log(BoxLayout):
    #         self.words.texture_update()
   #          self.bind(size=self.words.setter('text_size'))
    #         self.words.bind(size=self.words.setter('text_size'))
+
+    def add_blankline(self,size,**kwargs):
+        self.words.text="".join([self.words.text,'[size={}]\n[/size]'.format(size)])
+        self.height=max(self.words.texture_size[1],2000)
+        self.words.height=self.height
+
+
 
 
 '''
@@ -1037,7 +1274,43 @@ class AttackDescription(FloatLayout):
             self.ids['attackinfo'].add_widget(OutlinedTextBox(text=''.join((str(int(100*i['Strike Length'])/100),' m'))))
             self.ids['attackinfo'].add_widget(OutlinedTextBox(text=''.join((str(int(i['Average Force'])),' N'))))
             self.ids['attackinfo'].add_widget(OutlinedTextBox(text=''.join((str(int(i['Average Pressure']/100000)/10),' MPa'))))
+            self.ids['attackinfo'].add_widget(OutlinedTextBox(text=''.join((str(int(i['Average Energy'])),' J'))))
             self.ids['attackinfo'].add_widget(OutlinedTextBox(text=str(i['Stamina Cost']),halign='left'))
+
+class KillList(FloatLayout):
+    def __init__(self,mode='item',item=None,player=None,**kwargs):
+        self.size_hint=(0.4,0.3)
+        self.pos_hint={'x':0.1,'top':0.4}
+        super().__init__(**kwargs)
+        kills={}
+        killorder=[]
+        if mode=='item':
+            for i in item.kills:
+                if i.race[1] not in kills:
+                    kills[i.race[1]]=[i]
+                    killorder.append(i.race[1])
+                else:
+                    kills[i.race[1]].append(i)
+            for i in killorder:
+                if len(kills[i])>1:
+                    box=OutlinedTextBox(text=' '.join([str(len(kills[i])),i]),halign='left',color=(0.9,0,0,1))
+                    box.halign='left'
+                    self.ids['kills'].add_widget(box)
+                else:
+                    box=OutlinedTextBox(text=' '.join(['1',kills[i][0].race[0]]),halign='left',color=(0.9,0,0,1))
+                    box.halign='left'
+                    self.ids['kills'].add_widget(box)
+                for j in kills[i]:
+                    if j.true_name_known:
+                        box=OutlinedTextBox(text=''.join(['      ',j.true_name]),halign='left',color=(0.5,0.6,0,0.5))
+                        box.halign='left'
+                    else:
+                        text=" ".join(['a level',str(j.level),j.basicname,"on",j.place_of_death.name])
+                        box=OutlinedTextBox(text=''.join(['      ',text]),halign='left',color=(0.5,0.6,0,0.5))
+                        box.halign='left'
+                    self.ids['kills'].add_widget(box)
+
+
 
 class ItemDescription(FloatLayout):
     def __init__(self,item,player,pos_hint={'x':0.1,'y':0.4},**kwargs):
@@ -1045,6 +1318,7 @@ class ItemDescription(FloatLayout):
         self.size_hint=(0.4,0.5)
         self.pos_hint=pos_hint
         self.player=player
+        super().__init__(pos_hint=pos_hint,**kwargs)
         self.standard_inspection_screen(**kwargs)
         self.extrascreen=None
 
@@ -1134,7 +1408,15 @@ class ItemDescription(FloatLayout):
                 if isinstance(self.extrascreen,AttackDescription):
                     pass
                 else:
+                    self.remove_extra()
                     self.extrascreen=AttackDescription(player=Shell.shell.player,item=self.item)
+                    Shell.shell.add_widget(self.extrascreen)
+            elif keycode=='k':
+                if isinstance(self.extrascreen,KillList):
+                    pass
+                else:
+                    self.remove_extra()
+                    self.extrascreen=KillList(player=Shell.shell.player,item=self.item)
                     Shell.shell.add_widget(self.extrascreen)
 
     def remove_extra(self):
@@ -1151,13 +1433,15 @@ class InventoryItem(ButtonBehavior,GridLayout):
         mass=int(item.mass*100)/100
         text='[color=333300][b] {} [/b]({} kg) [/color]'.format(item.name,mass)
         if hasattr(item,'equipped') and item.equipped!=[]:
-            print(item.equipped)
+            #print(item.equipped)
             text=' '.join((text,' [color=ff33ff](equipped on {})[/color]'.format(' '.join((i.name for i in item.equipped)))))
-        self.text=Label(markup=True,text=text,halign='left',text_size=(500,None),shorten=True)
+        elif item.in_inventory!=None and item in item.in_inventory.quiver:
+            text=' '.join((text,' [color=ff33ff](in quiver)[/color]'))
+        self.text=Label(markup=True,text=text,halign='left',text_size=(500,None),shorten=False)
         if letter=='playerinventory':
-            self.index=Label(markup=True, text='[b][color=333300]     {}: [/color][/b]'.format(item.inventory_index),shorten=True,size_hint=(0.1,1))
+            self.index=Label(markup=True, text='[b][color=333300]     {}: [/color][/b]'.format(item.inventory_index),shorten=False,size_hint=(0.1,1))
         else:
-            self.index=Label(markup=True, text='[b][color=333300]     {}: [/color][/b]'.format(letter),shorten=True,size_hint=(0.1,1))
+            self.index=Label(markup=True, text='[b][color=333300]     {}: [/color][/b]'.format(letter),shorten=False,size_hint=(0.1,1))
         self.add_widget(self.index)
         self.add_widget(self.graphicsbox)
         self.add_widget(self.text)
@@ -1204,7 +1488,7 @@ class InventorySidebar(ScrollView):
             Color(0.7,0.7,0.7)
             self.graphics=Rectangle(size=(10000,10000),pos_hint=self.pos_hint)
 
-        weaponlabel=Label(markup=True,text="[color=333300]  Weapons:[/color]",halign='left',text_size=(500,None),shorten=True)
+        weaponlabel=Label(markup=True,text="[color=333300]  Weapons:[/color]",halign='left',text_size=(500,None),shorten=False)
         self.list.add_widget(weaponlabel)
         weaponlabel.bind(size=weaponlabel.setter('text_size'))
         weapons=0
@@ -1219,7 +1503,7 @@ class InventorySidebar(ScrollView):
             self.list.remove_widget(weaponlabel)
 
 
-        armorlabel=Label(markup=True,text="[color=333300]  Armor:[/color]",halign='left',text_size=(500,None),shorten=True)
+        armorlabel=Label(markup=True,text="[color=333300]  Armor:[/color]",halign='left',text_size=(500,None),shorten=False)
         armorlabel.bind(size=armorlabel.setter('text_size'))
         self.list.add_widget(armorlabel)
         armor=0
@@ -1233,7 +1517,7 @@ class InventorySidebar(ScrollView):
         if armor==0:
             self.list.remove_widget(armorlabel)
 
-        misclabel=Label(markup=True,text="[color=333300]  Miscellaneous:[/color]",halign='left',text_size=(500,None),shorten=True)
+        misclabel=Label(markup=True,text="[color=333300]  Miscellaneous:[/color]",halign='left',text_size=(500,None),shorten=False)
         misclabel.bind(size=misclabel.setter('text_size'))
         self.list.add_widget(misclabel)
         misc=0
@@ -1252,22 +1536,22 @@ class InventorySidebar(ScrollView):
             item_mass+=i.mass
         item_mass=int(item_mass*100)/100
         
-        carryweight=Label(markup=True,text="[b][color=333300]Carried Weight:[/b] {}[/color]".format(item_mass),halign='right',text_size=(500,None),shorten=True)
+        carryweight=Label(markup=True,text="[b][color=333300]Carried Weight:[/b] {}[/color]".format(item_mass),halign='right',text_size=(500,None),shorten=False)
         carryweight.bind(size=carryweight.setter('text_size'))
         self.list.add_widget(carryweight)
 
         body_mass=int(100*self.shell.player.mass)/100
-        bodyweight=Label(markup=True,text="[b][color=333300]Body Weight:[/b] {}[/color]".format(body_mass),halign='right',text_size=(500,None),shorten=True)
+        bodyweight=Label(markup=True,text="[b][color=333300]Body Weight:[/b] {}[/color]".format(body_mass),halign='right',text_size=(500,None),shorten=False)
         bodyweight.bind(size=bodyweight.setter('text_size'))
         self.list.add_widget(bodyweight)
 
         total_mass=int(self.shell.player.movemass*100)/100
-        totalweight=Label(markup=True,text="[b][color=333300]Total Weight: [/b] {}[/color]".format(total_mass),halign='right',text_size=(500,None),shorten=True)
+        totalweight=Label(markup=True,text="[b][color=333300]Total Weight: [/b] {}[/color]".format(total_mass),halign='right',text_size=(500,None),shorten=False)
         totalweight.bind(size=totalweight.setter('text_size'))
         self.list.add_widget(totalweight)
 
         encumbrance_factor=int(total_mass/self.shell.player.stats['str']*100)/100
-        encumbrance=Label(markup=True,text="[b][color=333300]Encumbrance Factor: [/b] {}[/color]".format(encumbrance_factor),halign='right',text_size=(500,None),shorten=True)
+        encumbrance=Label(markup=True,text="[b][color=333300]Encumbrance Factor: [/b] {}[/color]".format(encumbrance_factor),halign='right',text_size=(500,None),shorten=False)
         encumbrance.bind(size=encumbrance.setter('text_size'))
         self.list.add_widget(encumbrance)
 
@@ -1290,7 +1574,7 @@ class InventorySidebar(ScrollView):
             Color(0.7,0.7,0.7)
             self.graphics=Rectangle(size=(10000,10000),pos_hint=self.pos_hint)
 
-        weaponlabel=Label(markup=True,text="[color=333300]  Weapons:[/color]",halign='left',text_size=(500,None),shorten=True)
+        weaponlabel=Label(markup=True,text="[color=333300]  Weapons:[/color]",halign='left',text_size=(500,None),shorten=False)
         weaponlabel.bind(size=weaponlabel.setter('text_size'))
         self.list.add_widget(weaponlabel)
         weapons=0
@@ -1310,7 +1594,7 @@ class InventorySidebar(ScrollView):
         if weapons==0:
             self.list.remove_widget(weaponlabel)
 
-        armorlabel=Label(markup=True,text="[color=333300]  Armor:[/color]",halign='left',text_size=(500,None),shorten=True)
+        armorlabel=Label(markup=True,text="[color=333300]  Armor:[/color]",halign='left',text_size=(500,None),shorten=False)
         armorlabel.bind(size=armorlabel.setter('text_size'))
         self.list.add_widget(armorlabel)
         armor=0
@@ -1330,7 +1614,7 @@ class InventorySidebar(ScrollView):
         if armor==0:
             self.list.remove_widget(armorlabel)
 
-        misclabel=Label(markup=True,text="[color=333300]  Miscellaneous:[/color]",halign='left',text_size=(500,None),shorten=True)
+        misclabel=Label(markup=True,text="[color=333300]  Miscellaneous:[/color]",halign='left',text_size=(500,None),shorten=False)
         misclabel.bind(size=misclabel.setter('text_size'))
         self.list.add_widget(misclabel)
         misc=0
@@ -1453,6 +1737,8 @@ class InventorySidebar(ScrollView):
                     #dropped_items+=1
             else:
                 self.shell.player.inventory.remove(i.item)
+                if i.item in self.shell.player.quiver:
+                    self.shell.player.quiver.remove(i.item)
                 cell.contents.append(i.item)
                 i.in_inventory=None
                 self.shell.log.addtext('You drop the {}'.format(i.item.name))
@@ -1467,6 +1753,8 @@ class InventorySidebar(ScrollView):
                 self.shell.log.addtext('{} cannot be wielded as a weapon or armor'.format(i.item.name))
             if hasattr(i.item,'equipped') and i.item.equipped!=[] and i.item.wield!='grasp':
                 self.shell.log.addtext('The {} is already equipped!'.format(i.item.name))
+            elif i.item in self.shell.player.quiver:
+                self.shell.log.addtext("The {} is already quivered!".format(i.item.name))
             elif hasattr(i.item,'equipped') and i.item.equipped!=[] and i.item.wield=='grasp':
                 wieldingnumber=len(i.item.equipped)
                 self.shell.player.equip(i.item)
@@ -1479,6 +1767,8 @@ class InventorySidebar(ScrollView):
                 self.shell.player.equip(i.item)
                 if i.item.equipped!=[]:
                     self.shell.turn+=1
+                elif i.item in self.shell.player.quiver:
+                    pass
                 else:
                     self.shell.log.addtext('You have no body parts available which can wield the {}'.format(i.item.name))
         self.close()
@@ -1490,12 +1780,14 @@ class InventorySidebar(ScrollView):
                 return self.selectionindex[i].item
         pass
 
-
     def unequip_selected(self):
         for i in self.selected_items:
             if not hasattr(i.item,'wield'):
                 self.shell.log.addtext('{} cannot be wielded as a weapon or armor'.format(i.item.name))
-            if hasattr(i.item,'equipped') and i.item.equipped==[]:
+            if i.item in self.shell.player.quiver:
+                self.shell.player.quiver.remove(i.item)
+                self.shell.log.addtext("The {} is no longer quivered".format(i.item.name))
+            elif hasattr(i.item,'equipped') and i.item.equipped==[]:
                 self.shell.log.addtext('The {} is not equipped!'.format(i.item.name))
             if hasattr(i.item,'equipped') and i.item.equipped!=[]:
                 self.shell.player.unequip(i.item)
@@ -1517,6 +1809,449 @@ class InventorySidebar(ScrollView):
         self.list.canvas.clear()
         self.shell.remove_widget(self)
         self.clear_widgets()
+
+#Targeting screen related widgets
+
+class AdvancedTargetingScreen(FloatLayout):
+    def __init__(self,creature=None,cell=None,**kwargs):
+        super().__init__(**kwargs)
+        self.pos_hint={'x':0.065,'y':0.13}
+        index=1
+        self.currentlimb=None
+        self.attack_buttons=[]
+        self.attack=None
+        self.target=None
+        self.target_buttons=[]
+        self.specific_target=None
+        self.limblist=[]
+        self.creature=creature
+        self.repeat=True
+        for i in creature.attacks:
+            attack=SpecificAttack(attack=i,creature=creature,index=index,send_to=self)
+            if index==0:
+                index=''
+            else:
+                index+=1
+            if index==10:
+                index=0
+            self.ids['attacks'].add_widget(attack)
+            self.attack_buttons.append(attack)
+        letters='abcdefghijklmnopqrstuvwxyz'
+        index=0
+        attackables=cell.creatures.copy()
+        attackables.extend(cell.items)
+        for i in attackables:
+            if i.targetable==False:
+                continue
+            if index>25:
+                letter=''
+            else:
+                letter=letters[index]
+            creature=SpecificTarget(creature=i,index=letter,send_to=self)
+            index+=1
+            self.ids['coarsetargets'].add_widget(creature)
+            self.target_buttons.append(creature)
+
+    def select_attack(self,attack):
+        for i in self.attack_buttons:
+            if i.highlighted:
+                i.unhighlight()
+        self.attack=attack.attack
+        attack.highlight()
+
+    def select_target(self,target):
+        for i in self.target_buttons:
+            if i.highlighted:
+                i.unhighlight()
+        self.target=target.creature
+        target.highlight()
+        self.ids['finetargets'].clear_widgets()
+        if hasattr(target.creature,'limbs') and target.creature.limbs!=[]:
+            self.target=target.creature
+            self.limblist=[]
+            for i in target.creature.limbs:
+                if i.listed_in_limbs==False: continue
+                '''if i.attachpoint==None:
+                    self.limblist=SpecificLimb(i,origin=(self,'finetargets'))
+                    self.ids['finetargets'].add_widget(self.limblist)'''
+                limb=SpecificLimbTitle(i,origin=[self,'finetargets'])
+                self.limblist.append(limb)
+                self.ids['finetargets'].add_widget(limb)
+            self.adjust_sizing([self,'finetargets'])
+        else:
+            self.ids['finetargets'].add_widget(OutlinedTextBox(text='No parts'))
+            self.specific_target=self.target
+
+    def show_limb_info(self,limb):
+        if limb.listed_in_limbs==False: return
+        self.currentlimb=limb
+        self.ids['limbgraphic'].clear_widgets()
+        self.ids['limbgraphic'].add_widget(ItemGraphic(limb))
+        self.ids['limbname'].clear_widgets()
+        self.ids['limbname'].add_widget(OutlinedTextBox(color=(1,0,0,1),text=limb.name))
+        self.ids['limbdata'].clear_widgets()
+        if limb.attachpoint==None:
+            info='None'
+        else:
+            info=limb.attachpoint.name
+        self.ids['limbdata'].add_widget(DisplayBox(titletext='Attach Point',info=info,color=(0.5,0.5,0.5,0.5)))
+        self.ids['limbdata'].add_widget(DisplayBox(titletext='Attached Limbs',info=str(len(limb.limbs)),color=(0.5,0.5,0.5,0.5)))
+        self.ids['limbdata'].add_widget(DisplayBox(titletext='Length',info=''.join([str(int(1000*limb.length)/1000),' m']),color=(0.5,0.5,0.5,0.5)))
+        self.ids['limbdata'].add_widget(DisplayBox(titletext='Radius',info=''.join([str(int(10000*limb.radius)/10000),' m']),color=(0.5,0.5,0.5,0.5)))
+        self.ids['limbdata'].add_widget(DisplayBox(titletext='Mass',info=''.join([str(int(10000*limb.mass)/10000),' kg']),color=(0.5,0.5,0.5,0.5)))
+        self.ids['limbdata'].add_widget(DisplayBox(titletext='Ability',info=''.join([str(int(100*limb.ability)),'%']),color=(0.5,0.5,0.5,0.5)))
+        self.ids['limbdata'].add_widget(DisplayBox(titletext='Natural',info=str(limb.natural),color=(0.5,0.5,0.5,0.5)))
+
+        self.ids['limbdata2'].clear_widgets()
+        layerinfo=[i.name for i in limb.layers]
+        layerinfo.reverse()
+        self.ids['limbdata2'].add_widget(DisplayBox(titletext='Layers',info=', '.join(layerinfo),color=(0.5,0.5,0.5,0.5)))
+        self.ids['limbdata2'].add_widget(DisplayBox(titletext='Equippable Types',info=', '.join([i for i in limb.equipment]),color=(0.5,0.5,0.5,0.5)))
+        equipment=[]
+        for i in limb.equipment:
+            if limb.equipment[i]!=None:
+                equipment.append(limb.equipment[i].name)
+        if equipment==[]:
+            equipment='None'
+        else:
+            equipment=', '.join(equipment)
+        self.ids['limbdata2'].add_widget(DisplayBox(titletext='Equipped Items',info=equipment,color=(0.5,0.5,0.5,0.5)))
+
+        self.ids['limbinjuries'].clear_widgets()
+        injurydata=limb.describe_damage()
+        self.ids['limbinjuries'].add_widget(DisplayBox(titletext='Damage',info=injurydata,color=(0.5,0.5,0.5,0.5)))
+
+        self.ids['limbnote'].clear_widgets()
+        note=NoteBox(titletext='Note:',info=limb.note,color=(0.5,0.5,0.5,0.5))
+        self.ids['limbnote'].add_widget(note)
+        note.ids['information'].bind(on_text_validate=self.update_limb_note)
+
+        self.ids['limbstats'].clear_widgets()
+        if limb.stats['str']!=limb.stats['s']:
+            self.ids['limbstats'].add_widget(DisplayBox(titletext='Str',info='{} ({})'.format(limb.stats['str'],limb.stats['s']),color=(0.5,0.5,0.5,0.5)))
+        else:
+            self.ids['limbstats'].add_widget(DisplayBox(titletext='Str',info='{}'.format(limb.stats['str']),color=(0.5,0.5,0.5,0.5)))
+        if limb.stats['tec']!=limb.stats['t']:
+            self.ids['limbstats'].add_widget(DisplayBox(titletext='Tec',info='{} ({})'.format(limb.stats['tec'],limb.stats['t']),color=(0.5,0.5,0.5,0.5)))
+        else:
+            self.ids['limbstats'].add_widget(DisplayBox(titletext='Tec',info='{}'.format(limb.stats['tec']),color=(0.5,0.5,0.5,0.5)))
+        if limb.stats['per']!=limb.stats['p']:
+            self.ids['limbstats'].add_widget(DisplayBox(titletext='Per',info='{} ({})'.format(limb.stats['per'],limb.stats['p']),color=(0.5,0.5,0.5,0.5)))
+        else:
+            self.ids['limbstats'].add_widget(DisplayBox(titletext='Per',info='{}'.format(limb.stats['per']),color=(0.5,0.5,0.5,0.5)))
+        if limb.stats['wil']!=limb.stats['w']:
+            self.ids['limbstats'].add_widget(DisplayBox(titletext='Wil',info='{} ({})'.format(limb.stats['wil'],limb.stats['w']),color=(0.5,0.5,0.5,0.5)))
+        else:
+            self.ids['limbstats'].add_widget(DisplayBox(titletext='Wil',info='{}'.format(limb.stats['wil']),color=(0.5,0.5,0.5,0.5)))
+        if limb.stats['luc']!=limb.stats['l']:
+            self.ids['limbstats'].add_widget(DisplayBox(titletext='Luc',info='{} ({})'.format(limb.stats['luc'],limb.stats['l']),color=(0.5,0.5,0.5,0.5)))
+        else:
+            self.ids['limbstats'].add_widget(DisplayBox(titletext='Luc',info='{}'.format(limb.stats['luc']),color=(0.5,0.5,0.5,0.5)))
+
+        self.ids['limbattacks'].clear_widgets()
+        attacks=[]
+        self.creature.updateattacks()
+        for i in limb.attacks:
+            try:
+                if hasattr(i,'weapon') and hasattr(i.weapon,'equipped') and i.weapon not in (limb,None):
+                    hands=len(i.weapon.equipped)
+                    hands=min(hands,2)
+                else:
+                    hands=1
+                if i.hands==hands and i.useless==False:
+                    attacks.append(i.average_values()['Attack Name'])
+            except AttributeError: pass
+        if attacks==[]:
+            attacks='None'
+        else:
+            attacks=', '.join(attacks)
+        self.ids['limbattacks'].add_widget(DisplayBox(titletext='Attacks',info=attacks,color=(0.5,0.5,0.5,0.5)))
+
+    def select_specific_target(self,specific_target):
+        for i in self.limblist:
+            i.unhighlight()
+        self.specific_target=specific_target.limb
+        #self.limblist.highlight(self.specific_target)
+        specific_target.highlight()
+
+    def keyboard_input(self,input,shift):
+        if self.repeat==False:
+            return
+        self.repeat=False
+        for i in self.attack_buttons:
+            if input==str(i.index):
+                i.on_press()
+        if shift==False:
+            for i in self.target_buttons:
+                if input==i.index:
+                    i.on_press()
+        else:
+            for i in self.target_buttons:
+                if input.capitalize()==i.index:
+                    i.on_press()
+        if input=='enter':
+            if self.attack==None or self.target==None or self.specific_target==None:
+                self.repeat=True
+                return
+            else:
+                self.creature.attack(self.target,specific_target=self.specific_target,specific_attack=self.attack)
+                Shell.shell.keyboard_mode='play'
+                Shell.shell.remove_widget(self)
+                Shell.shell.turn+=1
+        elif input=='escape':
+            Shell.shell.keyboard_mode='play'
+            Shell.shell.remove_widget(self)
+        elif input=='up':
+            try:
+                if self.specific_target==None:
+                    self.limblist[len(self.limblist)-1].on_press()
+                    self.ids['finetargetscroll'].scroll_to(self.limblist[len(self.limblist)-1])
+                elif self.specific_target!=self.limblist[0].limb:
+                    for i in self.limblist:
+                        if self.specific_target==i.limb:
+                            current=i
+                            break
+                    index=self.limblist.index(current)-1
+                    self.limblist[index].on_press()
+                    self.ids['finetargetscroll'].scroll_to(self.limblist[index],padding=20,animate=False)
+            except: pass
+        elif input=='down':
+            try:
+                if self.specific_target==None:
+                    self.limblist[0].on_press()
+                    self.ids['finetargetscroll'].scroll_to(self.limblist[0])
+                elif self.specific_target!=self.limblist[len(self.limblist)-1].limb:
+                    for i in self.limblist:
+                        if self.specific_target==i.limb:
+                            current=i
+                            break
+                    index=self.limblist.index(current)+1
+                    self.limblist[index].on_press()
+                    self.ids['finetargetscroll'].scroll_to(self.limblist[index],padding=20,animate=False)
+            except: pass
+        Clock.schedule_once(self.allow_repeat,6/60)
+
+
+    def update_limb_note(self,instance):
+        if self.currentlimb==None:
+            return
+        self.currentlimb.note=instance.text
+
+    def adjust_sizing(self,origin):
+        id=str(origin[1])
+        self.ids[id].size_hint[1]=0
+        allchildren=self.ids[id].children.copy()
+        to_check=allchildren.copy()
+        while len(to_check)!=0:
+            newcheck=[]
+            for i in to_check:
+                if len(i.children)!=0:
+                    allchildren.extend(i.children)
+                    newcheck.extend(i.children)
+            to_check=newcheck
+        self.ids[id].size_hint[1]=0.05*len(allchildren)
+        for i in allchildren:
+            total=len(i.children)
+            test=i.children
+            while len(test)!=0:
+                newtest=[]
+                for j in test:
+                    if len(j.children)!=0:
+                        newtest.extend(j.children)
+                        total+=len(j.children)
+                test=newtest
+            i.size_hint[1]=max(total+2,1)
+        self.ids[id].size_hint[1]=self.ids[id].size_hint[1]/2
+        self.ids['finetargetscroll'].update_from_scroll()
+
+    def allow_repeat(self,clock):
+        self.repeat=True
+
+
+
+class SpecificAttack(ButtonBehavior,GridLayout):
+    def __init__(self,attack=None,creature=None,index=None,send_to=None,**kwargs):
+        super().__init__(**kwargs)
+        self.cols=3
+        self.attack=attack
+        self.creature=creature
+        self.index=index
+        self.highlighted=False
+        self.send_to=send_to
+        self.color=[1,1,1,1]
+        self.attack.__init__(weapon=attack.weapon,limb=attack.limb)
+        self.information=attack.average_values()
+        self.information['Index']=index
+        indexbox=OutlinedTextBox(text=str(index))
+        self.add_widget(indexbox)
+        namebox=OutlinedTextBox(text=self.information['Attack Name'])
+        self.add_widget(namebox)
+        weapon=self.attack.weapon
+        if weapon==None:
+            weapon=self.attack.limb
+        weaponbox=OutlinedTextBox(text=weapon.name)
+        self.add_widget(weaponbox)
+
+    def on_press(self):
+        self.send_to.select_attack(self)
+        pass
+
+    def highlight(self):
+        with self.canvas.after:
+            Color(0.2,0.2,0.2,0.5)
+            Rectangle(size=self.size,pos=self.pos)
+        self.highlighted=True
+
+    def unhighlight(self):
+        self.canvas.after.clear()
+        self.highlighted=False
+
+class SpecificTarget(ButtonBehavior,GridLayout):
+    def __init__(self,creature=None,index=None,send_to=None,unclickable=False,**kwargs):
+        super().__init__(**kwargs)
+        self.cols=3
+        self.creature=creature
+        self.index=index
+        self.unclickable=unclickable
+        self.highlighted=False
+        self.send_to=send_to
+        self.color=[1,1,1,1]
+        indexbox=OutlinedTextBox(text=str(index))
+        self.add_widget(indexbox)
+        indexbox.size_hint_x=0.2
+        namebox=OutlinedTextBox(text=creature.name)
+        self.add_widget(namebox)
+        try:
+            hostility=Shell.shell.player.hostilitycheck(creature)
+            if hostility==True: hostility='Y'
+            else: hostility='N'
+        except:
+            hostility='N/A'
+        hostilitybox=OutlinedTextBox(text=hostility)
+        hostilitybox.size_hint_x=0.2
+        self.add_widget(hostilitybox)
+
+    def on_press(self):
+        if not self.unclickable:
+            self.send_to.select_target(self)
+
+
+    def highlight(self):
+        with self.canvas.after:
+            Color(0.2,0.2,0.2,0.5)
+            Rectangle(size=self.size,pos=self.pos)
+        self.highlighted=True
+
+    def unhighlight(self):
+        self.canvas.after.clear()
+        self.highlighted=False
+
+class SpecificLimb(GridLayout):
+    def __init__(self,limb,indentationlevel=0,origin=None,unclickable=False,**kwargs):
+        super().__init__(**kwargs)
+        self.sizing_factor=1
+        self.cols=1
+        self.add_widget(SpecificLimbTitle(limb,indentationlevel=indentationlevel,origin=origin,unclickable=unclickable))
+        self.primary=limb
+        self.secondaries=[]
+        self.expanded=False
+        self.origin=origin
+        self.limb=None
+
+    def unhighlight(self):
+        for i in self.children:
+            i.unhighlight()
+
+    def highlight(self,limb):
+        for i in self.children:
+            if i.limb==None:
+                i.highlight(limb)
+            elif i.limb==limb:
+                i.highlight(limb)
+
+
+
+class SpecificLimbTitle(ButtonBehavior,GridLayout):
+    def __init__(self,limb,indentationlevel=0,origin=None,unclickable=False,**kwargs):
+        super().__init__(**kwargs)
+        self.highlighted=False
+        self.cols=2
+        self.sizing_factor=0
+        self.limb=limb
+        self.indentationlevel=indentationlevel
+        '''if self.limb.limbs==[]:
+            self.joiningsymbol=''
+        else:
+            self.joiningsymbol='+'''
+        self.joiningsymbol=''
+        self.text=''.join(['     ','   '*indentationlevel,self.joiningsymbol,limb.name])
+        self.textbox=OutlinedTextBox(text=self.text)
+        self.add_widget(self.textbox)
+        if limb.owner!=None and limb.owner.alive:
+            totalsize=sum(i.sizefactor for i in limb.owner.limbs)
+        difficulty=int(totalsize/limb.sizefactor)/10
+        self.difficultybox=OutlinedTextBox(text=str(difficulty))
+        self.difficultybox.size_hint_x=0.2
+        self.add_widget(self.difficultybox)
+        self.textbox.halign='left'
+        self.origin=origin
+        self.unclickable=unclickable
+        if limb.ability>0.9:
+            self.textbox.color=(1,1,1,1)
+        elif limb.ability>0.7:
+            self.textbox.color=(1,1,0.7,1)
+        elif limb.ability>0.5:
+            self.textbox.color=(1,1,0.1,1)
+        elif limb.ability>0.3:
+            self.textbox.color=(1,0,0,1)
+        elif limb.ability>0.1:
+            self.textbox.color=(0.52,0,0.46,1)
+        else:
+            self.textbox.color=(0.5,0.5,0.5,0.9)
+        if origin[0].specific_target==self.limb:
+            self.highlight()
+        else:
+            self.unhighlight()
+
+    def on_press(self):
+        redo=False
+        if self.limb!=self.origin[0].currentlimb:
+            self.origin[0].show_limb_info(self.limb)
+            self.origin[0].select_specific_target(self)
+            return
+        return
+        if self.unclickable==True:
+            return
+        if self.parent.expanded==False:
+            for i in self.limb.limbs:
+                self.parent.secondaries.append(i)
+                self.parent.add_widget(SpecificLimb(i,indentationlevel=self.indentationlevel+1,origin=self.origin))
+                self.parent.expanded=True
+                redo=True
+            if redo==True:
+                self.textbox.text=self.textbox.text.replace('+','-')
+        else:
+            for i in self.parent.children.copy():
+                if isinstance(i,SpecificLimb):
+                    if i.primary in self.limb.limbs:
+                        self.parent.remove_widget(i)
+                        self.parent.expanded=False
+            self.textbox.text=''.join(['     ','   '*self.indentationlevel,self.joiningsymbol,self.limb.name])
+        #self.parent.size_hint[1]=len(self.parent.children)
+        self.origin[0].adjust_sizing(self.origin)
+        self.origin[0].select_specific_target(self)
+
+    def highlight(self,limb=None):
+        with self.canvas.after:
+            Color(0.2,0.2,0.2,0.5)
+            Rectangle(size=self.size,pos=self.pos)
+        self.highlighted=True
+
+    def unhighlight(self):
+        self.canvas.after.clear()
+        self.highlighted=False
+
+
 
 
 #The classes below deal with creature status screens
@@ -1555,7 +2290,7 @@ class CreatureStatusScreen(FloatLayout):
         self.ids['attributes'].add_widget(self.will)
         self.ids['attributes'].add_widget(self.luck)
 
-        self.race=DisplayBox(titletext='Race',info='Human')
+        self.race=DisplayBox(titletext='Race',info=creature.race[0])
         self.ids['race'].add_widget(self.race)
 
         self.level=DisplayBox(titletext='Level',info=str(creature.level))
@@ -1733,9 +2468,6 @@ class CreatureStatusScreen(FloatLayout):
         self.creature.note=instance.text
 
 
-
-
-
 class AttackManagementScreen(FloatLayout):
     def __init__(self,creature=None,**kwargs):
         self.creature=creature
@@ -1826,7 +2558,10 @@ class AttackInfo(ButtonBehavior,GridLayout):
         self.information['Strike Length']=''.join((str(int(100*self.information['Strike Length'])/100),' m'))
         self.information['Average Force']=''.join((str(int(self.information['Average Force'])),' N'))
         self.information['Average Pressure']=''.join((str(int(self.information['Average Pressure']/100000)/10),' MPa'))
+        self.information['Average Energy']=''.join((str(int(self.information['Average Energy'])),' J'))
         super().__init__(**kwargs)
+        self.__touch_time=1
+
 
     def on_press(self):
         if type(self.attack) in self.creature.disabled_attack_types:
@@ -1848,9 +2583,13 @@ class AttackInfo(ButtonBehavior,GridLayout):
                 self.creature.disabled_attacks.append(self.attack.sig)
             return
 
+    def on_touch_up(self, touch):
+        pass
+
 class AttackType(ButtonBehavior,GridLayout):
     def __init__(self,attacktype=None,creature=None,index=None,**kwargs):
         self.index=index
+        self.__touch_time=1
         self.creature=creature
         self.attacktype=attacktype
         self.information={'Index':index.capitalize(),'Type Name':str(attacktype).strip("<class 'Attacks.").strip(">'")}
@@ -1874,6 +2613,9 @@ class AttackType(ButtonBehavior,GridLayout):
         for i in self.screen.ids['attacks'].children:
             i.clear_widgets()
             i.__init__(attack=i.attack,creature=i.creature,index=i.index)
+
+    def on_touch_up(self, touch):
+        pass
 
 class AttackPref(ButtonBehavior,GridLayout):
     def __init__(self,creature=None,pref=None,index=None,**kwargs):
@@ -1899,6 +2641,9 @@ class AttackPref(ButtonBehavior,GridLayout):
         for i in self.screen.ids['prefs'].children:
             i.clear_widgets()
             i.__init__(pref=i.pref,creature=i.creature,index=i.index)
+
+    def on_touch_up(self, touch):
+        pass
 
 class LimbBox(GridLayout):
     def __init__(self,limb,indentationlevel=0,origin=None,unclickable=False,**kwargs):
@@ -1964,7 +2709,6 @@ class LimbTitle(ButtonBehavior,OutlinedTextBox):
         #self.parent.size_hint[1]=len(self.parent.children)
         self.origin[0].adjust_sizing(self.origin)
 
-
 class StatusScreen(FloatLayout):
     def __init__(self,character,**kwargs):
         super().__init__(**kwargs)
@@ -1979,7 +2723,6 @@ class StatusScreen(FloatLayout):
         elif self.screen is not None:
             self.screen.keyboard_input(input,shift)
 
-
     def attack_screen(self):
         #self.add_widget(AttackDescription(mode='character',player=self.character))
         self.screen=AttackManagementScreen(self.character)
@@ -1989,6 +2732,19 @@ class StatusScreen(FloatLayout):
         self.screen=CreatureStatusScreen(self.character)
         self.add_widget(self.screen)
 
+
+class AbilityScreen(FloatLayout):
+    def __init__(self,character,**kwargs):
+        super().__init__(**kwargs)
+        self.pos_hint={'x':0.065,'y':0.13}
+        for i in character.abilities:
+            self.ids['abilities'].add_widget(OutlinedTextBox(text=i.name))
+
+    def keyboard_input(self,input,shift):
+        if input=='escape':
+            self.screen=None
+            Shell.shell.keyboard_mode='play'
+            Shell.shell.remove_widget(self)
 
 class Reticule():
     def __init__(self,purpose=None,location=None,highlight_type='cell'):
@@ -2001,7 +2757,10 @@ class Reticule():
         self.image='./images/Reticule.png'
         self.name='targeting reticule'
         self.highlight_type=highlight_type
+        self.player=False
 
+    def hostilitycheck(self,*args,**kwargs):
+        return False
 
     def do(self,**kwargs):
         if self.purpose!=None:
@@ -2015,6 +2774,7 @@ class Cell(Widget):
     contents=ListProperty([])
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
+        self.flash=None
         self.floor=None
         self.alignment=0
         self.size_hint=(None,None)
@@ -2128,14 +2888,15 @@ class Cell(Widget):
                 #self.recently_seen=False
                 self.update_graphics()
         except:
-            print(self.location)
+            print("cell loc",self.location)
+
             pass
         if self.dungeon==[]:
             self.dungeon.append(MapTiles.DungeonFloor(screen=self.floor,x=self.location[0],y=self.location[1]))
         if len(self.dungeon)>1:
             dungeoncopy=self.dungeon
             for i in dungeoncopy:
-                if isinstance(MapTiles.DungeonFloor):
+                if isinstance(i,MapTiles.DungeonFloor):
                     self.dungeon.remove(i)
         if self.has_targeting_reticule==True:
             self.place_reticule()
@@ -2160,6 +2921,7 @@ class Cell(Widget):
                 else: self.instructions.add(Color(i.color[0],i.color[1],i.color[2],i.color[3],group='dungeon'))
                 self.instructions.add(Rectangle(size=self.size,pos=self.pos,source=i.image,group='dungeon'))
 
+
         if show_items==True:
             self.instructions.remove_group('items')
             updatecall=True
@@ -2169,13 +2931,15 @@ class Cell(Widget):
                 else: self.instructions.add(Color(i.color[0],i.color[1],i.color[2],i.color[3],group='items'))
                 self.instructions.add(Rectangle(size=self.size,pos=self.pos,source=i.image,group='items'))
                 i.add_graphical_instructions(self)
+                if self.recently_seen==False: self.detected_items=True
+
+
 
         if show_creatures==True:
             self.instructions.remove_group('creatures')
             updatecall=True
             for i in self.creatures:
                 if i not in Shell.shell.player.detected_creatures:
-                    print(i)
                     continue
                 if self.recently_seen==False: self.detected_creatures=True
                 self.recently_seen=True
@@ -2184,10 +2948,14 @@ class Cell(Widget):
                 self.instructions.add(Rectangle(size=self.size,pos=self.pos,source=i.image,group='creatures'))
                 i.add_graphical_instructions(self)
 
+
+
         self.fog=False
         if updatecall==True:
+            self.instructions.remove_group('fog')
             self.canvas.clear()
             self.canvas.add(self.instructions)
+            #self.floor.canvas.add(self.instructions)
         if self.has_targeting_reticule==True:
             self.place_reticule()
             return
@@ -2202,9 +2970,10 @@ class Cell(Widget):
         if self.seen_by_player==True and self.visible_to_player==False and self.fog==False:
             self.fog=True
             self.recently_seen=False
-            with self.canvas:
-                Color(0.5,0.5,0.5,0.5)
-                Rectangle(size=self.size,pos=self.pos)
+            #with self.canvas:
+            self.instructions.remove_group('fog')
+            self.instructions.add(Color(0.5,0.5,0.5,0.5,group='fog'))
+            self.instructions.add(Rectangle(size=self.size,pos=self.pos,group='fog'))
         if len(self.instructions.get_group('creatures'))>0 and self.recently_seen==False:
 
             '''self.instructions.remove_group('creatures')
@@ -2212,9 +2981,13 @@ class Cell(Widget):
             self.update_graphics(show_dungeon=False,show_items=False)
             if self.fog==False and self.seen_by_player==True and self.visible_to_player==False:
                 self.fog=True
-                with self.canvas:
-                    Color(0.5,0.5,0.5,0.5)
-                    Rectangle(size=self.size,pos=self.pos)
+                self.instructions.remove_group('fog')
+                self.instructions.add(Color(0.5,0.5,0.5,0.5,group='fog'))
+                self.instructions.add(Rectangle(size=self.size,pos=self.pos,group='fog'))
+                #with self.canvas:
+
+                    #Color(0.5,0.5,0.5,0.5)
+                    #Rectangle(size=self.size,pos=self.pos)
         self.visible_to_player=False
         self.recently_seen=False
 
@@ -2229,8 +3002,9 @@ class Cell(Widget):
     def animate_flash(self,color=(1,1,1,1),color_variance=(0.1,0.1,0.1,0.1),duration=10,*args,**kwargs):
         self.flashcolor=color
         self.flashvariance=color_variance
-        self.flash=Widget(pos=self.pos,size=self.size)
-        self.add_widget(self.flash)
+        if self.flash==None:
+            self.flash=Widget(pos=self.pos,size=self.size)
+            self.add_widget(self.flash)
         with self.flash.canvas:
             Color(color[0],color[1],color[2],color[3])
             Rectangle(pos=self.flash.pos,size=self.flash.size)
@@ -2246,8 +3020,10 @@ class Cell(Widget):
 
     def endflash(self,*args,**kwargs):
         Clock.unschedule(self.flash_color_change)
-        self.flash.canvas.clear()
-        self.remove_widget(self.flash)
+        if self.flash!=None:
+            self.flash.canvas.clear()
+            self.remove_widget(self.flash)
+            self.flash=None
         pass
 
 cellsize=16

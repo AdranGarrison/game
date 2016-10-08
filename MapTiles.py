@@ -4,6 +4,8 @@ __author__ = 'Alan'
 
 import BaseClasses
 import Shell
+import random
+from kivy.clock import Clock
 
 
 
@@ -35,6 +37,12 @@ class DungeonFeature():
     def go_up(self,creature):
         pass
 
+    def burn(self,temp,intensity,**kwargs):
+        pass
+
+    def remove(self,*args,**kwargs):
+        self.floor.cells[self.location[0]][self.location[1]].contents.remove(self)
+
 class DungeonFloor(DungeonFeature):
     def __init__(self,screen=None,x=None,y=None):
         super().__init__(screen,x,y,image='./images/Floor.png')
@@ -48,6 +56,31 @@ class Wall(DungeonFeature):
         self.passage={'walk':0,'crawl':0,'fly':0,'float':0,'climb':0,'phase':1,'swim':0}
         self.vision_blocking=True
         self.name='wall'
+
+class IceWall(DungeonFeature):
+    def __init__(self,screen=None,x=None,y=None):
+        super().__init__(screen,x,y,image='./images/Wall.png')
+        self.passable=False
+        self.passage={'walk':0,'crawl':0,'fly':0,'float':0,'climb':0,'phase':1,'swim':0}
+        self.vision_blocking=False
+        self.name='ice wall'
+        self.color=[0,0.3*random.random(),0.8+0.2*random.random(),0.7]
+        self.melt_resistance=0.9
+        self.turns=0
+
+
+    def on_turn(self):
+        self.turns+=1
+        neighbors=0
+        for i in self.floor.cells[self.location[0]][self.location[1]].immediate_neighbors:
+            if any(isinstance(k,IceWall) for k in i.contents):
+                neighbors+=1
+        if random.random()>self.melt_resistance and random.randint(0,8)>neighbors and self.turns>random.randint(0,20):
+            self.floor.cells[self.location[0]][self.location[1]].contents.remove(self)
+
+
+    def burn(self,temp,intensity,**kwargs):
+        Clock.schedule_once(self.remove,15/60)
 
 class Upstair(DungeonFeature):
     def __init__(self,screen=None,x=None,y=None,goto=None):

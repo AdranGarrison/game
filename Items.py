@@ -8,7 +8,6 @@ import BaseClasses
 from Attacks import *
 
 
-
 import BaseClasses as B
 import Enchantments
 
@@ -90,6 +89,7 @@ class Hair(BaseClasses.Item):
     def __init__(self,length=0.5,in_radius=0.03,out_radius=0.05,material=M.Hair_Material,name='hair',plural=False,quality=1,threshold=0,**kwargs):
         super().__init__(painfactor=0,**kwargs)
         self.base_descriptor='Hair from some creature or another'
+        self.structural=False
         self.coverage=0.1
         self.plural=plural
         self.material=material(quality=quality,power=self.power)
@@ -121,6 +121,7 @@ class Feathers(BaseClasses.Item):
     def __init__(self,length=0.5,in_radius=0.03,out_radius=0.05,material=M.Feather,name='feathers',plural=True,quality=1,threshold=0,**kwargs):
         super().__init__(painfactor=0,**kwargs)
         self.base_descriptor='Feathers from some creature or another'
+        self.structural=False
         self.coverage=0.1
         self.plural=plural
         self.material=material(quality=quality,power=self.power)
@@ -149,6 +150,7 @@ class Scales(BaseClasses.Item):
         super().__init__(painfactor=0,**kwargs)
         self.base_descriptor='Scales from some creature or another'
         self.coverage=1
+        self.structural=False
         self.plural=plural
         self.material=material(quality=quality,power=self.power)
         self.material.mode="mail"
@@ -282,8 +284,8 @@ class LongSword(BaseClasses.Item):
         self.plural=False
         self.truename=self.material.name+' long sword'
         self.length=length
-        self.edge=edge
-        self.tip=tip
+        self.edge=max(edge,self.material.maxedge)
+        self.tip=max(tip,self.material.maxedge**1.5)
         self.width=width
         self.thickness=thickness
         self.radius=self.thickness
@@ -324,8 +326,8 @@ class Gladius(BaseClasses.Item):
         self.plural=False
         self.truename=self.material.name+' gladius'
         self.length=length
-        self.edge=edge
-        self.tip=tip
+        self.edge=max(edge,self.material.maxedge)
+        self.tip=max(tip,self.material.maxedge**1.5)
         self.width=width
         self.thickness=thickness
         self.radius=self.thickness
@@ -366,8 +368,8 @@ class Knife(BaseClasses.Item):
         self.plural=False
         self.truename=self.material.name+' dagger'
         self.length=length
-        self.edge=edge
-        self.tip=tip
+        self.edge=max(edge,self.material.maxedge)
+        self.tip=max(tip,self.material.maxedge**1.5)
         self.width=width
         self.thickness=thickness
         self.radius=self.thickness
@@ -409,8 +411,8 @@ class Saber(BaseClasses.Item):
         self.plural=False
         self.truename=self.material.name+' saber'
         self.length=length
-        self.edge=edge
-        self.tip=tip
+        self.edge=max(edge,self.material.maxedge)
+        self.tip=max(tip,self.material.maxedge**1.5)
         self.width=width
         self.thickness=thickness
         self.radius=self.thickness
@@ -451,8 +453,8 @@ class Claymore(BaseClasses.Item):
         self.plural=False
         self.truename=self.material.name+' claymore'
         self.length=length
-        self.edge=edge
-        self.tip=tip
+        self.edge=max(edge,self.material.maxedge)
+        self.tip=max(tip,self.material.maxedge**1.5)
         self.width=width
         self.thickness=thickness
         self.radius=self.thickness
@@ -514,27 +516,82 @@ class Mace(BaseClasses.Item):
         if self.base_radius==0:
             self.base_radius=self.radius
 
-class FlangedMace(BaseClasses.Item):
+class Flail(BaseClasses.Item):
     #length is length of mace in meters
     #head is head radius in meters
-    #contactarea is the contact area of a flange or spike in square meters
-    def __init__(self,length=0.8,head=0.06,contactarea=.0008,material=M.Iron,quality=1,**kwargs):
+    def __init__(self,length=0.6,head=0.06,chain=0.4,material=M.Iron,quality=1,**kwargs):
         super().__init__(**kwargs)
-        self.names=['weapon','club','flanged mace']
+        self.names=['weapon','club','flail']
+        self.base_descriptor='A heavy ball at the end of a chain. Unwieldly, but dangerous in the right hands.'
         self.sortingtype='weapon'
         self.material=material(quality=quality,power=self.power)
         self.length=length
         self.head=head
-        self.contactarea=contactarea
-        self.parry=True
-        self.mass=self.material.density*(self.length*3.14*0.005**2+1.33*3.14*self.head**3)
+        self.chain=chain
+        self.parry=False
+        self.truename=self.material.name+' flail'
         self.wield='grasp'
-        self.centermass=length*0.8
+        self.curvature=0.5
         self.attacktype=['bludgeon']
+        self.function=1
+        self.attacks=[Flail_Strike_1H,Flail_Strike_2H]
+        self.recalc()
+        self.generate_descriptions()
+
+    def recalc(self):
+        self.material_import()
+        self.mass=self.density*(self.length*3.14*0.005**2+1.33*3.14*self.head**3)
+        self.headmass=self.density*1.33*3.14*self.head**3
+        self.centermass=self.length+self.chain
         self.I=self.mass*self.centermass**2
-        self.damagetype=self.material.damagetype
-        self.damagetype.append('blunt')
+        self.contactarea=0.15*(1-self.curvature)*3.14*self.head**2
+        self.radius=self.head
+        self.thickness=0.02
+        self.r=0.015
         self.movemass=self.mass
+        if self.base_thickness==0:
+            self.base_thickness=self.thickness
+        if self.base_radius==0:
+            self.base_radius=self.radius
+
+class FlangedMace(BaseClasses.Item):
+    #length is length of mace in meters
+    #head is head radius in meters
+    #contactarea is the contact area of a flange or spike in square meters
+    def __init__(self,length=0.8,head=0.06,edge=0.00008,penetration_depth=0.08,material=M.Iron,quality=1,**kwargs):
+        super().__init__(**kwargs)
+        self.names=['weapon','club','flanged mace']
+        self.base_descriptor='A heavy mace covered in sharp blades'
+        self.sortingtype='weapon'
+        self.material=material(quality=quality,power=self.power)
+        self.length=length
+        self.head=head
+        self.edge=edge
+        self.penetration_depth=penetration_depth
+        self.parry=True
+        self.truename=self.material.name+' flanged mace'
+        self.wield='grasp'
+        self.curvature=0
+        self.attacktype=['bludgeon']
+        self.function=1
+        self.attacks=[Flanged_Mace_Strike_1H,Flanged_Mace_Strike_2H]
+        self.recalc()
+        self.generate_descriptions()
+
+    def recalc(self):
+        self.material_import()
+        self.mass=self.density*(self.length*3.14*0.005**2+1.33*3.14*self.head**3)
+        self.centermass=self.length*0.8
+        self.I=self.mass*self.centermass**2
+        self.contactarea=0.15*(1-self.curvature)*3.14*self.head**2
+        self.radius=self.head
+        self.thickness=0.02
+        self.r=0.015
+        self.movemass=self.mass
+        if self.base_thickness==0:
+            self.base_thickness=self.thickness
+        if self.base_radius==0:
+            self.base_radius=self.radius
 
 class WarHammer(BaseClasses.Item):
     #length is length of war hammer in meters
@@ -551,7 +608,7 @@ class WarHammer(BaseClasses.Item):
         self.length=length
         self.headvolume=headvolume
         self.headsize=headsize
-        self.tip=tip
+        self.tip=max(tip,self.material.maxedge**1.5)
         self.parry=True
         self.truename=self.material.name+' war hammer'
         self.wield='grasp'
@@ -591,7 +648,7 @@ class Spear(BaseClasses.Item):
         self.plural=False
         self.truename=self.material.name+' spear'
         self.length=length
-        self.tip=tip
+        self.tip=max(tip,self.material.maxedge**1.5)
         self.thickness=thickness
         self.radius=self.thickness
         self.parry=True
@@ -627,7 +684,7 @@ class Axe(BaseClasses.Item):
         self.plural=False
         self.truename=self.material.name+' axe'
         self.length=length
-        self.edge=edge
+        self.edge=max(edge,self.material.maxedge)
         self.width=width
         self.thickness=thickness
         self.radius=self.thickness
@@ -654,7 +711,7 @@ class Axe(BaseClasses.Item):
             self.base_radius=self.radius
 
 class QuarterStaff(BaseClasses.Item):
-    def __init__(self,length=2,thickness=0.02,material=M.Wood,quality=1,**kwargs):
+    def __init__(self,length=2,thickness=0.05,material=M.Wood,quality=1,**kwargs):
         super().__init__(**kwargs)
         self.names=['weapon','polearm','quarterstaff']
         self.base_descriptor='A long staff capable of delivering quick blows while keeping adversaries at range.'
@@ -664,7 +721,7 @@ class QuarterStaff(BaseClasses.Item):
         self.truename=self.material.name+' quarterstaff'
         self.length=length
         self.thickness=thickness
-        self.radius=self.thickness
+        self.radius=self.thickness/2
         self.parry=True
         self.wield='grasp'
         self.curvature=0
@@ -676,7 +733,7 @@ class QuarterStaff(BaseClasses.Item):
 
     def recalc(self):
         self.material_import()
-        self.mass=self.density*(3.14*self.length*self.thickness**2)
+        self.mass=self.density*(3.14*self.length*self.radius**2)
         self.movemass=self.mass
         self.centermass=0.01
         self.I=(1/12)*self.mass*self.length**2
@@ -686,6 +743,250 @@ class QuarterStaff(BaseClasses.Item):
         if self.base_radius==0:
             self.base_radius=self.radius
 
+class Shortbow(BaseClasses.Item):
+    def __init__(self,length=1.3,thickness=0.017,height=1.1,brace=0.2,material=M.Wood,quality=1,**kwargs):
+        super().__init__(**kwargs)
+        self.names=['weapon','bow','shortbow']
+        self.base_descriptor='A short bow suited for firing relatively lightweight arrows'
+        self.sortingtype='weapon'
+        self.material=material(quality=quality,power=self.power)
+        self.plural=False
+        self.truename=self.material.name+' shortbow'
+        self.length=length
+        self.thickness=thickness
+        self.radius=self.thickness/2
+        self.parry=True
+        self.wield='grasp'
+        self.height=height
+        self.brace=brace
+        self.curvature=0
+        self.attacktype=[]
+        self.function=1
+        self.attacks=[Strike_1H,Strike_2H]
+        self.abilities=[]
+        self.recalc()
+        self.generate_descriptions()
+
+    def recalc(self):
+        self.material_import()
+        self.mass=self.density*(3.14*self.length*self.radius**2)
+        self.movemass=self.mass
+        self.centermass=0.01
+        self.I=(1/12)*self.mass*self.length**2
+        self.r=self.thickness
+        if self.base_thickness==0:
+            self.base_thickness=self.thickness
+        if self.base_radius==0:
+            self.base_radius=self.radius
+        self.maxdraw=self.height*0.4
+        self.maxdraw_strength=(1/60)*48*3.14159*1000000000*self.maxdraw*self.youngs*(self.radius**4)/(4*self.height**3)
+        self.stiffness=48*3.14159*1000000000*self.youngs*(self.radius**4)/(4*self.height**3)
+
+    def on_equip(self):
+        import Abilities
+        super().on_equip()
+        self.fire_arrow=Abilities.Fire_Bow(self.equipped[0].owner,self)
+        self.abilities=[self.fire_arrow]
+
+    def on_unequip(self,limb,**kwargs):
+        super().on_unequip(limb,**kwargs)
+        self.abilities=[]
+
+class Longbow(BaseClasses.Item):
+    def __init__(self,length=2.1,thickness=0.023,height=1.8,brace=0.2,material=M.Wood,quality=1,**kwargs):
+        super().__init__(**kwargs)
+        self.names=['weapon','bow','longbow']
+        self.base_descriptor='A tall bow with a long draw and great range.'
+        self.sortingtype='weapon'
+        self.material=material(quality=quality,power=self.power)
+        self.plural=False
+        self.truename=self.material.name+' longbow'
+        self.length=length
+        self.thickness=thickness
+        self.radius=self.thickness/2
+        self.parry=True
+        self.wield='grasp'
+        self.height=height
+        self.brace=brace
+        self.curvature=0
+        self.attacktype=[]
+        self.function=1
+        self.attacks=[Strike_1H,Strike_2H]
+        self.abilities=[]
+        self.recalc()
+        self.generate_descriptions()
+
+    def recalc(self):
+        self.material_import()
+        self.mass=self.density*(3.14*self.length*self.radius**2)
+        self.movemass=self.mass
+        self.centermass=0.01
+        self.I=(1/12)*self.mass*self.length**2
+        self.r=self.thickness
+        if self.base_thickness==0:
+            self.base_thickness=self.thickness
+        if self.base_radius==0:
+            self.base_radius=self.radius
+        self.maxdraw=self.height*0.4
+        self.maxdraw_strength=(1/60)*48*3.14159*1000000000*self.maxdraw*self.youngs*(self.radius**4)/(4*self.height**3)
+        self.stiffness=48*3.14159*1000000000*self.youngs*(self.radius**4)/(4*self.height**3)
+
+    def on_equip(self):
+        import Abilities
+        super().on_equip()
+        self.fire_arrow=Abilities.Fire_Bow(self.equipped[0].owner,self)
+        self.abilities=[self.fire_arrow]
+
+    def on_unequip(self,limb,**kwargs):
+        super().on_unequip(limb,**kwargs)
+        self.abilities=[]
+
+class Crossbow(BaseClasses.Item):
+    def __init__(self,length=0.8,thickness=0.1,stiffness=3000,brace=0.2,material=M.Wood,quality=1,**kwargs):
+        super().__init__(**kwargs)
+        self.names=['weapon','crossbow']
+        self.base_descriptor='A mechanical bow which requires little skill to use effectively. Requires reloading between shots.'
+        self.sortingtype='weapon'
+        self.material=material(quality=quality,power=self.power)
+        self.plural=False
+        self.truename=self.material.name+' crossbow'
+        self.length=length
+        self.thickness=thickness
+        self.radius=self.thickness/2
+        self.parry=True
+        self.wield='grasp'
+        self.stiffness=stiffness
+        self.ammo=None
+        self.brace=brace
+        self.curvature=0
+        self.attacktype=[]
+        self.function=1
+        self.attacks=[Strike_1H,Strike_2H]
+        self.abilities=[]
+        self.recalc()
+        self.generate_descriptions()
+
+    def recalc(self):
+        self.material_import()
+        self.mass=self.density*(3.14*self.length*self.radius**2)
+        self.movemass=self.mass
+        self.centermass=0.01
+        self.I=(1/12)*self.mass*self.length**2
+        self.r=self.thickness
+        if self.base_thickness==0:
+            self.base_thickness=self.thickness
+        if self.base_radius==0:
+            self.base_radius=self.radius
+
+    def on_equip(self):
+        import Abilities
+        super().on_equip()
+        self.fire_arrow=Abilities.Fire_Crossbow(self.equipped[0].owner,self)
+        self.abilities=[self.fire_arrow]
+
+    def on_unequip(self,limb,**kwargs):
+        super().on_unequip(limb,**kwargs)
+        self.abilities=[]
+
+class Arrow(BaseClasses.Item):
+    def __init__(self,length=0.85,tip=0.0000001,thickness=0.004,material=M.Wood,quality=1,**kwargs):
+        super().__init__(**kwargs)
+        self.stack_id=random.random()
+        self.names=['weapon','arrow']
+        self.base_descriptor='A simple projectile to be fired from a bow'
+        self.sortingtype='weapon'
+        self.material=material(quality=quality,power=self.power)
+        self.plural=False
+        self.truename=self.material.name+' arrow'
+        self.length=length
+        self.thickness=thickness
+        self.radius=self.thickness/2
+        self.parry=True
+        self.wield='quiver'
+        self.tip=tip
+        self.stackable=True
+        self.curvature=0
+        self.attacktype=[]
+        self.function=1
+        self.attacks=[]
+        self.abilities=[]
+        self.in_stack=100
+        self.recalc()
+        self.generate_descriptions()
+
+    def recalc(self):
+        self.material_import()
+        self.mass=self.density*(3.14*self.length*self.radius**2)
+        self.movemass=self.mass
+        self.centermass=0.01
+        self.I=(1/12)*self.mass*self.length**2
+        self.r=self.thickness
+        if self.base_thickness==0:
+            self.base_thickness=self.thickness
+        if self.base_radius==0:
+            self.base_radius=self.radius
+
+    def get_from_stack(self,**kwargs):
+        self.in_stack-=1
+        self.generate_descriptions(name_only=True)
+        new_arrow=Arrow(length=self.length,tip=self.tip,thickness=self.thickness,material=type(self.material),quality=self.quality)
+        new_arrow.in_stack=1
+        new_arrow.stack_id=self.stack_id
+        new_arrow.knowledge_level=self.knowledge_level
+        new_arrow.generate_descriptions(name_only=True)
+        for i in self.enchantments:
+            type(i)(new_arrow,strength=i.strength,turns=i.turns)
+        return new_arrow
+
+class Bolt(BaseClasses.Item):
+    def __init__(self,length=0.5,tip=0.0000001,thickness=0.01,material=M.Wood,quality=1,**kwargs):
+        super().__init__(**kwargs)
+        self.stack_id=random.random()
+        self.names=['weapon','bolt']
+        self.base_descriptor='A heavy bolt designed to be fired from a crossbow'
+        self.sortingtype='weapon'
+        self.material=material(quality=quality,power=self.power)
+        self.plural=False
+        self.truename=self.material.name+' bolt'
+        self.length=length
+        self.thickness=thickness
+        self.radius=self.thickness/2
+        self.parry=True
+        self.wield='quiver'
+        self.tip=tip
+        self.stackable=True
+        self.curvature=0
+        self.attacktype=[]
+        self.function=1
+        self.attacks=[]
+        self.abilities=[]
+        self.in_stack=100
+        self.recalc()
+        self.generate_descriptions()
+
+    def recalc(self):
+        self.material_import()
+        self.mass=self.density*(3.14*self.length*self.radius**2)
+        self.movemass=self.mass
+        self.centermass=0.01
+        self.I=(1/12)*self.mass*self.length**2
+        self.r=self.thickness
+        if self.base_thickness==0:
+            self.base_thickness=self.thickness
+        if self.base_radius==0:
+            self.base_radius=self.radius
+
+    def get_from_stack(self,**kwargs):
+        self.in_stack-=1
+        self.generate_descriptions(name_only=True)
+        new_arrow=Arrow(length=self.length,tip=self.tip,thickness=self.thickness,material=type(self.material),quality=self.quality)
+        new_arrow.in_stack=1
+        new_arrow.stack_id=self.stack_id
+        new_arrow.knowledge_level=self.knowledge_level
+        new_arrow.generate_descriptions(name_only=True)
+        for i in self.enchantments:
+            type(i)(new_arrow,strength=i.strength,turns=i.turns)
+        return new_arrow
 
 
 ############################################Armor####################################################################
@@ -1199,13 +1500,43 @@ class ExperimentalMace(Mace):
         super().__init__(material=material,quality=quality)
         self.attacks=[Experimental_Bash]
 
+
+###########################################Miscelaneous############################################################
+
+class Stone(BaseClasses.Item):
+    def __init__(self,length=0.1,in_radius=0,out_radius=0.1,material=M.Granite,name='stone',plural=False,quality=1,threshold=0,**kwargs):
+        super().__init__(**kwargs)
+        self.base_descriptor='A heavy ball of rock'
+        self.plural=plural
+        self.material=material(quality=quality,power=self.power)
+        self.names=['lump','stone']
+        self.truename='stone'
+        self.identification_difficulty['basic']=1
+        self.name=name
+        self.length=length
+        self.radius=out_radius
+        self.in_radius=in_radius
+        self.cross_section_range=[3.14*(self.radius**2-in_radius**2),self.length*2*(self.radius-in_radius)]
+        self.parry=False
+        self.wield=None
+        self.curvature=0
+        self.attacktype=None
+        self.threshold=threshold
+        self.function=1
+        self.coverage=0.5
+        self.recalc()
+
+
+
+
 default_item_weights=[(Bone,0),(Flesh,0),(Hair,0),(LongSword,10),(Gladius,5),(Knife,7),(Saber,4),(Claymore,4),(Mace,8),
-                 (WarHammer,3),(Spear,5),(Axe,6),(QuarterStaff,3),(Chest,8),(Glove,12),(Legging,12),(Armlet,12),
+                 (WarHammer,3),(FlangedMace,3),(Spear,5),(Axe,6),(QuarterStaff,3),(Chest,8),(Glove,12),(Legging,12),(Armlet,12),
                 (Boot,12),(Helm,8),(GreatHelm,3),(Shield,6),(Buckler,6),(Chainmail,5),(Chain_Armlet,6),(Chain_Legging,6),
-                (Chain_Glove,6)]
+                (Chain_Glove,6),(Stone,3)]
 total_item_weight=sum(i[1] for i in default_item_weights)
 
-hard_material_weights=[(M.Iron,10),(M.Bone_Material,7),(M.Wood,10),(M.Copper,10),(M.Brass,6),(M.Bronze,5),(M.Steel,4),(M.Aluminum,3),(M.Silver,2),(M.Duraluminum,1),(M.Zicral,1)]
+hard_material_weights=[(M.Iron,10),(M.Bone_Material,7),(M.Wood,10),(M.Copper,10),(M.Brass,6),(M.Bronze,5),(M.Steel,4),
+                       (M.Aluminum,3),(M.Silver,2),(M.Duraluminum,1),(M.Zicral,1),(M.Granite,2)]
 soft_material_weights=[(M.Leather,10),(M.Cotton,10),(M.Wool,9),(M.Silk,5),(M.Spider_Silk,2),(M.Basalt_Fiber,1),(M.Fur,3),(M.Flesh_Material,1)]
 
 def weighted_choice(pairs):
@@ -1235,6 +1566,9 @@ def weighted_generation(weighted_items=default_item_weights,totalweight=total_it
     elif itemtype in (LongSword,Gladius,Knife,Saber,Claymore,Mace,WarHammer,Spear,Axe,QuarterStaff,Shield,Buckler):
         if random.random()<0.99:
             chosen_material=weighted_choice(hard_materials)
+    elif itemtype in [Stone]:
+        if random.random()>0.99:
+            chosen_material=random.choice([M.Granite])
     if chosen_material==None:
         mats=hard_materials.copy()
         mats.extend(soft_materials)

@@ -5,9 +5,11 @@ import Fluids
 import random
 import Shell
 import Materials as Mats
+import ai
 from kivy.clock import Clock
 import functools
 from kivy.graphics import Color,Rectangle
+
 
 
 #Item enchantments
@@ -19,18 +21,21 @@ class Acidic(BaseClasses.Enchantment):
         super().__init__(target,turns=turns,strength=strength,**kwargs)
         self.classname='acidic'
         self.strength=strength
-        self.old_acid_resistance=self.target.acid_resistance
-        self.old_mat_acid_resistance=self.target.material.acid_resistance
-        self.target.acid_resistance=2*strength
-        self.target.material.acid_resistance=2*strength
+        self.target.resistance['acid']*=1+self.strength/3
         self.acid=Fluids.Acid(None,strength=self.strength)
 
     def on_turn(self):
         super().on_turn()
+        owner=None
         for i in self.target.equipped:
+            Limb_Resistance_Modification(i,turns=2,strength=self.strength,res='acid')
+            if owner==None:
+                owner=i.owner
             if random.random()<(1/i.stats['luc'])**1.5:
                 self.acid.add(i)
                 self.attempt_identification(15)
+        if owner!=None:
+            Creature_Resistance_Modification(owner,turns=2,strength=self.strength/10,res='acid')
         if random.random()>0.7: self.acid.add(self.target)
 
     def on_strike(self,attack):
@@ -60,10 +65,20 @@ class Acidic(BaseClasses.Enchantment):
             self.acid=Fluids.Acid(self.target,strength=self.strength)
             self.acid.splatter(intensity=3,volume=self.strength*2)
 
-    def on_dispel(self,**kwargs):
-        self.target.acid_resistance=self.old_acid_resistance
-        self.target.material.acid_resistance=self.old_mat_acid_resistance
-        super().on_dispel(**kwargs)
+    def on_removal(self,**kwargs):
+        self.target.resistance['acid']*=3/(self.strength+3)
+        super().on_removal(**kwargs)
+
+    def modify_strength(self,amount,**kwargs):
+        oldstrength=self.strength
+        super().modify_strength(amount,**kwargs)
+        if self.strength<=0:
+            self.on_removal(**kwargs)
+            self.target.enchantments.remove(self)
+            self.strength=oldstrength
+            return
+        if self in self.target.enchantments:
+            self.target.resistance['acid']*=(1+self.strength/3)/(1+oldstrength/3)
 
 class Burning(BaseClasses.Enchantment):
     def __init__(self,target,turns='permanent',strength=6,**kwargs):
@@ -71,32 +86,48 @@ class Burning(BaseClasses.Enchantment):
             return
         super().__init__(target,turns=turns,strength=strength,**kwargs)
         self.classname='burning'
+        self.classification=['magic','enchantment']
         self.strength=strength
-        self.old_burn_resistance=self.target.burn_resistance
-        self.old_mat_burn_resistance=self.target.material.burn_resistance
-        self.target.burn_resistance=2*strength*self.target.burn_resistance
-        self.target.material.burn_resistance=2*strength*self.target.material.burn_resistance
+        self.target.resistance['fire']*=1+self.strength/3
 
     def on_turn(self):
         super().on_turn()
+        owner=None
         for i in self.target.equipped:
+            Limb_Resistance_Modification(i,turns=2,strength=self.strength,res='fire')
+            if owner==None:
+                owner=i.owner
             if random.random()<(1/i.stats['luc'])**1.5:
                 if random.random()<(1/i.stats['luc'])**1.5:
-                    i.burn(random.gauss(self.strength*100,100),random.gauss(2,0.5),with_armor=False)
+                    i.burn(random.gauss(self.strength*100,100),random.gauss(2,0.5),with_armor=False,source=self)
                     self.attempt_identification(20)
                 else:
-                    i.burn(random.gauss(self.strength*100,100),random.gauss(2,0.5))
+                    i.burn(random.gauss(self.strength*100,100),random.gauss(2,0.5),source=self)
                     if i.armor is None:
                         self.attempt_identification(20)
                     else:
                         self.attempt_identification(10)
+        if owner!=None:
+            Creature_Resistance_Modification(owner,turns=2,strength=self.strength/10,res='fire')
 
     def on_strike(self,attack):
         super().on_strike(attack)
         luc=attack.attacker.stats['luc']
         for i in attack.touchedobjects:
             if random.random()<luc/(10+luc):
-                i.burn(random.gauss(self.strength*100,100),random.gauss(len(attack.touchedobjects)**0.5,0.1))
+                temp=random.gauss(self.strength*100,100)
+                intensity=random.gauss(len(attack.touchedobjects)**0.5,0.1)
+                if i.in_limb!=None:
+                    temp=temp/i.in_limb.resistance['fire']
+                    intensity=intensity/i.in_limb.resistance['fire']
+                    if i.in_limb.owner!=None:
+                        temp=temp/i.in_limb.owner.resistance['fire']
+                        intensity=intensity/i.in_limb.owner.resistance['fire']
+                        message=i.burn(temp,intensity,source=self,log=True,in_limb=True,limb=i.in_limb)
+                        if i.in_limb.owner in Shell.shell.player.visible_creatures and i.in_limb.owner.alive and message[0]!='':
+                            Shell.messages.append(message[0])
+                else:
+                    i.burn(temp,intensity,source=self)
                 if attack.attacker==Shell.shell.player or attack.basetarget.owner==Shell.shell.player: self.attempt_identification(15)
                 elif attack.basetarget.owner in Shell.shell.player.visible_creatures: self.attempt_identification(5)
 
@@ -115,9 +146,139 @@ class Burning(BaseClasses.Enchantment):
             self.magma=Fluids.Magma(self.target,temp=random.gauss(self.strength*200,100))
             self.magma.splatter(intensity=3,volume=self.strength*2)
 
-    def on_dispel(self):
-        self.target.burn_resistance=self.old_burn_resistance
-        self.target.material.burn_resistance=self.old_mat_burn_resistance
+    def on_removal(self,**kwargs):
+        self.target.resistance['fire']*=3/(self.strength+3)
+        super().on_removal(**kwargs)
+
+    def modify_strength(self,amount,**kwargs):
+        oldstrength=self.strength
+        super().modify_strength(amount,**kwargs)
+        if self.strength<=0:
+            self.on_removal(**kwargs)
+            self.target.enchantments.remove(self)
+            self.strength=oldstrength
+            return
+        if self in self.target.enchantments:
+            self.target.resistance['fire']*=(1+self.strength/3)/(1+oldstrength/3)
+
+class Freezing(BaseClasses.Enchantment):
+    def __init__(self,target,turns='permanent',strength=6,**kwargs):
+        if not isinstance(target,BaseClasses.Item):
+            return
+        super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='freezing'
+        self.classification=['magic','enchantment']
+        self.strength=strength
+        self.target.resistance['ice']*=1+self.strength/3
+
+    def on_turn(self):
+        super().on_turn()
+        owner=None
+        for i in self.target.equipped:
+            Limb_Resistance_Modification(i,turns=2,strength=self.strength,res='ice')
+            if owner==None:
+                owner=i.owner
+            if random.random()<(1/i.stats['luc'])**1.5:
+                if i.armor!=None and self.strength*random.random()>random.random()*(i.stats['luc']**0.5)/i.armor.heat_conduction:
+                    Frozen_Limb(i,strength=self.strength/i.resistance['ice'])
+                    if owner==Shell.shell.player:
+                        Shell.messages.append("[color=C21D25]Your {} is frozen![/color]".format(i.name))
+                    elif owner in Shell.shell.player.visible_creatures:
+                        Shell.messages.append("[color=1F4CAD]{}'s {} is frozen![/color]".format(owner.name,i.name))
+                    self.attempt_identification(20)
+                elif i.armor==None:
+                    Frozen_Limb(i,strength=self.strength/i.resistance['ice'])
+                    if owner==Shell.shell.player:
+                        Shell.messages.append("[color=C21D25]Your {} is frozen![/color]".format(i.name))
+                    elif owner in Shell.shell.player.visible_creatures:
+                        Shell.messages.append("[color=1F4CAD]{}'s {} is frozen![/color]".format(owner.name,i.name))
+                    self.attempt_identification(20)
+        if owner!=None:
+            Creature_Resistance_Modification(owner,turns=2,strength=self.strength/10,res='ice')
+
+    def on_strike(self,attack):
+        super().on_strike(attack)
+        message=None
+        luc=attack.attacker.stats['luc']
+        for i in attack.touchedobjects:
+            if random.random()<luc/(10+luc):
+                if i.in_limb!=None:
+                    res=i.in_limb.resistance['ice']
+                    if i.in_limb.owner!=None:
+                        res*=i.in_limb.owner.resistance['ice']
+                        chance=self.strength/res
+                        chance=chance/(chance+i.in_limb.owner.stats['luc']**0.5)
+                        if 0.2*chance**4>random.random():
+                            Frozen_Creature(i.in_limb.owner,strength=self.strength/res)
+                            if i.in_limb.owner==Shell.shell.player:
+                                message="[color=C21D25]You are frozen solid![/color]"
+                            elif i.in_limb.owner in Shell.shell.player.visible_creatures:
+                                message="[color=1F4CAD]{} is frozen solid![/color]".format(i.in_limb.owner.name)
+                        elif chance>random.random():
+                            Frozen_Limb(i.in_limb,strength=self.strength/res)
+                            if i.in_limb.owner==Shell.shell.player:
+                                message="[color=C21D25]Your {} is frozen![/color]".format(i.in_limb.name)
+                            elif i.in_limb.owner in Shell.shell.player.visible_creatures:
+                                message="[color=1F4CAD]{}'s {} is frozen![/color]".format(i.in_limb.owner.name,i.in_limb.name)
+                        if message!=None:
+                            Shell.messages.append(message)
+                if attack.attacker==Shell.shell.player or attack.basetarget.owner==Shell.shell.player: self.attempt_identification(15)
+                elif attack.basetarget.owner in Shell.shell.player.visible_creatures: self.attempt_identification(5)
+
+    def on_struck(self,attack):
+        super().on_struck(attack)
+        if 'melee' in attack.classification:
+            chance=self.strength/attack.attacker.resistance['ice']
+            chance=chance/(chance+attack.attacker.stats['luc']**0.5)
+            if 0.2*chance**4>random.random():
+                Frozen_Creature(attack.attacker,strength=self.strength/attack.attacker.resistance['ice'])
+                if attack.attacker==Shell.shell.player:
+                    Shell.messages.append("[color=C21D25]You are frozen solid![/color]".format(attack.limb.name))
+                elif attack.attacker in Shell.shell.player.visible_creatures:
+                    Shell.messages.append("[color=1F4CAD]{} is frozen solid![/color]".format(attack.attacker.name))
+                return
+            if 'weaponless' in attack.classification:
+                chance=self.strength/(attack.limb.resistance['ice']*attack.attacker.resistance['ice'])
+                if chance>random.random():
+                    if attack.attacker==Shell.shell.player:
+                        Shell.messages.append("[color=C21D25]Your {} is frozen![/color]".format(attack.limb.name))
+                    elif attack.attacker in Shell.shell.player.visible_creatures:
+                        Shell.messages.append("[color=1F4CAD]{}'s {} is frozen![/color]".format(attack.attacker.name,attack.limb.name))
+                    Frozen_Limb(attack.limb,strength=self.strength/(attack.limb.resistance['ice']*attack.attacker.resistance['ice']))
+
+    def on_destruction(self):
+        location=[None,None]
+        floor=None
+        if self.target.location==[None,None]:
+            try:
+                location=self.target.in_inventory.location
+                floor=self.target.in_inventory.floor
+            except:
+                location=[None,None]
+        else:
+            location=self.target.location
+            floor=self.target.floor
+        if location==[None,None]:
+            return
+        else:
+            cell=floor.cells[location[0]][location[1]]
+            frost=Shell.Abilities.Frost_Explosion(2*self.strength)
+            frost.do(cell)
+
+    def on_removal(self,**kwargs):
+        self.target.resistance['ice']*=3/(self.strength+3)
+        super().on_removal(**kwargs)
+
+    def modify_strength(self,amount,**kwargs):
+        oldstrength=self.strength
+        super().modify_strength(amount,**kwargs)
+        if self.strength<=0:
+            self.on_removal(**kwargs)
+            self.target.enchantments.remove(self)
+            self.strength=oldstrength
+            return
+        if self in self.target.enchantments:
+            self.target.resistance['ice']*=(1+self.strength/3)/(1+oldstrength/3)
 
 class Vampiric(BaseClasses.Enchantment):
     def __init__(self,target,turns='permanent',strength=6,**kwargs):
@@ -236,11 +397,12 @@ class Vampiric(BaseClasses.Enchantment):
             self.magma=Fluids.Blood(self.target,temp=random.gauss(self.strength*200,100))
             self.magma.splatter(intensity=3,volume=self.strength*2)
 
-    def on_dispel(self):
+    def on_removal(self,**kwargs):
         if self.has_edge:
             self.target.edge=self.base_edge
         if self.has_tip:
             self.target.tip=self.base_tip
+        super().on_removal(**kwargs)
 
 class Unstable(BaseClasses.Enchantment):
     def __init__(self,target,turns='permanent',strength=6,**kwargs):
@@ -287,7 +449,7 @@ class Bound(BaseClasses.Enchantment):
         elif attach.owner in Shell.shell.player.visible_creatures:
             Shell.shell.log.addtext('The {} fuses itself to the {} of {}'.format(self.target.name,attach.name,attach.owner.name))
 
-    def on_dispel(self):
+    def on_removal(self,**kwargs):
         try:
             self.limb.owner.limbs.remove(self.limb)
             self.limb.attachpoint.limbs.remove(self.limb)
@@ -295,6 +457,7 @@ class Bound(BaseClasses.Enchantment):
                 self.limb.owner.inventory_add(self.target)
         except:
             pass
+        super().on_removal(**kwargs)
 
     def on_destruction(self):
         super().on_destruction()
@@ -329,20 +492,18 @@ class Indestructable(BaseClasses.Enchantment):
         self.old_mat_heat_reaction=self.target.material.heat_reaction
         self.target.material.heat_reaction='indestructable'
 
-
-
     def on_struck(self,attack):
         super().on_struck(attack)
         self.attempt_identification(5)
 
-
-    def on_dispel(self):
+    def on_removal(self,**kwargs):
         self.target.mode=self.old_mode
         self.target.material.mode=self.old_mode
         self.target.acid_reaction=self.old_acid_reaction
         self.target.material.acid_reaction=self.old_mat_acid_reaction
         self.target.heat_reaction=self.old_heat_reaction
         self.target.material.heat_reaction=self.old_mat_heat_reaction
+        super().on_removal(**kwargs)
 
 class Shifting(BaseClasses.Enchantment):
     def __init__(self,target,turns='permanent',strength=6,**kwargs):
@@ -438,12 +599,11 @@ class Blinking(BaseClasses.Enchantment):
         self.classname='blinking'
         self.strength=strength
 
-
     def on_turn(self):
         player=Shell.shell.player
         super().on_turn()
         for i in self.target.equipped:
-            if random.random()<(self.strength**0.5)/(i.stats['luc']*i.stats['luc']):
+            if random.random()<(self.strength**0.5)/(i.stats['luc']*i.stats['luc']*i.resistance['teleport']):
                 creature=i.owner
                 equipped_items=0
                 for j in i.equipment:
@@ -451,38 +611,40 @@ class Blinking(BaseClasses.Enchantment):
                         equipped_items+=1
                 if i.armor!=None and i.armor!=self.target:
                     armor=i.armor
-                    creature.unequip(armor,log=False)
-                    creature.inventory.remove(armor)
-                    armor.in_inventory=None
-                    creature.floor.place_item(armor,location=None)
-                    if creature==player:
-                        Shell.messages.append("Your {} vanishes!".format(armor.name))
-                        self.attempt_identification(15)
-                    elif creature in player.visible_creatures:
-                        Shell.messages.append("{}'s {} vanishes!".format(creature.name,armor.name))
-                        self.attempt_identification(15)
+                    if armor.resistance['teleport']<random.random()*self.strength**0.5:
+                        creature.unequip(armor,log=False)
+                        creature.inventory.remove(armor)
+                        armor.in_inventory=None
+                        creature.floor.place_item(armor,location=None)
+                        if creature==player:
+                            Shell.messages.append("[color=1F4CAD]Your {} vanishes![/color]".format(armor.name))
+                            self.attempt_identification(15)
+                        elif creature in player.visible_creatures:
+                            Shell.messages.append("[color=1F4CAD]{}'s {} vanishes![/color]".format(creature.name,armor.name))
+                            self.attempt_identification(15)
                 elif random.random()>0.5 and equipped_items>1:
                     for j in i.equipment:
                         if i.equipment[j]!=self.target:
                             item=i.equipment[j]
-                            creature.unequip(item)
-                            creature.inventory.remove(item)
-                            item.in_inventory=None
-                            creature.floor.place_item(item)
-                        if creature==player:
-                            Shell.messages.append("Your {} vanishes!".format(item.name))
-                            self.attempt_identification(15)
-                        elif creature in player.visible_creatures:
-                            Shell.messages.append("{}'s {} vanishes!".format(creature.name,item.name))
-                            self.attempt_identification(15)
-                else:
+                            if item.resistance['teleport']<random.random()*self.strength**0.5:
+                                creature.unequip(item)
+                                creature.inventory.remove(item)
+                                item.in_inventory=None
+                                creature.floor.place_item(item)
+                                if creature==player:
+                                    Shell.messages.append("[color=1F4CAD]Your {} vanishes![/color]".format(item.name))
+                                    self.attempt_identification(15)
+                                elif creature in player.visible_creatures:
+                                    Shell.messages.append("[color=1F4CAD]{}'s {} vanishes![/color]".format(creature.name,item.name))
+                                    self.attempt_identification(15)
+                elif creature.resistance['teleport']<random.random()*self.strength**0.5:
                     creature.floor.cells[creature.location[0]][creature.location[1]].contents.remove(creature)
                     creature.floor.place_creature(creature)
                     if creature==player:
-                        Shell.messages.append("You feel disoriented.")
+                        Shell.messages.append("[color=1F4CAD]You feel disoriented.[/color]")
                         self.attempt_identification(10)
                     elif creature in player.visible_creatures:
-                        Shell.messages.append("{} vanishes from sight!".format(creature.name))
+                        Shell.messages.append("[color=1F4CAD]{} vanishes from sight![/color]".format(creature.name))
                         self.attempt_identification(5)
 
     def on_strike(self,attack):
@@ -492,34 +654,33 @@ class Blinking(BaseClasses.Enchantment):
         elif hasattr(attack.basetarget,'stats'):d_luc=attack.basetarget.stats['luc']
         else: d_luc=10
         defender=attack.basetarget.owner
-        effect_chance=self.strength*luc/(d_luc*d_luc)
+        effect_chance=2*self.strength*luc/(d_luc*d_luc)
         for i in attack.touchedobjects:
-            if random.random()<effect_chance/(1+effect_chance):
+            if random.random()<effect_chance/((1+effect_chance)*i.resistance['teleport']):
                 if hasattr(i,'equipped') and any(isinstance(j,Shell.Limb) for j in i.equipped):
                     defender.unequip(i,log=False)
                     defender.inventory.remove(i)
                     i.in_inventory=None
                     defender.floor.place_item(i)
                     if defender==Shell.shell.player:
-                        Shell.messages.append("Your {} vanishes!".format(i.name))
+                        Shell.messages.append("[color=1F4CAD]Your {} vanishes![/color]".format(i.name))
                         self.attempt_identification(15)
                     elif defender in Shell.shell.player.visible_creatures:
-                        Shell.messages.append("{}'s {} vanishes!".format(defender.name,i.name))
+                        Shell.messages.append("[color=1F4CAD]{}'s {} vanishes![/color]".format(defender.name,i.name))
                         self.attempt_identification(10)
-                elif i in attack.basetarget.layers:
+                elif i in attack.basetarget.layers and defender.resistance['teleport']<random.random()*self.strength**0.5:
                     defender.floor.cells[defender.location[0]][defender.location[1]].contents.remove(defender)
                     defender.floor.place_creature(defender)
                     if defender==Shell.shell.player:
-                        Shell.messages.append("You feel disoriented")
+                        Shell.messages.append("[color=1F4CAD]You feel disoriented[/color]")
                         self.attempt_identification(10)
                     elif defender in Shell.shell.player.visible_creatures:
-                        Shell.messages.append("{} vanishes from sight!".format(defender.name))
+                        Shell.messages.append("[color=1F4CAD]{} vanishes from sight![/color]".format(defender.name))
                         self.attempt_identification(10)
 
     def on_struck(self,attack):
         super().on_struck(attack)
         if 'ranged' in attack.classification and 'weaponless' in attack.classification:
-            print('None of that here!')
             return
         try: luc=self.target.stats['luc']
         except:
@@ -529,38 +690,35 @@ class Blinking(BaseClasses.Enchantment):
         except:
             try: d_luc=attack.armor.stats['luc']
             except: d_luc=attack.limb.stats['luc']
-        effect_chance=2*self.strength*luc/(d_luc*d_luc)
+        effect_chance=3*self.strength*luc/(d_luc*d_luc)
         item=None
         if random.random()<effect_chance/(1+effect_chance):
             if attack.weapon!=None and not any(isinstance(i,Bound) for i in attack.weapon.enchantments) and 'weaponless' not in attack.classification:
                 item=attack.weapon
             elif attack.limb.armor!=None and not any(isinstance(i,Bound) for i in attack.limb.armor.enchantments):
                 item=attack.limb.armor
-            if item!=None:
+            if item!=None and item.resistance['teleport']<random.random()*self.strength**0.5:
                 attack.attacker.unequip(item,log=False)
                 try: attack.attacker.inventory.remove(item)
                 except ValueError: pass
                 item.in_inventory=None
                 attack.attacker.floor.place_item(item)
                 if attack.attacker==Shell.shell.player:
-                    Shell.messages.append("Your {} vanishes!".format(item.name))
+                    Shell.messages.append("[color=1F4CAD]Your {} vanishes![/color]".format(item.name))
                     self.attempt_identification(10)
                 elif attack.attacker in Shell.shell.player.visible_creatures:
-                    Shell.messages.append("{}'s {} vanishes!".format(attack.attacker.name,item.name))
+                    Shell.messages.append("[color=1F4CAD]{}'s {} vanishes![/color]".format(attack.attacker.name,item.name))
                     self.attempt_identification(10)
                 return
-            attack.attacker.floor.cells[attack.attacker.location[0]][attack.attacker.location[1]].contents.remove(attack.attacker)
-            attack.attacker.floor.place_creature(attack.attacker)
-            if attack.attacker==Shell.shell.player:
-                Shell.messages.append("You feel disoriented")
-                self.attempt_identification(10)
-            elif attack.attacker in Shell.shell.player.visible_creatures:
-                Shell.messages.append("{} vanishes from sight!".format(attack.attacker.name))
-                self.attempt_identification(10)
-
-
-
-
+            if attack.attacker.resistance['teleport']<random.random()*self.strength**0.5:
+                attack.attacker.floor.cells[attack.attacker.location[0]][attack.attacker.location[1]].contents.remove(attack.attacker)
+                attack.attacker.floor.place_creature(attack.attacker)
+                if attack.attacker==Shell.shell.player:
+                    Shell.messages.append("[color=1F4CAD]You feel disoriented[/color]")
+                    self.attempt_identification(10)
+                elif attack.attacker in Shell.shell.player.visible_creatures:
+                    Shell.messages.append("[color=1F4CAD]{} vanishes from sight![/color]".format(attack.attacker.name))
+                    self.attempt_identification(10)
 
     def on_destruction(self):
         pass
@@ -622,23 +780,23 @@ class Numbing(BaseClasses.Enchantment):
                     return
             Numb(limb,turns=int(random.gauss(self.strength,1)),strength=self.strength)
             if limb.owner==Shell.shell.player:
-                Shell.messages.append("Your {} goes numb".format(limb.name))
+                Shell.messages.append("[color=1F4CAD]Your {} goes numb[/color]".format(limb.name))
                 self.attempt_identification(10)
 
     def on_struck(self,attack):
         try:
             if attack.basetarget.owner==Shell.shell.player:
-                message=' '.join([Shell.messages.pop(),"You barely feel a thing."])
+                message=' '.join([Shell.messages.pop(),"[color=1F4CAD]You barely feel a thing.[/color]"])
                 Shell.messages.append(message)
                 self.attempt_identification(10)
         except:
             pass
 
-    def on_dispel(self,**kwargs):
+    def on_removal(self,**kwargs):
         for i in self.oldpainfactors.copy():
             i.painfactor=i.painfactor*self.strength
             del self.oldpainfactors[i]
-        super().on_dispel(**kwargs)
+        super().on_removal(**kwargs)
 
 class Bleeding(BaseClasses.Enchantment):
     def __init__(self,target,turns='permanent',strength=6,**kwargs):
@@ -659,10 +817,10 @@ class Bleeding(BaseClasses.Enchantment):
 
     def on_turn(self):
         self.target.fluid.splatter(volume=self.strength,intensity=0.5)
-        self.strength-=random.random()*self.target.in_limb.owner.stats['luc']**0.5
+        self.modify_strength(-random.random()*self.target.in_limb.owner.stats['luc']**0.5)
         if self.strength<=0:
             self.strength=0
-            #self.on_dispel()
+            self.on_removal()
             self.target.enchantments.remove(self)
 
 class Rot(BaseClasses.Enchantment):
@@ -673,6 +831,7 @@ class Rot(BaseClasses.Enchantment):
             return
         super().__init__(target,turns=turns,strength=strength,**kwargs)
         self.classname='rot'
+        self.category='physical'
         self.strength=strength
         self.minimum_damage=target.damage.copy()
         self.attempt_identification(10*strength)
@@ -686,40 +845,36 @@ class Rot(BaseClasses.Enchantment):
         else:
             luc=10
         luc*=(self.target.rot_resistance+1)
-        if self.strength/(luc+self.strength)>random.random():
+        if self.strength/((luc+self.strength)*self.target.resistance['rot'])>random.random():
             for i in self.minimum_damage:
                 if self.target.damage[i]<self.minimum_damage[i]:
-                    self.target.damage[i]+=(self.minimum_damage[i]-self.target.damage[i])*random.random()*random.random()
+                    self.target.damage[i]+=(self.minimum_damage[i]-self.target.damage[i])*random.random()*random.random()/self.target.resistance['rot']
                     self.target.damage[i]=min(self.target.damage[i],self.minimum_damage[i])
                 else:
                     self.minimum_damage[i]=self.target.damage[i]
             oldrot=self.target.damage['rot']
             self.target.damage['rot']+=(self.target.damage['cut']+self.target.damage['pierce']+self.target.damage['crack']*0.6+
                                         self.target.damage['burn']+self.target.damage['corrode']+self.target.damage['crush']
-                                        )*random.random()*self.strength/(10*max(luc-self.strength,1))
+                                        )*random.random()*self.strength/(10*max(luc-self.strength,1))/self.target.resistance['rot']
             self.target.damage['rot']=min(1,self.target.damage['rot'])
             try:
-                self.target.in_limb.owner.pain+=(1-self.target.damage['rot'])*self.target.damage['rot']*10/self.target.in_limb.owner.stats['wil']**0.5
+                self.target.in_limb.owner.pain+=(1-self.target.damage['rot'])*self.target.damage['rot']*10/(
+                    self.target.resistance['rot']*self.target.in_limb.owner.stats['wil']**0.5)
             except:
                 pass
             if random.random()>0.75 and self.loggable==True and oldrot<1 and self.target.damage['rot']>oldrot:
                 if self.target.in_limb!=None:
                     if self.target.in_limb.owner==Shell.shell.player:
-                        Shell.messages.append("The {} on your {} rots!".format(self.target.name,self.target.in_limb.name))
+                        Shell.messages.append("[color=C21D25]The {} on your {} rots![/color]".format(self.target.name,self.target.in_limb.name))
                     elif self.target.in_limb.owner in Shell.shell.player.visible_creatures:
-                        Shell.messages.append("The {} on {}'s {} rots!".format(self.target.name,self.target.in_limb.owner.name,self.target.in_limb.name))
+                        Shell.messages.append("[color=1F4CAD]The {} on {}'s {} rots![/color]".format(self.target.name,self.target.in_limb.owner.name,self.target.in_limb.name))
                 elif self.target.in_inventory==Shell.shell.player:
-                    Shell.messages.append("Your {} decays".format(self.target.name))
+                    Shell.messages.append("[color=C21D25]Your {} decays[/color]".format(self.target.name))
         if random.random()*luc*(0.5)>random.random()*(self.strength+10*self.target.damage['rot']):
-            self.strength-=1
+            self.modify_strength(-1)
         if self.strength<=0:
             self.on_removal()
             self.target.enchantments.remove(self)
-
-
-
-
-
 
 class Magic_Eating(BaseClasses.Enchantment):
     def __init__(self,target,turns='permanent',strength=6,**kwargs):
@@ -753,27 +908,27 @@ class Magic_Eating(BaseClasses.Enchantment):
             self.target.magic_contamination[i]=0
             if self.target.equipped!=[] and self.target.equipped[0].owner!=None:
                 if i=='dark' and self.magic_consumed[i]/300>random.random():
-                    power=random.randint(1,self.magic_consumed[i]+1)
+                    power=random.randint(1,int(self.magic_consumed[i]+1))
                     self.magic_consumed[i]-=power
                     power=int(1.5*power**0.5+1)
                     Creature_Stat_Modification(self.target.equipped[0].owner,turns=self.strength,strength=power,stat='t')
                 if i=='elemental' and self.magic_consumed[i]/300>random.random():
-                    power=random.randint(1,self.magic_consumed[i]+1)
+                    power=random.randint(1,int(self.magic_consumed[i]+1))
                     self.magic_consumed[i]-=power
                     power=int(1.5*power**0.5+1)
                     Creature_Stat_Modification(self.target.equipped[0].owner,turns=self.strength,strength=power,stat='s')
                 if i=='summoning' and self.magic_consumed[i]/300>random.random():
-                    power=random.randint(1,self.magic_consumed[i]+1)
+                    power=random.randint(1,int(self.magic_consumed[i]+1))
                     self.magic_consumed[i]-=power
                     power=int(1.5*power**0.5+1)
                     Creature_Stat_Modification(self.target.equipped[0].owner,turns=self.strength,strength=power,stat='l')
                 if i=='transmutation' and self.magic_consumed[i]/300>random.random():
-                    power=random.randint(1,self.magic_consumed[i]+1)
+                    power=random.randint(1,int(self.magic_consumed[i]+1))
                     self.magic_consumed[i]-=power
                     power=int(1.5*power**0.5+1)
                     Creature_Stat_Modification(self.target.equipped[0].owner,turns=self.strength,strength=power,stat='p')
                 if i=='arcane' and self.magic_consumed[i]/300>random.random():
-                    power=random.randint(1,self.magic_consumed[i]+1)
+                    power=random.randint(1,int(self.magic_consumed[i]+1))
                     self.magic_consumed[i]-=power
                     power=int(1.5*power**0.5+1)
                     Creature_Stat_Modification(self.target.equipped[0].owner,turns=self.strength,strength=power,stat='w')
@@ -860,7 +1015,6 @@ class Magic_Eating(BaseClasses.Enchantment):
 
 
 
-
 #Limb enchantments
 
 class Numb(BaseClasses.Enchantment):
@@ -877,10 +1031,10 @@ class Numb(BaseClasses.Enchantment):
         self.target.painfactor=0
         if self.target.owner==Shell.shell.player:
             self.attempt_identification(30)
-            if new==True: Shell.messages.append("Your {} goes numb!".format(self.target.name))
+            if new==True: Shell.messages.append("[color=1F4CAD]Your {} goes numb![/color]".format(self.target.name))
         elif self.target.owner in Shell.shell.player.visible_creatures:
             if random.random()*Shell.shell.player.stats['per']>random.random()*10 and new==True:
-                Shell.messages.append("{}'s {} goes numb".format(self.target.owner.name,self.target.name))
+                Shell.messages.append("[color=1F4CAD]{}'s {} goes numb[/color]".format(self.target.owner.name,self.target.name))
 
     def on_turn(self):
         super().on_turn()
@@ -1016,6 +1170,83 @@ class Held(BaseClasses.Enchantment):
     def limb_function_modification(self):
         self.target.ability=0
 
+class Frozen_Limb(BaseClasses.Enchantment):
+    def __init__(self,target,turns='permanent',strength=6,**kwargs):
+        if not isinstance(target,BaseClasses.Limb):
+            return
+        super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='frozen'
+        self.classification=['incapacitate','magic','ice']
+        self.display=False
+        self.strength=strength
+        if self.target==Shell.shell.player:
+            self.removalmessage="[b][color=1FAD39]You can move your {} again[/b][/color]".format(self.target.name)
+        else:
+            self.removalmessage="[color=1F4CAD]{}'s {} is no longer frozen[/color]".format(self.target.owner.name,self.target.name)
+
+    def on_turn(self):
+        res=self.target.resistance['magic']*self.target.resistance['ice']*self.target.resistance['elemental']
+        try:
+            owner=self.target.owner
+            res*=owner.resistance['magic']*owner.resistance['ice']*owner.resistance['elemental']
+        except:
+            pass
+        self.target.ability=0
+        if hasattr(self.target,'vision'):
+            self.target.vision=0
+        if hasattr(self.target,'smell_sense'):
+            self.target.smell=0
+        if hasattr(self.target,'hearing'):
+            self.target.hearing=0
+        if hasattr(self.target,'dexterity'):
+            self.target.dexterity=0
+        super().on_turn()
+        if self.strength<=0:
+            self.on_removal()
+            if self in self.target.enchantments: self.target.enchantments.remove(self)
+            return
+        if res*self.target.stats['luc']*random.random()>self.strength*random.random():
+            self.modify_strength(-random.random()*random.random()*self.target.stats['luc']*res)
+            self.strength=int(self.strength)
+
+class Limb_Resistance_Modification(BaseClasses.Enchantment):
+    def __init__(self,target,turns='permanent',strength=6,res='random',**kwargs):
+        if not isinstance(target,BaseClasses.Limb):
+            return
+        super().__init__(target,turns=turns,strength=strength,combine=False,**kwargs)
+        self.classname='limb resistance modification'
+        self.display=False
+        if res!='random':
+            self.res_modified=res
+        else:
+            self.res_modified=random.choice(['teleport','fire','ice','physical','acid','lightning','poison','pain',
+                                             'psychic','divine','magic','dark','disable','rot','death','arcane',
+                                             'elemental','transmutation'])
+        self.strength=strength
+        if self.strength>=0:
+            self.target.resistance[self.res_modified]*=(1+self.strength/30)
+        elif self.strength<=0:
+            self.target.resistance[self.res_modified]*=1/(1-self.strength/30)
+
+    def on_removal(self,**kwargs):
+        if self.strength>0:
+            self.target.resistance[self.res_modified]*=1/(1+self.strength/30)
+        elif self.strength<0:
+            self.target.resistance[self.res_modified]*=(1-self.strength/30)
+        super().on_removal(**kwargs)
+
+    def modify_strength(self,amount,**kwargs):
+        oldstrength=self.strength
+        self.strength+=amount
+        if self.strength*oldstrength<=0:
+            self.strength=oldstrength
+            self.on_removal(**kwargs)
+            self.target.enchantments.remove(self)
+            return
+        if self.strength>0:
+            self.target.resistance[self.res_modified]*=(1+self.strength/30)/(1+oldstrength/30)
+        elif self.strength<0:
+            self.target.resistance[self.res_modified]*=(1-oldstrength/30)/(1-self.strength/30)
 
 #Creature enchantments
 
@@ -1028,6 +1259,9 @@ class Psychic_Detection(BaseClasses.Enchantment):
         self.strength=strength
         self.category="psychic"
         self.classification=["psychic","sensory"]
+        if self.target==Shell.shell.player:
+            self.identified=True
+            self.detected=True
 
     def sense_modification(self):
         self.target.focus[0]=max(0,self.target.focus[0])
@@ -1045,6 +1279,7 @@ class Psychic_Detection(BaseClasses.Enchantment):
         if self.target==Shell.shell.player:
             for i in self.target.psychic_detected_creatures:
                 i.floor.cells[i.location[0]][i.location[1]].update_graphics(show_items=False,show_dungeon=False)
+        super().sense_modification()
 
     def sense_specific_creature(self,creature):
         if not isinstance(creature,BaseClasses.Creature):
@@ -1068,6 +1303,9 @@ class Magical_Sense(BaseClasses.Enchantment):
         self.hearing=hearing
         self.smell=smell
         self.classification.append("sensory")
+        if self.target==Shell.shell.player:
+            self.identified=True
+            self.detected=True
 
     def sense_modification(self):
         if self.vision==True:
@@ -1087,6 +1325,8 @@ class Levitation(BaseClasses.Enchantment):
         super().__init__(target,turns=turns,strength=strength,**kwargs)
         self.classname='levitation'
         self.strength=strength
+        self.identified=True
+        self.detected=True
 
 
     def sense_modification(self):
@@ -1101,6 +1341,8 @@ class Stealth(BaseClasses.Enchantment):
         self.classname='stealth'
         self.strength=strength
         self.detection_bonuses={}
+        self.identified=True
+        self.detected=True
 
     def on_turn(self):
         for i in self.detection_bonuses:
@@ -1133,35 +1375,463 @@ class Silenced(BaseClasses.Enchantment):
         super().__init__(target,turns=turns,strength=strength,**kwargs)
         self.classname='silenced'
         self.strength=strength
+        self.attempt_identification()
 
     def magic_modification(self,magic,**kwargs):
         super().magic_modification(magic,**kwargs)
         magic.abort=True
         if self.target==Shell.shell.player:
             Shell.shell.log.addtext("Your magical abilities are sealed!")
+            self.attempt_identification(15)
 
 class Spell_Failure(BaseClasses.Enchantment):
     def __init__(self,target,turns='permanent',strength=6,**kwargs):
         if not isinstance(target,BaseClasses.Creature):
             return
         super().__init__(target,turns=turns,strength=strength,**kwargs)
-        self.classname='spell failure'
-        self.display=False
+        self.classname='magic disruption'
         self.strength=strength
+        self.attempt_identification()
 
     def magic_modification(self,magic,**kwargs):
         super().magic_modification(magic,**kwargs)
         if self.strength>random.random()*self.target.stats['wil'] or magic.power<self.strength:
             magic.abort=True
             if self.target==Shell.shell.player:
-                Shell.messages.append("Something disrupts your spell!")
+                Shell.messages.append("[b][size=13][color=7B888C]Something disrupts your spell![/b][/size][/color]")
+                self.attempt_identification(10)
                 Shell.shell.turn+=1
             elif self.target in Shell.shell.detected_creatures:
-                Shell.messages.append("{} attempts to cast a spell, but something disrupts the magic!".format(self.target.name))
+                Shell.messages.append("[b][size=13][color=AD801F]{} attempts to cast a spell,[/color][color=7B888C] but something disrupts the magic![/b][/size][/color]".format(self.target.name))
+                self.attempt_identification(5)
         magic.power-=self.strength
 
+class Frozen_Creature(BaseClasses.Enchantment):
+    def __init__(self,target,turns='permanent',strength=6,**kwargs):
+        if not isinstance(target,BaseClasses.Creature):
+            return
+        super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='frozen'
+        self.classification=['incapacitate','magic','ice','movement impairing','attack impairing']
+        self.strength=strength
+        self.identified=True
+        self.detected=True
+        if self.target==Shell.shell.player:
+            self.removalmessage="[b][color=1FAD39]You are no longer frozen.[/b][/color]"
+        else:
+            self.removalmessage="[color=1F4CAD]{} is no longer frozen[/color]".format(self.target.name)
 
 
+    def on_turn(self):
+        res=self.target.resistance['ice']*self.target.resistance['magic']*self.target.resistance['elemental']
+        super().on_turn()
+        if self.strength<=0:
+            self.on_removal()
+            self.target.enchantments.remove(self)
+        if res*self.target.stats['luc']*random.random()>self.strength*random.random():
+            self.modify_strength(-random.random()*random.random()*self.target.stats['luc']*res)
+            self.strength=int(self.strength)
+
+    def attempt_attack(self):
+        if self.target==Shell.shell.player:
+            Shell.messages.append("You are frozen solid!")
+        return False
+
+    def attempt_movement(self):
+        if self.target==Shell.shell.player:
+            Shell.messages.append("You are frozen solid!")
+        return False
+
+    def attempt_ability_use(self,ability,**kwargs):
+        if self.target==Shell.shell.player:
+            Shell.messages.append("You are frozen solid!")
+        ability.abort=True
+        Shell.shell.turn+=1
+        return False
+
+class Dazed(BaseClasses.Enchantment):
+    def __init__(self,target,turns='permanent',strength=6,**kwargs):
+        if not isinstance(target,BaseClasses.Creature):
+            return
+        super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='dazed'
+        self.classification=['daze','psychic','ai_modifying','movement impairing','attack impairing']
+        self.category='psychic'
+        self.strength=strength
+        self.old_ai=self.target.ai
+        self.target.ai=ai.dazed_ai
+        self.active=True
+        if self.target==Shell.shell.player:
+            self.identified=True
+            self.detected=True
+        if self.target==Shell.shell.player:
+            self.removalmessage="[b][color=1FAD39]You are no longer dazed.[/b][/color]"
+
+    def on_turn(self):
+        self.active=True
+        super().on_turn()
+
+    def on_removal(self,**kwargs):
+        self.target.ai=self.old_ai
+        super().on_removal(**kwargs)
+
+    def attempt_movement(self):
+        super().attempt_movement()
+        if self.target!=Shell.shell.player:
+            return True
+        elif self.target.stats['luc']*random.random()>self.strength:
+            return True
+        elif self.active==True:
+            self.active=False
+            ai.dazed_ai(self.target)
+            return False
+
+    def attempt_attack(self):
+        super().attempt_attack()
+        if self.target!=Shell.shell.player:
+            return True
+        elif self.target.stats['luc']*random.random()>self.strength:
+            return True
+        elif self.active==True:
+            self.active=False
+            ai.dazed_ai(self.target)
+            return False
+
+    def attempt_ability_use(self,ability,**kwargs):
+        super().attempt_ability_use(ability,**kwargs)
+        if random.random()*2*self.target.stats['luc']<3*self.strength:
+            ability.abort=True
+            if self.target==Shell.shell.player:
+                Shell.messages.append("[color=7B888C]You attempt to use an ability, but are unable to focus[/color]")
+                Shell.shell.turn+=1
+            elif self.target in Shell.shell.player.visible_creatures:
+                Shell.messages.append("[color=7B888C]{} looks like it is trying to do something[/color]")
+
+class Confused(BaseClasses.Enchantment):
+    def __init__(self,target,turns='permanent',strength=6,**kwargs):
+        if not isinstance(target,BaseClasses.Creature):
+            return
+        super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='confused'
+        self.classification=['confused','psychic','attack impairing']
+        self.category='psychic'
+        self.strength=strength
+        self.old_affinity=self.target.affinity.copy()
+        if self.target==Shell.shell.player:
+            self.removalmessage="[b][color=1FAD39]You are no longer confused.[/b][/color]"
+        else:
+            self.removalmessage="[color=1F4CAD]{} regains its wits[/color]".format(self.target.name)
+        if self.target==Shell.shell.player:
+            self.identified=True
+            self.detected=True
+
+    def on_turn(self):
+        for i in self.target.affinity:
+            if i not in self.old_affinity:
+                self.old_affinity[i]=self.target.affinity[i]
+            self.target.affinity[i]=random.randint(-10,11)
+        self.target.target=None
+        super().on_turn()
+
+
+    def on_removal(self,**kwargs):
+        self.target.affinity=self.old_affinity.copy()
+        super().on_removal(**kwargs)
+
+
+    def attempt_attack(self):
+        super().attempt_attack()
+        if self.target!=Shell.shell.player:
+            return True
+        else:
+            if self.target.stats['luc']<random.random()*self.strength**2:
+                creature=random.choice(["that harmless old lady!","that kindhearted child!","your own mother!","yourself!",
+                                        "that poor beggar!","such a delicious sandwich!","your best friend!","the fabric of reality!",
+                                        "such a brilliant idea!","yet another defenseless slime!","that... uhm... what were you doing again?",
+                                        "the hopes of the future!","death itself!"])
+                Shell.messages.append("[b][color=1F4CAD]You cannot bring yourself to attack {}[/color][/b[".format(creature))
+                return False
+            else: return True
+
+    def attempt_ability_use(self,ability,**kwargs):
+        super().attempt_ability_use(ability,**kwargs)
+
+class Psychic_Shield(BaseClasses.Enchantment):
+    def __init__(self,target,turns='permanent',strength=6,**kwargs):
+        if not isinstance(target,BaseClasses.Creature):
+            return
+        super().__init__(target,turns=turns,strength=strength,combine=False,**kwargs)
+        self.classname='psychic shield'
+        self.strength=strength
+        self.focuscost=0
+        self.attacks=[]
+        self.active=True
+        if self.target==Shell.shell.player:
+            self.identified=True
+            self.detected=True
+
+    def on_turn(self):
+        self.focuscost=0
+        for i in self.attacks:
+            self.focuscost+=int((10/self.strength)*i.energy**0.5)
+        self.target.focus[0]-=self.focuscost+5
+        self.attacks=[]
+        super().on_turn()
+
+    def evasion_modification(self,attack,**kwargs):
+        if not self.active:
+            return
+        if random.random()<self.target.focus[0]/self.target.focus[1]:
+            attack.abort=True
+            if self.target==Shell.shell.player:
+                Shell.messages.append(1)
+                Shell.messages.append("[color=7B888C]You deflect the attack with your psychic shield![/color]")
+                Shell.messages.append(-1)
+            elif self.target in Shell.shell.player.visible_creatures:
+                self.attempt_identification(10)
+                Shell.messages.append(1)
+                Shell.messages.append("[color=7B888C]The attack glances off of an invisible barrier![/color]")
+                Shell.messages.append(-1)
+            self.attacks.append(attack)
+            return 'abort'
+        elif random.random()*self.strength*self.strength*self.strength<random.random()*attack.energy:
+            self.active=False
+            self.turns=0
+            if self.target==Shell.shell.player:
+                Shell.messages.append(1)
+                Shell.messages.append("[color=EB05B1]Your psychic shield shatters![/color]")
+                Shell.messages.append(-1)
+            elif self.target in Shell.shell.player.visible_creatures:
+                Shell.messages.append(1)
+                Shell.messages.append("[color=EB05B1]{}'s barrier collapses![/color]".format(self.target.name))
+                Shell.messages.append(-1)
+            self.target.focus[0]-=int(0.5*random.random()*random.random()*self.target.focus[0])+1
+            pass
+
+class Haste(BaseClasses.Enchantment):
+    def __init__(self,target,turns='permanent',strength=6,**kwargs):
+        if not isinstance(target,BaseClasses.Creature):
+            return
+        super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='haste'
+        self.classification=['haste','physical','attack impairing','movement impairing']
+        self.category='physical'
+        self.strength=strength
+        self.successive_turns=0
+        if self.target==Shell.shell.player:
+            self.removalmessage="[b][color=1FAD39]You slow down.[/b][/color]"
+        else:
+            self.removalmessage="[color=1F4CAD]{} slows down[/color]".format(self.target.name)
+        if self.target==Shell.shell.player:
+            self.identified=True
+            self.detected=True
+
+    def attempt_attack(self):
+        super().attempt_attack()
+        if random.random()>(self.strength/(3+self.strength))**(2+self.successive_turns):
+            self.successive_turns=0
+            return True
+        else:
+            self.successive_turns+=1
+            return 'free'
+
+    def attempt_movement(self):
+        super().attempt_movement()
+        if random.random()>(self.strength/(3+self.strength))**(2+self.successive_turns):
+            self.successive_turns=0
+            return True
+        else:
+            self.successive_turns+=1
+            return 'free'
+
+class Slow(BaseClasses.Enchantment):
+    def __init__(self,target,turns='permanent',strength=6,**kwargs):
+        if not isinstance(target,BaseClasses.Creature):
+            return
+        super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='slowed'
+        self.classification=['slow','physical','attack impairing','movement impairing']
+        self.category='physical'
+        self.strength=strength
+        self.successive_turns=0
+        if self.target==Shell.shell.player:
+            self.removalmessage="[b][color=1FAD39]You speed up![/b][/color]"
+        else:
+            self.removalmessage="[color=1F4CAD]{} speeds up![/color]".format(self.target.name)
+        if self.target==Shell.shell.player:
+            self.identified=True
+            self.detected=True
+
+
+    def attempt_attack(self):
+        super().attempt_attack()
+        if random.random()>(self.strength/(3+self.strength))**(2+self.successive_turns):
+            self.successive_turns=0
+            return True
+        else:
+            self.successive_turns+=1
+            if self.target==Shell.shell.player:
+                Shell.shell.turn+=1
+                self.attempt_attack()
+            else:
+                return False
+
+    def attempt_movement(self):
+        super().attempt_movement()
+        if random.random()>(self.strength/(3+self.strength))**(2+self.successive_turns):
+            self.successive_turns=0
+            return True
+        else:
+            self.successive_turns+=1
+            if self.target==Shell.shell.player:
+                Shell.shell.turn+=1
+                self.attempt_movement()
+            else:
+                return False
+
+class Sprinting(BaseClasses.Enchantment):
+    def __init__(self,target,turns='permanent',strength=6,**kwargs):
+        if not isinstance(target,BaseClasses.Creature):
+            return
+        super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='sprinting'
+        self.classification=['sprinting','physical','attack impairing','movement impairing']
+        self.category='physical'
+        self.strength=strength
+        self.successive_turns=0
+        if self.target==Shell.shell.player:
+            self.identified=True
+            self.detected=True
+
+    def attempt_attack(self):
+        super().attempt_attack()
+        self.turns=0
+        self.on_turn()
+
+    def attempt_movement(self):
+        super().attempt_movement()
+        self.target.stamina[0]-=int((60+self.successive_turns*15)/self.strength)
+        if self.target.stamina[0]<=0:
+            self.target.stamina[0]=0
+            self.turns=0
+            self.on_turn()
+            return True
+        self.successive_turns+=1
+        if self.target==Shell.shell.player:
+            Shell.shell.playerstamina=self.target.stamina
+        return 'free'
+
+class Defenseless(BaseClasses.Enchantment):
+    def __init__(self,target,turns='permanent',strength=6,**kwargs):
+        if not isinstance(target,BaseClasses.Creature):
+            return
+        super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='defenseless'
+        self.classification=['incapacitate']
+        self.strength=strength
+        self.identified=True
+        self.detected=True
+
+class Tormented(BaseClasses.Enchantment):
+    def __init__(self,target,turns='permanent',strength=6,**kwargs):
+        if not isinstance(target,BaseClasses.Creature) or target.feels_pain==False:
+            return
+        super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='tormented'
+        self.classification=['tormented','magic','pain']
+        self.category='magic'
+        self.strength=strength
+        self.old_affinity=self.target.affinity.copy()
+        if self.target==Shell.shell.player:
+            self.removalmessage="[b][color=1FAD39]The pain fades away.[/b][/color]"
+        else:
+            self.removalmessage="[color=1F4CAD]{} looks better.[/color]".format(self.target.name)
+        if self.target==Shell.shell.player:
+            self.identified=True
+            self.detected=True
+
+    def on_turn(self):
+        self.target.pain+=2*int(self.strength/(self.target.resistance['pain']*self.target.resistance['magic']*self.target.resistance['dark']))
+        if self.target==Shell.shell.player:
+            Shell.messages.append("[color=1F4CAD]Your body is wracked with intense pain![/color]")
+        elif self.target in Shell.shell.player.visible_creatures:
+            Shell.messages.append("[color=1F4CAD]{} is in pain![/color]")
+        super().on_turn()
+
+class Blind(BaseClasses.Enchantment):
+    def __init__(self,target,turns='permanent',strength=6,**kwargs):
+        if not isinstance(target,BaseClasses.Creature):
+            return
+        super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='blind'
+        self.strength=strength
+        self.classification=["blind","sensory"]
+        if self.target==Shell.shell.player:
+            self.identified=True
+            self.detected=True
+
+    def sense_modification(self):
+        self.target.vision_radius=0
+        self.target.can_see=False
+        super().sense_modification()
+
+
+
+class Vision_Modification(BaseClasses.Enchantment):
+    def __init__(self,target,turns='permanent',strength=1,**kwargs):
+        if not isinstance(target,BaseClasses.Creature):
+            return
+        super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='vision modification'
+        self.strength=strength
+        self.display=False
+        self.classification=["vision modification","sensory"]
+        if self.target==Shell.shell.player:
+            self.identified=True
+            self.detected=True
+
+    def sense_modification(self):
+        self.target.vision_radius+=self.strength
+        super().sense_modification()
+
+class Creature_Resistance_Modification(BaseClasses.Enchantment):
+    def __init__(self,target,turns='permanent',strength=6,res='random',**kwargs):
+        if not isinstance(target,BaseClasses.Creature):
+            return
+        super().__init__(target,turns=turns,strength=strength,combine=False,**kwargs)
+        self.classname='creature resistance modification'
+        self.display=False
+        if res!='random':
+            self.res_modified=res
+        else:
+            self.res_modified=random.choice(['teleport','fire','ice','physical','acid','lightning','poison','pain',
+                                             'psychic','divine','magic','dark','disable','rot','death','arcane',
+                                             'elemental','transmutation'])
+        self.strength=strength
+        if self.strength>=0:
+            self.target.resistance[self.res_modified]*=(1+self.strength/30)
+        elif self.strength<=0:
+            self.target.resistance[self.res_modified]*=1/(1-self.strength/30)
+
+    def on_removal(self,**kwargs):
+        if self.strength>0:
+            self.target.resistance[self.res_modified]*=1/(1+self.strength/30)
+        elif self.strength<0:
+            self.target.resistance[self.res_modified]*=(1-self.strength/30)
+        super().on_removal(**kwargs)
+
+    def modify_strength(self,amount,**kwargs):
+        oldstrength=self.strength
+        self.strength+=amount
+        if self.strength*oldstrength<=0:
+            self.strength=oldstrength
+            self.on_removal(**kwargs)
+            self.target.enchantments.remove(self)
+            return
+        if self.strength>0:
+            self.target.resistance[self.res_modified]*=(1+self.strength/30)/(1+oldstrength/30)
+        elif self.strength<0:
+            self.target.resistance[self.res_modified]*=(1-oldstrength/30)/(1-self.strength/30)
 
 class Creature_Stat_Modification(BaseClasses.Enchantment):
     def __init__(self,target,turns='permanent',strength=6,stat='s',**kwargs):
@@ -1203,21 +1873,23 @@ class Held_In_Grasp(BaseClasses.Enchantment):
         self.category='physical'
         self.classification=['physical','grasp','root','movement impairing']
         self.strength=strength
+        self.identified=True
+        self.detected=True
 
     def on_turn(self):
-        if self.held_limb not in self.target.limbs or self.holding_limb==None or self.target.alive==False:
+        if self.held_limb not in self.target.limbs or self.holding_limb==None or self.target.alive==False or self.holding_limb.owner.alive==False:
             self.on_removal()
             self.target.enchantments.remove(self)
             return
         if self.mobile_grabber==False:
             if self.grabber_location!=self.holding_limb.owner.location:
                 if self.holding_limb.owner==Shell.shell.player:
-                    Shell.messages.append("You release your grip on {}'s {}".format(self.target.name,self.held_limb.name))
+                    Shell.messages.append("[b][color=1F4CAD]You release your grip on {}'s {}[/color][/b]".format(self.target.name,self.held_limb.name))
                 elif self.target==Shell.shell.player:
-                    Shell.messages.append("{} releases its grip on your {}".format(
+                    Shell.messages.append("[b][color=1F4CAD]{} releases its grip on your {}[/color][/b]".format(
                         self.holding_limb.owner.name,self.held_limb.name))
                 elif self.target in Shell.shell.player.visible_creatures:
-                    Shell.messages.append("{} releases its grip on {}'s {}".format(
+                    Shell.messages.append("[color=1F4CAD]{} releases its grip on {}'s {}[/color]".format(
                         self.holding_limb.owner.name,self.target.name,self.held_limb.name))
                 self.on_removal()
                 self.target.enchantments.remove(self)
@@ -1245,22 +1917,22 @@ class Held_In_Grasp(BaseClasses.Enchantment):
         self.holding_limb.ability=0
         if chance>random.random():
             if self.target==Shell.shell.player:
-                Shell.messages.append("You wrest your {} free from {}'s {}".format(
+                Shell.messages.append("[b][color=1FAD39]You wrest your {} free from {}'s {}[/b][/color]".format(
                     self.held_limb.name,self.holding_limb.owner.name,self.holding_limb.name))
             elif self.holding_limb.owner==Shell.shell.player:
-                Shell.messages.append("{} struggles free of your {}'s grasp on its {}".format(
+                Shell.messages.append("[b][color=C21D25]{} struggles free of your {}'s grasp on its {}[/b][/color]".format(
                     self.target.name,self.holding_limb.name,self.held_limb.name))
             elif self.target in Shell.shell.player.visible_creatures:
-                Shell.messages.append("{} breaks out of {}'s grasp!".format(self.target.name,self.holding_limb.owner.name))
+                Shell.messages.append("[color=1F4CAD]{} breaks out of {}'s grasp![/color]".format(self.target.name,self.holding_limb.owner.name))
             self.on_removal()
             self.target.enchantments.remove(self)
             self.target.stamina[0]-=int(random.random()*random.random()*self.holding_limb.stats['str']+2)
             return True
         else:
             if self.target==Shell.shell.player:
-                Shell.messages.append("You struggle, but are unable to break your {} free!".format(self.held_limb.name))
+                Shell.messages.append("[b][color=C21D25]You struggle, but are unable to break your {} free![/b][/color]".format(self.held_limb.name))
             elif self.target in Shell.shell.player.visible_creatures:
-                Shell.messages.append("{} struggles to break free of the grasp on its {}".format(self.target.name,self.held_limb.name))
+                Shell.messages.append("[color=1F4CAD]{} struggles to break free of the grasp on its {}[/color]".format(self.target.name,self.held_limb.name))
             self.target.stamina[0]-=int(random.random()*self.holding_limb.stats['str']+5)
             return False
 
@@ -1283,6 +1955,7 @@ class Held_In_Grasp(BaseClasses.Enchantment):
 
 class Familiar_Spirit(BaseClasses.Enchantment):
     def __init__(self,target,turns='permanent',strength=1,owner=None,**kwargs):
+        import Abilities
         if not isinstance(target,BaseClasses.Creature):
             return
         super().__init__(target,turns=turns,strength=strength,**kwargs)
@@ -1293,11 +1966,25 @@ class Familiar_Spirit(BaseClasses.Enchantment):
         self.owner=owner
         self.companion_enchantment=Familiar_Guidance(self.owner,familiar=self.target)
         self.companion_enchantment.compantion_enchantment=self
-        self.powergifts=[]
-        
+        self.powergifts=[Abilities.Pain,Abilities.Psychic_Grab,Abilities.Fireball,Abilities.Controlled_Teleport]
+
 
     def on_turn(self):
         super().on_turn()
+        if random.random()*random.random()*self.target.magic_contamination['total']>5+self.strength:
+            self.grant_power()
+            for i in range(0,int(5+self.strength)):
+                magic_reduced=False
+                tries=0
+                while magic_reduced==False and tries<25:
+                    key=random.choice(list(self.target.magic_contamination))
+                    if self.target.magic_contamination[key]<=0 or key=='total':
+                        pass
+                    else:
+                        self.target.magic_contamination[key]-=1
+                        magic_reduced=True
+                    tries+=1
+
 
     def add_graphical_instructions(self,cell,**kwargs):
         if self.owner==Shell.shell.player:
@@ -1306,6 +1993,30 @@ class Familiar_Spirit(BaseClasses.Enchantment):
                                                                                   cell.pos[1]+cell.size[1]*0.6],
                                         source="./images/Heartoutline.png",group='creatures'))
 
+    def grant_power(self):
+        if random.random()>0.5:
+            #About half the time, give an increases to stats
+            self.target.stats['s']+=int(random.random()*random.random()*random.random()*self.target.stats['s'])
+            self.target.stats['t']+=int(random.random()*random.random()*random.random()*self.target.stats['t'])
+            self.target.stats['p']+=int(random.random()*random.random()*random.random()*self.target.stats['p'])
+            self.target.stats['w']+=int(random.random()*random.random()*random.random()*self.target.stats['w'])
+            self.target.stats['l']+=int(random.random()*random.random()*random.random()*self.target.stats['l'])
+            if self.owner==Shell.shell.player:
+                Shell.messages.append("[color=1F4CAD]{} has grown in power![/color]".format(self.target.name))
+            elif self.target in Shell.shell.player.detected_creatures:
+                Shell.messages.append("[color=1F4CAD]{} looks stronger![/color]".format(self.target.name))
+        elif random.random()>0.5 and self.powergifts!=[]:
+            #Sometimes, grant an ability
+            ability=random.choice(self.powergifts)
+            self.target.abilities.append(ability(self.target))
+            self.powergifts.remove(ability)
+            if self.owner==Shell.shell.player:
+                Shell.messages.append("[color=1F4CAD]{} has gained mastery over new powers![/color]".format(self.target.name))
+            elif self.target in Shell.shell.player.detected_creatures:
+                Shell.messages.append("[color=1F4CAD]{} looks stronger![/color]".format(self.target.name))
+        elif random.random()>0.5:
+            #otherwise, cause mutations
+            pass
 
 class Familiar_Guidance(BaseClasses.Enchantment):
     def __init__(self,target,turns='permanent',strength=1,familiar=None,**kwargs):
@@ -1317,6 +2028,9 @@ class Familiar_Guidance(BaseClasses.Enchantment):
         self.category="magic"
         self.classification=["magic","summoning"]
         self.familiar=familiar
+        if self.target==Shell.shell.player:
+            self.identified=True
+            self.detected=True
 
     def on_turn(self):
         if self.familiar.alive==False:
@@ -1327,6 +2041,7 @@ class Familiar_Guidance(BaseClasses.Enchantment):
             if key!="total" and self.target.magic_contamination[key]>0:
                 self.target.magic_contamination[key]-=1
                 self.familiar.magic_contamination[key]+=1
+                #print(self.target.magic_contamination,self.familiar.magic_contamination)
 
     def magic_modification(self,magic,**kwargs):
         super().magic_modification(magic,**kwargs)
@@ -1335,6 +2050,8 @@ class Familiar_Guidance(BaseClasses.Enchantment):
     def sense_modification(self):
         super().sense_modification()
         self.familiar.check_visible_cells(send_to=self.target)
+
+
 
 
 

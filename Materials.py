@@ -49,7 +49,7 @@ class Bone_Material(BaseClasses.Material):
         self.electric_conduction=True
         self.heat_conduction=0.5
         self.dissipationfactor=4
-        self.maxedge=(10**-4)/self.quality
+        self.maxedge=(10**-3)/self.quality
         self.damagetype=['crack','break','crush','cut','shatter','sever']
         self.magic_affinity=7
         self.identification_difficulty=5
@@ -153,7 +153,7 @@ class Keratin(BaseClasses.Material):
         self.electric_conduction=True
         self.heat_conduction=0.0005
         self.dissipationfactor=4
-        self.maxedge=(10**-7)/self.quality
+        self.maxedge=(10**-6)/self.quality
         self.damagetype=['crack','break','crush','cut','shatter','sever']
         self.magic_affinity=7
         self.identification_difficulty=5
@@ -679,7 +679,7 @@ class Wood(BaseClasses.Material):
         self.default_thickness=0.005
         self.basicname='wood'
         self.name='wood'
-        self.maxquality=1.5
+        self.maxquality=2
         self.quality=min(quality,self.maxquality)
         self.thickness=thickness
         self.density=700
@@ -697,10 +697,41 @@ class Wood(BaseClasses.Material):
         self.heat_conduction=0.1
         self.burn_temp=200
         self.dissipationfactor=1
-        self.maxedge=(10**-4)/self.quality
+        self.maxedge=(10**-3)/self.quality
         self.damagetype=['dent','crack','break','crush','cut']
         self.magic_affinity=7
         self.identification_difficulty=7
+
+class Granite(BaseClasses.Material):
+    def __init__(self,thickness=1,quality=1,**kwargs):
+        super().__init__(**kwargs)
+        self.color=(0.4,0.4,0.4,1)
+        self.poisson=0.25
+        self.acid_resistance=9
+        self.default_thickness=0.003
+        self.basicname='stone'
+        self.name='granite'
+        self.maxquality=1.5
+        self.quality=min(quality,self.maxquality)
+        self.thickness=thickness
+        self.density=2700
+        self.youngs=55
+        self.fracture_energy=11*self.quality
+        self.tensile_strength=200*self.quality
+        self.mode='brittle'
+        self.fracture_toughness=(self.youngs*self.fracture_energy)**0.5
+        self.shear=36
+        self.shear_strength=90*self.quality
+        self.rottable=False
+        self.electric_conduction=False
+        self.heat_reaction='melt'
+        self.heat_conduction=2.3
+        self.burn_temp=1200
+        self.dissipationfactor=1
+        self.maxedge=(10**-3)/self.quality
+        self.damagetype=['crack','break','crush','cut']
+        self.magic_affinity=6
+        self.identification_difficulty=20
 
 
 class Leather(BaseClasses.Material):
@@ -1025,6 +1056,36 @@ class Aether(BaseClasses.Material):
         self.fracture_toughness=(self.youngs*self.fracture_energy)**0.5
         self.shear=1
         self.shear_strength=1
+        self.electric_conduction=True
+        self.heat_conduction=500
+        self.burn_temp=300*power
+        self.dissipationfactor=1
+        self.maxedge=(5*10**-8)/self.quality
+        self.damagetype=['dent','crush','bend','cut']
+        self.magic_affinity=10
+        self.identification_difficulty=30
+        self.default_thickness=0.004**power
+
+class Magic_Projectile_Material(BaseClasses.Material):
+    def __init__(self,thickness=1,quality=1,power=3,**kwargs):
+        super().__init__(**kwargs)
+        self.color=(0,0.8,0.8,0.5)
+        self.acid_reaction='corrode'
+        self.wetdamage=None
+        self.poisson=0.25
+        self.name='aether'
+        self.basicname='magical'
+        self.maxquality=100
+        self.quality=min(power,self.maxquality)
+        self.thickness=thickness
+        self.density=power*100
+        self.youngs=8*power
+        self.fracture_energy=10000
+        self.tensile_strength=1
+        self.mode='brittle'
+        self.fracture_toughness=(self.youngs*self.fracture_energy)**0.5
+        self.shear=5*power
+        self.shear_strength=10000
         self.electric_conduction=True
         self.heat_conduction=500
         self.burn_temp=300*power

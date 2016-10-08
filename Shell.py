@@ -6,8 +6,10 @@ import sys
 from kivy.uix.floatlayout import FloatLayout
 from kivy.properties import ListProperty,StringProperty,NumericProperty
 import dill
+import pickle
+import json
 import Limbs
-
+import shelve
 import Creatures
 import Attacks
 import Abilities
@@ -18,6 +20,7 @@ import Fluids
 from Materials import *
 from UI_Elements import *
 from BaseClasses import Floor
+from kivy.storage.jsonstore import JsonStore
 
 
 
@@ -78,7 +81,8 @@ class Shell(FloatLayout):
         self.minimap=Minimap(pos_hint={'right':0.97,'y':0.13})
         self.playscreen.add_widget(self.minimap)
         #combat log
-        self.combatlog=Combatlog(pos_hint={'right':self.right,'top':self.top})
+        #self.combatlog=Combatlog(pos_hint={'right':self.right,'top':self.top})
+        self.combatlog=Combatlog(pos_hint={'right':1,'top':1})
         playscreen.add_widget(self.combatlog)
         self.log=Log()
         self.log.height=self.combatlog.height
@@ -117,6 +121,9 @@ class Shell(FloatLayout):
         self.turncounter=Label(text='Turn: {}'.format(self.turn),size_hint=(0.15,0.17),pos_hint={'x':0.64,'y':0.465},
                                halign='left',valign='bottom')
         self.playscreen.add_widget(self.turncounter)
+        #effect list
+        self.effect_list=GridLayout(size_hint=(0.15,0.2),pos_hint={'right':0.65,'top':1},cols=1)
+        self.playscreen.add_widget(self.effect_list)
         #inventory sidebar
         self.inventory=InventorySidebar(self)
 
@@ -133,6 +140,7 @@ class Shell(FloatLayout):
         self.keyboard.bind(on_key_down=self.on_key_down)
         self.keyboard.bind(on_key_up=self.on_key_up)
         self.shift=False
+        self.recent_shift=False
         self.keyboard_mode='play'
         self.keyboard_send_to=None
 
@@ -174,7 +182,8 @@ class Shell(FloatLayout):
         self.leveltag.text='Lvl. {}'.format(self.charlevel)
 
     def on_turn(self,*args,**kwargs):
-        #print(self.player.attacks)
+        oldkb=self.keyboard_mode
+        #self.keyboard_mode=None
         self.playerstats=self.player.stats
         self.turncounter.text='Turn: {}'.format(self.turn)
         self.playerstamina=self.player.stamina
@@ -182,10 +191,7 @@ class Shell(FloatLayout):
         for i in self.dungeonmanager.current_screen.creaturelist:
             i.on_turn()
         self.player.on_turn()
-        if len(messages)>0:
-            self.log.addtext("[b]Turn {}:[/b]".format(self.turn),newturn=True)
-        while len(messages)>0:
-            self.log.addtext(messages.pop(0))
+        self.post_messages()
         self.dungeonmanager.current_screen.itemlist=[]
         for i in self.dungeonmanager.current_screen.nonindexedcells:
             i.on_turn()
@@ -202,7 +208,8 @@ class Shell(FloatLayout):
                                            Creatures.Acid_Blob,Creatures.Wolf,Creatures.Dog,Creatures.Cat,Creatures.Animated_Weapon])
             creature=newcreaturetype(color=(random.random(),random.random(),random.random(),0.8))
             creature.abilities.extend([Abilities.Conjur_Weapon(creature),Abilities.Psychokinesis(creature),Abilities.Throw(creature),
-                                       Abilities.Charge(creature),Abilities.Divine_Healing(creature),Abilities.Grab(creature)])
+                                       Abilities.Charge(creature),Abilities.Divine_Healing(creature),Abilities.Grab(creature),
+                                       Abilities.Fireball(creature),Abilities.Pain(creature),Abilities.Telekinetic_Barrier(creature)])
             for i in creature.inventory:
                 creature.value_item(i)
             self.dungeonmanager.current_screen.place_creature(creature)
@@ -214,6 +221,42 @@ class Shell(FloatLayout):
             if self.player.alive:
                 pass
                 #print(i.name,i.favor[self.player])
+        self.dungeonmanager.current_screen.on_turn()
+        self.effect_list.clear_widgets()
+        enchants=[]
+        for i in self.player.enchantments:
+            if i.display and i.detected:
+                enchants.append(i)
+        self.effect_list.size_hint_y=0.03*(len(enchants)+1)
+        self.effect_list.add_widget(OutlinedTextBox(text='Active Effects:'))
+        for i in enchants:
+            if not i.identified:
+                self.effect_list.add_widget(Label(text="Unknown effect",text_size=[self.effect_list.width,0]))
+            elif i.turns!='permanent':
+                self.effect_list.add_widget(Label(text="{} ({})".format(i.classname,i.turns),text_size=[self.effect_list.width,0]))
+            else:
+                self.effect_list.add_widget(Label(text=i.classname,text_size=[self.effect_list.width,0]))
+        self.keyboard_mode=oldkb
+
+    def post_messages(self):
+        message_posted=False
+        while len(messages)>0:
+            message=messages.pop(0)
+            #print(message)
+            if message==1:
+                self.log.indentation_level+=1
+            elif message==-1:
+                self.log.indentation_level-=1
+                self.log.indentation_level=max(self.log.indentation_level,0)
+            elif message==0:
+                self.log.indentation_level=0
+            else:
+                if message_posted==False:
+                    self.log.addtext("[b]Turn {}:[/b]".format(self.turn),newturn=True)
+                    message_posted=True
+
+                self.log.addtext(message)
+        self.log.indentation_level=0
 
 
     #These functions are related to listening devices (mouse and keyboard inputs)
@@ -264,6 +307,7 @@ class Shell(FloatLayout):
         floor=self.dungeonmanager.current_screen
         if keycode[0]==303 or keycode[0]==304:
             self.shift=True
+            self.recent_shift=True
         if self.keyboard_mode=='play':
             #The below bindings are for test/debugging purposes only, to increase or decrease important attributes
             #print('play',keycode)
@@ -282,31 +326,45 @@ class Shell(FloatLayout):
                     i.burn(1000,5)
 
             #The below bindings are for real
+            movement=None
             if keycode[1]=='numpad7':
-                self.player.move([-1,1])
+                movement=[-1,1]
                 #self.move(self.player,[-1,1])
             elif keycode[1]=='numpad8' or keycode[1]=='up':
-                self.player.move([0,1])
+                movement=[0,1]
                 #self.move(self.player,[0,1])
             elif keycode[1]=='numpad9':
-                self.player.move([1,1])
+                movement=[1,1]
                 #self.move(self.player,[1,1])
             elif keycode[1]=='numpad4' or keycode[1]=='left':
-                self.player.move([-1,0])
+                movement=[-1,0]
                 #self.move(self.player,[-1,0])
             elif keycode[1]=='numpad6' or keycode[1]=='right':
-                self.player.move([1,0])
+                movement=[1,0]
                 #self.move(self.player,[1,0])
             elif keycode[1]=='numpad1':
-                self.player.move([-1,-1])
+                movement=[-1,-1]
                 #self.move(self.player,[-1,-1])
             elif keycode[1]=='numpad2' or keycode[1]=='down':
-                self.player.move([0,-1])
+                movement=[0,-1]
                 #self.move(self.player,[0,-1])
             elif keycode[1]=='numpad3':
-                self.player.move([1,-1])
+                movement=[1,-1]
                 #self.move(self.player,[1,-1])
-            elif keycode[1]=='numpad5' or (keycode[1]=='.' and self.shift==False):
+            elif keycode[1]=='numpad5':
+                movement=[0,0]
+            if movement!=None:
+                if self.recent_shift==False:
+                    if movement==[0,0]:
+                        self.turn+=1
+                    else:
+                        self.player.move(movement)
+                else:
+                    self.status_screen=AdvancedTargetingScreen(self.player,cell=self.player.floor.cells[self.player.location[0]+movement[0]][self.player.location[1]+movement[1]])
+                    self.add_widget(self.status_screen)
+                    self.keyboard_mode='status screen'
+
+            if keycode[1]=='.' and self.shift==False:
                 self.turn+=1
             elif keycode[1]=='.' and self.shift==True:
                 for i in self.dungeonmanager.current_screen.cells[self.player.location[0]][self.player.location[1]].contents:
@@ -389,10 +447,39 @@ class Shell(FloatLayout):
             elif keycode[1]=='g' and self.shift==False:
                 grasp=Abilities.Psychic_Grab(self.player)
                 grasp.select_target()
-            elif keycode[1]=='x':
+            elif keycode[1]=='k' and self.shift==False:
+                starstorm=Abilities.Starstorm(self.player)
+                starstorm.select_target()
+            elif keycode[1]=='m' and self.shift==True:
+                smite=Abilities.Smite(self.player)
+                smite.select_target()
+            elif keycode[1]=='x' and self.shift==False:
                 blood=Fluids.Blood(self.player)
                 blood.splatter(5,99)
                 self.player.blood=[100,100]
+            elif keycode[1]=='b' and self.shift==False:
+                frostbolt=Abilities.Frostbolt(self.player)
+                frostbolt.select_target()
+            elif keycode[1]=='d' and self.shift==True:
+                addle=Abilities.Addle(self.player)
+                addle.select_target()
+            elif keycode[1]=='z' and self.shift==False:
+                thing=BaseClasses.Creature()
+                attempt=dill.dump(thing,open('testfile.grp','wb'),protocol=4)
+                pass
+            elif keycode[1]=='v' and self.shift==False:
+                for i in self.player.item_abilities:
+                    if isinstance(i,Abilities.Fire_Bow):
+                        i.select_target()
+                        return
+                    if isinstance(i,Abilities.Fire_Crossbow):
+                        i.select_target()
+                        return
+            elif keycode[1]=='z' and self.shift==True:
+                self.status_screen=AbilityScreen(self.player)
+                self.keyboard_mode='status screen'
+                self.add_widget(self.status_screen)
+
 
 
         if self.keyboard_mode=='inventory sidebar':
@@ -522,6 +609,12 @@ class Shell(FloatLayout):
     def on_key_up(self,keyboard,keycode):
         if keycode[0]==303 or keycode[0]==304:
             self.shift=False
+            self.recent_shift=True
+            Clock.schedule_once(self.kill_shift,1/60)
+
+    def kill_shift(self,*args,**kwargs):
+        self.recent_shift=False
+
     #kbclosed should never be called in normal operation
     def kbclosed(self):
         #print('Uhhhh... guys... the keyboard just closed')
@@ -532,11 +625,13 @@ class Shell(FloatLayout):
         pass
 
     #This function handles movement of objects from cell to cell and calls for bump attacks
-    def move(self,target,distance,teleport=False,mobile=True,free=False,track=False,phasing=False,*args,**kwargs):
+    def move(self,target,distance,teleport=False,mobile=True,free=False,track=False,phasing=False,force_attack=False,*args,**kwargs):
+        if target==None: return
         #Make sure the cell we are trying to move to exists and is passable
         if target.location[0]+distance[0] in range(0,self.dungeonmanager.current_screen.dimensions[0]) and target.location[1]+distance[1] in range(0,self.dungeonmanager.current_screen.dimensions[1]):
             #if target==self.player: self.dungeonmanager.current_screen.cells[target.location[0]+distance[0]][target.location[1]+distance[1]].on_contents(None,None)
-            if self.dungeonmanager.current_screen.cells[target.location[0]+distance[0]][target.location[1]+distance[1]].passable==True or phasing==True:
+            cell=self.dungeonmanager.current_screen.cells[target.location[0]+distance[0]][target.location[1]+distance[1]]
+            if cell.passable==True or (phasing==True and cell.creatures==[]) or isinstance(target,Reticule):
 
                 if target in self.dungeonmanager.current_screen.cells[target.location[0]][target.location[1]].contents:
                     #print(target.location,distance)
@@ -549,6 +644,8 @@ class Shell(FloatLayout):
                     #Ensuring that the viewport tracks the player-controlled character
                     if target==self.player and free==False:
                         self.turn+=1
+                    elif target==self.player:
+                        self.post_messages()
                     if target==self.player or track:
                         scrollamount=viewport.convert_distance_to_scroll(cellsize,cellsize)
                         cell=self.dungeonmanager.current_screen.cells[target.location[0]][target.location[1]]
@@ -573,17 +670,22 @@ class Shell(FloatLayout):
 
                 attacked=False
                 for i in self.dungeonmanager.current_screen.cells[target.location[0]+distance[0]][target.location[1]+distance[1]].contents:
-                    if i.targetable==True and Attacks.hostilitycheck(target,i)==True:
-                        if target.player==True:
-                            target.attack(i)
+                    if i.targetable==True and (target.hostilitycheck(i)==True or force_attack==True):
+                        target.attack(i)
+                        if target.player==True and free==False:
                             self.turn+=1
-                        else:
-                            target.attack(i)
+                        elif target.player:
+                            self.post_messages()
                         attacked=True
                         break
-                    elif i.targetable==True and Attacks.hostilitycheck(target,i)==False and target.player:
-                        #TODO: Need ability to attack non-hostile targets (usually a bad idea, but should be possible)
-                        self.log.addtext('Do you want to attack {}?'.format(i.name))
+                    elif i.targetable==True and target.hostilitycheck(i)==False and target==self.player:
+                        if self.shift or force_attack:
+                            target.attack(i)
+                            if free:
+                                self.post_messages()
+                            else: self.turn+=1
+                        else:
+                            self.log.addtext('Do you want to attack {}?'.format(i.name))
                 if attacked==False and target.player:
                     self.log.addtext('You cannot pass through here')
                     print('not passable')
@@ -606,7 +708,9 @@ class Shell(FloatLayout):
     def populate(self):
         initialinventory=[]
 
-        initialinventory.append(Items.Mace(material=Steel,id=True))
+        initialinventory.append(Items.Longbow(id=True))
+        initialinventory.append(Items.Arrow(material=Aluminum,id=True))
+        initialinventory.append(Items.Flail(material=Steel,id=True))
         initialinventory.append(Items.LongSword(material=Steel,id=True))
         initialinventory.append(Items.WarHammer(material=Steel,id=True))
         initialinventory.append(Items.Axe(material=Steel,id=True))
@@ -646,9 +750,6 @@ class Shell(FloatLayout):
             self.dungeonmanager.current_screen.cells[self.player.location[0]][self.player.location[1]].contents.remove(self.player)
             self.dungeonmanager.current_screen.cells[random.randint(0,self.dungeonmanager.current_screen.dimensions[0]-1)][random.randint(0,self.dungeonmanager.current_screen.dimensions[1]-1)].contents.append(self.player)
         self.player.mass_calc()
-
-        print(self.player.mass,self.player.movemass)
-
 
         self.playerstamina=self.player.stamina
         self.playerfocus=self.player.focus
@@ -738,6 +839,7 @@ class Shell(FloatLayout):
             item=Items.weighted_generation()
             self.dungeonmanager.current_screen.place_creature(item)
 
+        Enchantments.Psychic_Shield(self.player)
 
 
         #for i in adversary.limbs:
@@ -745,18 +847,20 @@ class Shell(FloatLayout):
 
         for i in self.player.inventory:
             #Enchantments.Acidic(i)
-            #Enchantments.Burning(i,strength=8)
+            #Enchantments.Burning(i)
             #Enchantments.BloodDrinking(i)
             #Enchantments.Indestructable(i)
             #Enchantments.Shifting(i)
             #Enchantments.Blinking(i)
             #Enchantments.Numbing(i)
+            Enchantments.Freezing(i)
             Enchantments.Magic_Eating(i)
-            Fluids.Numbing_Poison(None,applied=True).add(i)
+            #Fluids.Numbing_Poison(None,applied=True).add(i)
             pass
         for i in self.player.limbs:
             #Enchantments.Magical_Grasp(i)
             #Enchantments.Magical_Balance(i)
+            #Enchantments.Frozen_Limb(i)
             pass
         #Enchantments.Psychic_Detection(self.player,strength=30)
         for i in currentscreen.creaturelist:
@@ -764,6 +868,14 @@ class Shell(FloatLayout):
             pass
         #Enchantments.Stealth(self.player)
         Enchantments.Psychic_Detection(self.player)
+        #Enchantments.Haste(self.player)
+        #Enchantments.Slow(self.player)
+        Enchantments.Sprinting(self.player,turns=3)
+        self.player.abilities.extend([Abilities.Fireball(self.player),Abilities.Pain(self.player),
+                                      Abilities.Charge(self.player),Abilities.Grab(self.player),
+                                      Abilities.Sprint(self.player),Abilities.Divine_Healing(self.player),
+                                      Abilities.Throw(self.player),Abilities.Addle(self.player)])
+
 
 
 
@@ -777,6 +889,8 @@ class Shell(FloatLayout):
 shell=Shell()
 
 shell.populate()
+
+
 
 
 

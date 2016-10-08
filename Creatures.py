@@ -251,6 +251,8 @@ class Human(BaseClasses.Creature):
     def __init__(self,color=(1,1,1,1),name='the human',job='',named=False,hostile=True,player=False,stats='random',sizefactor=random.gauss(1,0.1)):
         super().__init__()
         self.basicname='human'
+        self.race=('human','humans')
+        self.true_name=NameGen.namegen(random.choice(['m','f']))
         if stats=='random':
             self.stats= {'s': int(random.triangular(low=5, high=25, mode=15)),
                          't': int(random.triangular(low=5, high=25, mode=15)),
@@ -337,6 +339,8 @@ class Giant(BaseClasses.Creature):
     def __init__(self,color=(1,1,1,1),name='the giant',job='',named=False,hostile=True,player=False,stats='random',sizefactor=random.gauss(3,0.2)):
         super().__init__()
         self.basicname='giant'
+        self.race=('giant','giants')
+        self.true_name=NameGen.namegen(random.choice(['m','f']))
         if stats=='random':
             self.stats= {'s': int(random.triangular(low=45, high=200, mode=125)),
                          't': int(random.triangular(low=3, high=18, mode=10)),
@@ -398,6 +402,8 @@ class Goblin(BaseClasses.Creature):
     def __init__(self,color=(1,1,1,1),name='the goblin',job='',named=False,hostile=True,player=False,stats='random',sizefactor=random.gauss(0.7,0.1)):
         super().__init__()
         self.basicname='goblin'
+        self.race=('goblin','goblins')
+        self.true_name=NameGen.namegen(random.choice(['m','f']))
         if stats=='random':
             self.stats= {'s': int(random.triangular(low=7, high=20, mode=10)),
                          't': int(random.triangular(low=3, high=12, mode=9)),
@@ -466,6 +472,8 @@ class Halfling(BaseClasses.Creature):
     def __init__(self,color=(1,1,1,1),name='the halfling',job='',named=False,hostile=True,player=False,stats='random',sizefactor=random.gauss(0.6,0.03)):
         super().__init__()
         self.basicname='halfling'
+        self.race=('halfling','halflings')
+        self.true_name=NameGen.namegen(random.choice(['m','f']))
         if stats=='random':
             self.stats= {'s': int(random.triangular(low=7, high=16, mode=11)),
                          't': int(random.triangular(low=10, high=35, mode=17)),
@@ -530,6 +538,8 @@ class Fairy(BaseClasses.Creature):
     def __init__(self,color=(1,1,1,1),name='the fairy',job='',named=False,hostile=True,player=False,stats='random',sizefactor=random.gauss(0.15,0.01)):
         super().__init__()
         self.basicname='fairy'
+        self.race=('fairy','fairies')
+        self.true_name=NameGen.namegen(random.choice(['m','f']))
         if stats=='random':
             self.stats= {'s': int(random.triangular(low=1, high=4, mode=2)),
                          't': int(random.triangular(low=5, high=20, mode=12)),
@@ -603,6 +613,7 @@ class Wolf(BaseClasses.Creature):
     def __init__(self,color=(1,1,1,1),name='the wolf',job='',named=False,hostile=True,player=False,stats='random',sizefactor=random.gauss(1,0.08)):
         super().__init__()
         self.basicname='wolf'
+        self.race=('wolf','wolves')
         if stats=='random':
             self.stats= {'s': int(random.triangular(low=5, high=15, mode=10)),
                          't': int(random.triangular(low=5, high=8, mode=7)),
@@ -739,6 +750,7 @@ class Dire_Wolf(BaseClasses.Creature):
     def __init__(self,color=(1,1,1,1),name='the dire wolf',job='',named=False,hostile=True,player=False,stats='random',sizefactor=random.gauss(1,0.08)):
         super().__init__()
         self.basicname='dire wolf'
+        self.race=('dire wolf','dire wolves')
         if stats=='random':
             self.stats= {'s': int(random.triangular(low=8, high=26, mode=15)),
                          't': int(random.triangular(low=6, high=10, mode=8)),
@@ -875,6 +887,7 @@ class Dog(BaseClasses.Creature):
     def __init__(self,color=(1,1,1,1),name='the dog',job='',named=False,hostile=False,player=False,stats='random',sizefactor=random.gauss(1,0.08)):
         super().__init__()
         self.basicname='dog'
+        self.race=('dog','dogs')
         if stats=='random':
             self.stats= {'s': int(random.triangular(low=3, high=12, mode=8)),
                          't': int(random.triangular(low=5, high=8, mode=7)),
@@ -1012,6 +1025,7 @@ class Cat(BaseClasses.Creature):
     def __init__(self,color=(1,1,1,1),name='the cat',job='',named=False,hostile=False,player=False,stats='random',sizefactor=random.gauss(1,0.08)):
         super().__init__()
         self.basicname='cat'
+        self.race=('cat','cats')
         if stats=='random':
             self.stats= {'s': int(random.triangular(low=3, high=9, mode=5)),
                          't': int(random.triangular(low=9, high=25, mode=15)),
@@ -1147,6 +1161,7 @@ class Giant_Ant(BaseClasses.Creature):
     def __init__(self,color=(1,1,1,1),name='the giant ant',job='',named=False,hostile=True,player=False,stats='random',sizefactor=random.gauss(1,0.08)):
         super().__init__()
         self.basicname='giant ant'
+        self.race=('giant ant','giant ants')
         if stats=='random':
             self.stats= {'s': int(random.triangular(low=8, high=35, mode=19)),
                          't': int(random.triangular(low=3, high=15, mode=7)),
@@ -1235,6 +1250,7 @@ class Giant_Spider(BaseClasses.Creature):
     def __init__(self,color=(1,1,1,1),name='the giant spider',job='',named=False,hostile=True,player=False,stats='random',sizefactor=random.gauss(1,0.08)):
         super().__init__()
         self.basicname='giant spider'
+        self.race=('giant spider','giant spiders')
         if stats=='random':
             self.stats= {'s': int(random.triangular(low=12, high=45, mode=21)),
                          't': int(random.triangular(low=10, high=30, mode=16)),
@@ -1320,6 +1336,7 @@ class Argentavis(BaseClasses.Creature):
     def __init__(self,color=(1,1,1,1),name='the argentavis',job='',named=False,hostile=True,player=False,stats='random',sizefactor=random.gauss(1,0.06)):
         super().__init__()
         self.basicname='argentavis'
+        self.race=('argentavis','argentaves')
         if stats=='random':
             self.stats= {'s': int(random.triangular(low=12, high=20, mode=16)),
                          't': int(random.triangular(low=8, high=29, mode=19)),
@@ -1403,6 +1420,7 @@ class Owl(BaseClasses.Creature):
     def __init__(self,color=(1,1,1,1),name='the owl',job='',named=False,hostile=True,player=False,stats='random',sizefactor=random.gauss(1,0.06)):
         super().__init__()
         self.basicname='owl'
+        self.race=('owl','owls')
         if stats=='random':
             self.stats= {'s': int(random.triangular(low=3, high=9, mode=5)),
                          't': int(random.triangular(low=8, high=29, mode=19)),
@@ -1485,6 +1503,7 @@ class Ostrich(BaseClasses.Creature):
     def __init__(self,color=(1,1,1,1),name='the ostrich',job='',named=False,hostile=True,player=False,stats='random',sizefactor=random.gauss(1,0.06)):
         super().__init__()
         self.basicname='ostrich'
+        self.race=['ostrich','ostriches']
         if stats=='random':
             self.stats= {'s': int(random.triangular(low=12, high=27, mode=18)),
                          't': int(random.triangular(low=7, high=25, mode=15)),
@@ -1572,6 +1591,7 @@ class Elephant_Bird(BaseClasses.Creature):
     def __init__(self,color=(1,1,1,1),name='the elephant bird',job='',named=False,hostile=True,player=False,stats='random',sizefactor=random.gauss(1,0.06)):
         super().__init__()
         self.basicname='elephant bird'
+        self.race=['elephant bird','elephant birds']
         if stats=='random':
             self.stats= {'s': int(random.triangular(low=20, high=50, mode=27)),
                          't': int(random.triangular(low=7, high=25, mode=15)),
@@ -1659,6 +1679,7 @@ class Dromornis(BaseClasses.Creature):
     def __init__(self,color=(1,1,1,1),name='the dromornis',job='',named=False,hostile=True,player=False,stats='random',sizefactor=random.gauss(1,0.06)):
         super().__init__()
         self.basicname='dromornis'
+        self.race=['dromornis','dromornis']
         if stats=='random':
             self.stats= {'s': int(random.triangular(low=32, high=78, mode=37)),
                          't': int(random.triangular(low=7, high=25, mode=15)),
@@ -1746,6 +1767,7 @@ class Falcon(BaseClasses.Creature):
     def __init__(self,color=(1,1,1,1),name='the falcon',job='',named=False,hostile=True,player=False,stats='random',sizefactor=random.gauss(1,0.06)):
         super().__init__()
         self.basicname='falcon'
+        self.race=['falcon','falcons']
         if stats=='random':
             self.stats= {'s': int(random.triangular(low=2, high=7, mode=4)),
                          't': int(random.triangular(low=14, high=45, mode=23)),
@@ -1828,6 +1850,7 @@ class Hawk(BaseClasses.Creature):
     def __init__(self,color=(1,1,1,1),name='the hawk',job='',named=False,hostile=True,player=False,stats='random',sizefactor=random.gauss(1,0.06)):
         super().__init__()
         self.basicname='hawk'
+        self.race=['hawk','hawks']
         if stats=='random':
             self.stats= {'s': int(random.triangular(low=3, high=8, mode=5)),
                          't': int(random.triangular(low=11, high=37, mode=19)),
@@ -1910,6 +1933,7 @@ class Rat(BaseClasses.Creature):
     def __init__(self,color=(1,1,1,1),name='the rat',job='',named=False,hostile=False,player=False,stats='random',sizefactor=random.gauss(1,0.08)):
         super().__init__()
         self.basicname='rat'
+        self.race=['rat','rats']
         if stats=='random':
             self.stats= {'s': int(random.triangular(low=2, high=6, mode=3)),
                          't': int(random.triangular(low=6, high=15, mode=9)),
@@ -2045,6 +2069,7 @@ class Giant_Rat(BaseClasses.Creature):
         super().__init__()
         sizefactor*=4
         self.basicname='giant rat'
+        self.race=['giant rat','giant rats']
         if stats=='random':
             self.stats= {'s': int(random.triangular(low=5, high=20, mode=11)),
                          't': int(random.triangular(low=6, high=15, mode=9)),
@@ -2181,6 +2206,7 @@ class Golem(BaseClasses.Creature):
     def __init__(self,color=(1,1,1,1),name='the golem',job='',named=False,hostile=True,player=False,stats='power',mass=500,material=M.Iron(),power=5,creator=None):
         super().__init__()
         self.basicname='golem'
+        self.race=['golem','golem']
         if stats=='power':
             self.stats= {'s': int(power*mass*.04+1),
                          't': int(power*2),
@@ -2296,6 +2322,7 @@ class Animated_Armor(BaseClasses.Creature):
                  stats='random',sizefactor=random.gauss(1,0.1),material=M.Iron,power=5,creator=None):
         super().__init__()
         self.basicname='enchanted armor'
+        self.race=['animated item','animated items']
         if stats=='random':
             self.stats= {'s': int(random.triangular(low=power, high=5*power, mode=3*power)),
                          't': int(random.triangular(low=power, high=5*power, mode=3*power)),
@@ -2413,6 +2440,7 @@ class Animated_Weapon(BaseClasses.Creature):
     def __init__(self,color=(1,1,1,1),name='',job='',named=False,hostile=True,player=False,
                  stats='random',weapon='random',power=5,creator=None):
         super().__init__()
+        self.race=['animated item','animated items']
         if weapon=='random':
             itemtypes=[(Items.LongSword,10),(Items.Gladius,5),(Items.Knife,7),(Items.Saber,4),(Items.Claymore,4),(Items.Mace,8),
                  (Items.WarHammer,3),(Items.Spear,5),(Items.Axe,6),(Items.QuarterStaff,3)]
@@ -2501,6 +2529,7 @@ class Blob(BaseClasses.Creature):
     def __init__(self,color=(1,1,1,1),name='the blob',job='',named=False,hostile=True,player=False,stats='random',mass=random.gauss(500,30),material=M.Slime):
         super().__init__()
         self.basicname='blob'
+        self.race=['blob','blobs']
         if stats=='random':
             self.stats= {'s': int(random.triangular(low=5, high=20, mode=10)),
                          't': int(random.triangular(low=1, high=10, mode=5)),
@@ -2606,6 +2635,7 @@ class Blob(BaseClasses.Creature):
 class Acid_Blob(Blob):
     def __init__(self,color=(1,1,1,1),name='the acid blob',job='',named=False,hostile=True,player=False,stats='random',mass=random.gauss(400,30),material=M.Slime):
         super().__init__(color=color,name=name,job=job,named=named,hostile=hostile,player=player,stats=stats,mass=mass,material=material)
+        self.basicname='acid blob'
 
     def fluidize(self):
         for i in self.limbs:
@@ -2624,6 +2654,7 @@ class Amorphous_Horror(BaseClasses.Creature):
                  mass=random.gauss(600,80),decay=True,summoner=None):
         super().__init__()
         self.basicname='amorphous horror'
+        self.race=['horror','horrors']
         if stats=='random':
             self.stats= {'s': int(random.triangular(low=5, high=25, mode=15)),
                          't': int(random.triangular(low=5, high=25, mode=15)),
