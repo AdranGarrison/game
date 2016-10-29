@@ -133,6 +133,7 @@ class Shell(FloatLayout):
         #setting up listener for mouse position, to correctly identify the cell to which the mouse points.
         self.mousemode='cell'
         self.mouse_circle_radius=5
+        self.mouse_cone_radius=5
         Window.bind(mouse_pos=self.mouselistener)
 
         #setting up listener for keyboard inputs. Must have different settings for different screens.
@@ -292,6 +293,18 @@ class Shell(FloatLayout):
                     color=(1,0,0,0.1)
                     known_blockage=True
                 floor.cells[position[0]][position[1]].highlight(color=color)
+        if self.mousemode=='los from':
+            color=(1,1,1,0.1)
+            line=BaseClasses.get_line(self.highlight_start_location,targetedcell.location)
+            if len(line)>0:line.pop(0)
+            known_blockage=False
+            for position in line:
+                if floor.cells[position[0]][position[1]].seen_by_player==False and known_blockage==False:
+                    color=(0.5,1,0,0.2)
+                elif floor.cells[position[0]][position[1]].passable==False:
+                    color=(1,0,0,0.1)
+                    known_blockage=True
+                floor.cells[position[0]][position[1]].highlight(color=color)
         if self.mousemode=='circle':
             color=(1,1,1,0.1)
             circle=floor.get_circle(targetedcell.location,self.mouse_circle_radius)
@@ -301,6 +314,16 @@ class Shell(FloatLayout):
             color=(1,1,1,0.1)
             circle=floor.get_circle(targetedcell.location,self.mouse_circle_radius,require_los=True)
             for i in circle:
+                i.highlight(color=color)
+        if self.mousemode=='cone':
+            color=(1,1,1,0.1)
+            cone=floor.get_cone(self.player.location,targetedcell.location,maxradius=self.mouse_cone_radius,require_los=False)
+            for i in cone:
+                i.highlight(color=color)
+        if self.mousemode=='los cone':
+            color=(1,1,1,0.1)
+            cone=floor.get_cone(self.player.location,targetedcell.location,maxradius=self.mouse_cone_radius,require_los=True)
+            for i in cone:
                 i.highlight(color=color)
 
     def on_key_down(self,keyboard,keycode,text,modifiers):
@@ -321,9 +344,9 @@ class Shell(FloatLayout):
             #
             #    print("ARMORED")
             #    unittestone(Items.Spear,enemy_armor=True,twohand=True)
-            if keycode[1]=='b' and self.shift==True:
-                for i in self.player.limbs:
-                    i.burn(1000,5)
+            #if keycode[1]=='b' and self.shift==True:
+            #    for i in self.player.limbs:
+            #        i.burn(1000,5)
 
             #The below bindings are for real
             movement=None
@@ -363,8 +386,31 @@ class Shell(FloatLayout):
                     self.status_screen=AdvancedTargetingScreen(self.player,cell=self.player.floor.cells[self.player.location[0]+movement[0]][self.player.location[1]+movement[1]])
                     self.add_widget(self.status_screen)
                     self.keyboard_mode='status screen'
-
-            if keycode[1]=='.' and self.shift==False:
+            if keycode[1]=='1':
+                self.actionbar.button1.on_release()
+            elif keycode[1]=='2':
+                self.actionbar.button2.on_release()
+            elif keycode[1]=='3':
+                self.actionbar.button3.on_release()
+            elif keycode[1]=='4':
+                self.actionbar.button4.on_release()
+            elif keycode[1]=='5':
+                self.actionbar.button5.on_release()
+            elif keycode[1]=='6':
+                self.actionbar.button6.on_release()
+            elif keycode[1]=='7':
+                self.actionbar.button7.on_release()
+            elif keycode[1]=='8':
+                self.actionbar.button8.on_release()
+            elif keycode[1]=='9':
+                self.actionbar.button9.on_release()
+            elif keycode[1]=='0':
+                self.actionbar.button10.on_release()
+            elif keycode[1]=='-':
+                self.actionbar.button11.on_release()
+            elif keycode[1]=='=':
+                self.actionbar.button12.on_release()
+            elif keycode[1]=='.' and self.shift==False:
                 self.turn+=1
             elif keycode[1]=='.' and self.shift==True:
                 for i in self.dungeonmanager.current_screen.cells[self.player.location[0]][self.player.location[1]].contents:
@@ -437,7 +483,7 @@ class Shell(FloatLayout):
                 teleport=Abilities.Pain(self.player)
                 teleport.select_target()
             elif keycode[1]=='f' and self.shift==False:
-                fireball=Abilities.Fireball(self.player)
+                fireball=Abilities.Fireburst(self.player,power=25)
                 fireball.select_target()
             elif keycode[1]=='f' and self.shift==True:
                 summon=Abilities.Summon_Familiar(self.player)
@@ -458,8 +504,7 @@ class Shell(FloatLayout):
                 blood.splatter(5,99)
                 self.player.blood=[100,100]
             elif keycode[1]=='b' and self.shift==False:
-                frostbolt=Abilities.Frostbolt(self.player)
-                frostbolt.select_target()
+                Enchantments.Berserk(self.player,turns=10)
             elif keycode[1]=='d' and self.shift==True:
                 addle=Abilities.Addle(self.player)
                 addle.select_target()
@@ -479,6 +524,10 @@ class Shell(FloatLayout):
                 self.status_screen=AbilityScreen(self.player)
                 self.keyboard_mode='status screen'
                 self.add_widget(self.status_screen)
+            elif keycode[1]=='g' and self.shift==True:
+                if self.player.missing_limbs!=[]:
+                    limb=random.choice(self.player.missing_limbs)
+                    self.player.regrow_limb(limb)
 
 
 
@@ -577,6 +626,10 @@ class Shell(FloatLayout):
 
         if self.keyboard_mode=='targeting':
             if keycode[1]=='escape':
+                try:
+                    self.reticule.purpose.cleanup()
+                except:
+                    pass
                 try:
                     floor.cells[self.reticule.location[0]][self.reticule.location[1]].contents.remove(self.reticule)
                     self.reticule=None
@@ -695,6 +748,7 @@ class Shell(FloatLayout):
             self.log.addtext('Trust me, you don\'t want to go that way')
 
         if hasattr(self,'reticule') and target==self.reticule:
+            self.highlight_start_location=self.reticule.hsl
             cell=self.dungeonmanager.current_screen.cells[target.location[0]][target.location[1]]
             self.oldmousemode=self.mousemode
             self.mousemode=self.reticule.highlight_type
@@ -818,7 +872,7 @@ class Shell(FloatLayout):
         currentscreen.creaturelist.append(golem)
         currentscreen.place_creature(golem,[15,15])
 
-        animated_armor=Creatures.Animated_Armor(power=5)
+        animated_armor=Creatures.Phoenix()
         currentscreen.creaturelist.append(animated_armor)
         currentscreen.place_creature(animated_armor,[20,20])
 
@@ -848,13 +902,13 @@ class Shell(FloatLayout):
         for i in self.player.inventory:
             #Enchantments.Acidic(i)
             #Enchantments.Burning(i)
-            #Enchantments.BloodDrinking(i)
+            #Enchantments.Vampiric(i)
             #Enchantments.Indestructable(i)
             #Enchantments.Shifting(i)
             #Enchantments.Blinking(i)
             #Enchantments.Numbing(i)
-            Enchantments.Freezing(i)
-            Enchantments.Magic_Eating(i)
+            #Enchantments.Freezing(i)
+            #Enchantments.Magic_Eating(i)
             #Fluids.Numbing_Poison(None,applied=True).add(i)
             pass
         for i in self.player.limbs:
@@ -867,14 +921,17 @@ class Shell(FloatLayout):
             #Enchantments.Stealth(i)
             pass
         #Enchantments.Stealth(self.player)
-        Enchantments.Psychic_Detection(self.player)
+        #Enchantments.Psychic_Detection(self.player)
         #Enchantments.Haste(self.player)
         #Enchantments.Slow(self.player)
-        Enchantments.Sprinting(self.player,turns=3)
+        #Enchantments.Sprinting(self.player,turns=3)
         self.player.abilities.extend([Abilities.Fireball(self.player),Abilities.Pain(self.player),
                                       Abilities.Charge(self.player),Abilities.Grab(self.player),
                                       Abilities.Sprint(self.player),Abilities.Divine_Healing(self.player),
-                                      Abilities.Throw(self.player),Abilities.Addle(self.player)])
+                                      Abilities.Throw(self.player),Abilities.Addle(self.player),Abilities.Regrowth(self.player),
+                                      Abilities.Throw_Creature(self.player),Abilities.Psychic_Throw(self.player),
+                                      Abilities.Firebreath(self.player),Abilities.Frostbolt(self.player),
+                                      Abilities.Invisibility(self.player)])
 
 
 

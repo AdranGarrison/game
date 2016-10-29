@@ -120,6 +120,7 @@ class Attack():
             self.basetarget.owner.survivalcheck()
             if self.basetarget.owner.alive==False and alive==True:
                 self.killingblow=True
+            #self.basetarget.owner.on_struck(self)
         except: pass
 
         limb_processed=False

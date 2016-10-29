@@ -23,6 +23,7 @@ import queue
 import functools
 import MapTiles
 import FloorGen
+import math
 #import Deities
 import ai
 
@@ -179,6 +180,7 @@ class Limb():
         self.note=''
         self.coverage=1
         self.coatings=[]
+        self.in_inventory=None
 
     def youngscalc(self):
         if self.layers==[]:
@@ -529,7 +531,13 @@ class Limb():
                     self.unequip(i,drop=False,log=False)
         if primary:
             if self.natural==True and self in self.owner.limbs: #self.owner.missing_limbs.append(copy.copy(self))
-                self.owner.missing_limbs.append(self.copyself())
+                ghost=self.copyself()
+                self.owner.missing_limbs.append(ghost)
+                for i in self.limbs:
+                    i.attachpoint=ghost
+                for i in self.owner.missing_limbs:
+                    if i.attachpoint==self:
+                        i.attachpoint=ghost
             self.owner.pain+=75*self.painfactor
             if self.owner==Shell.shell.player and self in self.owner.limbs and log==True:
                 if self.attachpoint!=None:
@@ -706,6 +714,10 @@ class Limb():
     def on_equip(self,**kwargs):
         pass
 
+    def on_unequip(self,limb,**kwargs):
+        for i in list(self.enchantments):
+            i.on_unequip(limb,**kwargs)
+
     def change_material(self,oldmaterial,newmaterial):
         for i in self.layers:
             if isinstance(i.material,oldmaterial):
@@ -773,9 +785,10 @@ class Limb():
             #print(temp,intensity)
         if self.owner is not None:
             res*=self.owner.resistance['fire']
-            for i in source.classification:
-                if i in self.owner.resistance:
-                    res*=self.owner.resistance[i]
+            if source is not None:
+                for i in source.classification:
+                    if i in self.owner.resistance:
+                        res*=self.owner.resistance[i]
         for i in reversed(self.layers):
             chance=1-i.damage['burn']-i.damage['disintegrate']
             if random.random()>chance:
@@ -785,6 +798,9 @@ class Limb():
             newmessage=new[0]#.capitalize()
             temp=new[1]
             intensity=new[2]
+            if new[3]:
+                import Enchantments
+                Enchantments.Burning_Limb(self,turns=int(3*i.mass**0.5)+3,strength=temp/i.burn_resistance)
             message=''.join((message,newmessage))
             for j in ['burn','bend','dent','deform']:
                 try: self.owner.pain+=(i.damage[j]-old_damage[j])*150*self.painfactor*i.painfactor/self.stats['wil']**0.5
@@ -1570,6 +1586,8 @@ class Creature():
         return False
 
     def modify_fear(self,target,amount):
+        if self.feels_fear==False:
+            self.fear[target]=0
         if target not in self.fear:
             self.fear[target]=0
             for i in self.aversion:
@@ -1584,28 +1602,44 @@ class Creature():
     def evasion(self,attack,blockable=1,dodgeable=1,parryable=1,surprisable=1,exploitable=1,**kwargs):
         if not self.alive: return
         self.combataction=True
+        self.block=blockable
+        self.dodge=dodgeable
+        self.parry=parryable
+        self.surprise=surprisable
+        self.exploit=exploitable
         parrytime=0
         blocktime=0
         dodgetime=0
+        #you won't try to defend against your own self
+        if attack.attacker==self:
+            attack.damagefactor*=10*random.random()+1
+            attack.arpen+=1
+            return
         for i in self.enchantments:
             if i.evasion_modification(attack)=='abort':
                 return
 
+        if attack.attacker in self.detected_creatures:
+            self.hostilitycheck(attack.attacker)
+            self.affinity[attack.attacker]-=1
         #incapacitated foes are unable to make even the most basic of evasive maneuvers and take much greater damage
 
-        if (any(incapacitate.search(i) for i in self.conditions) or any('incapacitate' in i.classification for i in self.enchantments)) and exploitable>=random.random():
-            attack.damagefactor*=attack.attacker.stats['tec']
-            attack.arpen+=0.5
+        if (any(incapacitate.search(i) for i in self.conditions) or any('incapacitate' in i.classification for i in self.enchantments)):
+            if self.exploit>random.random(): exploited=True
+            else: exploited=False
+            if exploited==True:
+                attack.damagefactor*=attack.attacker.stats['tec']
+                attack.arpen+=attack.attacker.stats['tec']/(attack.attacker.stats['tec']+20)
             if self.player:
-                Shell.messages.append(1)
-                Shell.messages.append("[color=EB05B1]You are defenseless![/color]")
+                if exploited:
+                    Shell.messages.append(1)
+                    Shell.messages.append("[color=EB05B1]You are defenseless![/color]")
                 attack.surprise=True
             elif self in Shell.shell.player.visible_creatures:
-                Shell.messages.append(1)
-                Shell.messages.append('[color=EB05B1]{} is defenseless![/color]'.format(self.name))
+                if exploited:
+                    Shell.messages.append(1)
+                    Shell.messages.append('[color=EB05B1]{} is defenseless![/color]'.format(self.name))
                 attack.surprise=True
-            self.stamina[0]-=attack.basetarget.staminacost
-            self.focus[0]-=attack.basetarget.staminacost
             return
 
 
@@ -1618,14 +1652,14 @@ class Creature():
 
         if self.player: name='you'
         else: name=self.name
-        if attack.time<reactiontime or "off_balance" in self.conditions and surprisable>=random.random():
+        if attack.time<reactiontime or "off_balance" in self.conditions and self.surprise>=random.random():
             attack.damagefactor*=attack.attacker.stats['tec']**0.5
             if self in Shell.shell.player.visible_creatures:
                 Shell.messages.append(1)
                 Shell.messages.append('[color=EB8005]The attack takes {} completely unaware![/color]'.format(name))
                 attack.surprise=True
             return
-        elif attack.attacker not in self.detected_creatures and surprisable>=random.random():
+        elif attack.attacker not in self.detected_creatures and self.surprise>=random.random():
             attack.damagefactor*=attack.attacker.stats['tec']**0.5
             if self in Shell.shell.player.visible_creatures:
                 Shell.messsages.append(1)
@@ -1636,7 +1670,7 @@ class Creature():
         #Attempt to dodge
         try:
             dodgetime=reactiontime+((self.focus[1]/(1+self.focus[0]))**0.5)*random.gauss(3/(self.stats['tec']*self.stats['luc']**0.5),.01)*(self.movemass**1.2/(self.stats['str']*max(self.stamina[0],1)/self.stamina[1]))*attack.accuracy*self.targetsize/(7*self.balance+0.01)
-            if dodgetime<attack.time and random.random()*attack.attacker.stats['tec']<random.random()*self.stats['per'] and dodgeable>=random.random():
+            if dodgetime<attack.time and random.random()*attack.attacker.stats['tec']<random.random()*self.stats['per'] and self.dodge>=random.random():
                 attack.dodged=True
                 attack.attacker.tension+=1
                 self.stamina[0]-=2*attack.basetarget.movemass/attack.basetarget.stats['str']
@@ -1648,7 +1682,7 @@ class Creature():
         #Attempt to block
         try:
             for i in self.equipped_items:
-                if i.block==True and blockable>=random.random():
+                if i.block==True and self.block>=random.random():
                     encumbrance=0.1*(self.movemass-self.mass)/self.stats['str']
                     if len(i.equipped)==1:
                         if i.equipped[0].attachpoint is not None:
@@ -1693,7 +1727,7 @@ class Creature():
 
         #Attempt to parry
         for i in self.equipped_items:
-            if i.parry==True and parryable>=random.random():
+            if i.parry==True and self.parry>=random.random():
                 encumbrance=0.3*(self.movemass-self.mass)/self.stats['str']
                 basemass=0
                 strength=0
@@ -1767,6 +1801,9 @@ class Creature():
             if self.movement[i]>0:
                 squarebalance+=self.movement[i]*self.movement[i]*passage*passage
         self.balance=squarebalance**0.5
+        if self.balance<2:
+            import Enchantments
+            Enchantments.Impaired_Mobility(self,turns=1)
         for i in list(self.enchantments):
             i.sense_modification()
 
@@ -1973,18 +2010,25 @@ class Creature():
                 if self.floor.vision_check(self,i)==True:
                     self.visible_items.append(i)
             for i in possible_detections:
-                if not any(isinstance(j,Enchantments.Stealth) for j in i.enchantments):
+                if not any((j.classname in ('invisible','stealth')) for j in i.enchantments):
                     self.visible_creatures.append(i)
                 elif i==self:
                     self.visible_creatures.append(i)
                 else:
                     strength=0
+                    invisible=False
+                    detected=False
                     for j in i.enchantments:
                         if isinstance(j,Enchantments.Stealth):
                             s=j.strength-j.get_bonus(self)
                             strength=(strength*strength+s*s)**0.5
-                    distance=self.floor.cells[i.location[0]][i.location[1]].distance_to(self.floor.cells[self.location[0]][self.location[1]])
-                    if random.random()*self.stats['per']>strength*distance:
+                        if j.classname=='invisible':
+                            invisible=True
+                            detected=j.detect(self)
+                    if invisible:
+                        if detected:
+                            self.detected_creatures.append(i)
+                    elif random.random()*self.stats['per']>strength*self.floor.cells[i.location[0]][i.location[1]].distance_to(self.floor.cells[self.location[0]][self.location[1]]):
                         #print(i.name," is seen")
                         self.visible_creatures.append(i)
 
@@ -2046,7 +2090,7 @@ class Creature():
         self.visible_items=[]
         for i in self.visible_cells:
             for j in i.creatures:
-                if not any(isinstance(k,Enchantments.Stealth) for k in j.enchantments):
+                if not any(k.classname in ('stealth','invisible') for k in j.enchantments):
                     self.visible_creatures.append(j)
                     self.detected_creatures.append(j)
                     #print('unstealthed {} is seen'.format(j.name))
@@ -2054,11 +2098,19 @@ class Creature():
                     continue
                 else:
                     strength=0
+                    invisible=False
+                    detected=False
                     for k in j.enchantments:
                         if isinstance(k,Enchantments.Stealth):
                             s=k.strength-k.get_bonus(self)
                             strength=(strength*strength+s*s)**0.5
-                    if random.random()*self.stats['per']/i.distance_to(self.floor.cells[self.location[0]][self.location[1]])>strength:
+                        if k.classname=='invisible':
+                            invisible=True
+                            detected=k.detect(self)
+                    if invisible==True:
+                        if detected:
+                            self.detected_creatures.append(j)
+                    elif random.random()*self.stats['per']/i.distance_to(self.floor.cells[self.location[0]][self.location[1]])>strength:
                         #print(j.name," is seen")
                         self.visible_creatures.append(j)
                         self.detected_creatures.append(j)
@@ -2098,8 +2150,13 @@ class Creature():
         psychic_detection=False
         if self.floor.vision_check(self,creature):
             stealth=False
+            invisible=False
+            detected=False
             for i in creature.enchantments:
                 strength=0
+                if i.classname=='invisible':
+                    invisible=True
+                    detected=i.detect(self)
                 if i.classname=='stealth':
                     startcell=self.floor.cells[self.location[0]][self.location[1]]
                     endcell=self.floor.cells[creature.location[0]][creature.location[1]]
@@ -2107,7 +2164,11 @@ class Creature():
                     s=i.strength-i.get_bonus(self)
                     strength=(strength*strength+s*s)**0.5
                     stealth=True
-            if stealth==True:
+            if invisible==True:
+                visible=False
+                if detected:
+                    self.detected_creatures.append(creature)
+            elif stealth==True:
                 if random.random()*self.stats['per']>strength*distance:
                     visible=True
             else:
@@ -2238,9 +2299,23 @@ class Creature():
     def regrow_limb(self,limb):
         if limb not in self.missing_limbs:
             return
+        if limb.attachpoint not in self.limbs:
+            return
         self.limbs.append(limb)
         self.missing_limbs.remove(limb)
         limb.join_to(limb.attachpoint)
+        to_process=[limb]
+        processed=[]
+        while to_process!=[]:
+            new=[]
+            for i in to_process:
+                processed.append(i)
+                for j in i.limbs:
+                    if j not in processed:
+                        new.append(j)
+            to_process=new
+            for i in to_process:
+                self.limbs.append(i)
 
     def add_graphical_instructions(self,cell,**kwargs):
         for i in self.enchantments:
@@ -3299,7 +3374,7 @@ class Item():
                     Shell.messages.append(message.replace(' the '," {}'s ").format(self.equipped[0].owner.name))
 
     def burn(self,temp,intensity=1,in_limb=False,limb=None,log=True,log_override=False,source=None):
-        if self.heat_reaction=='indestructable': return
+        if self.heat_reaction=='indestructable': return ('',0,0)
 
     #handle resistance
         res=self.resistance['fire']
@@ -3345,6 +3420,7 @@ class Item():
                     temp+=random.random()*temp
                     intensity+=3*random.random()
                     removed_coatings.append(i)
+                    ignition=True
             elif random.random()*temp*intensity>1000 and i.evaporate==True:
                 removed_coatings.append(i)
         for i in removed_coatings:
@@ -3391,6 +3467,9 @@ class Item():
                 else:
                     message='[color=CFD18A]The {} on the {} is scorched by the heat. [/color]'.format(self.name, limb.name)
                 self.damage['burn']=severity
+            if severity<1:
+                if burn_severity*burn_severity*burn_severity>random.random():
+                    ignition=True
         elif self.heat_reaction=='melt':
             severity=(burn_severity**2+self.damage['burn']**2)**0.5
             if severity>=1:
@@ -3447,7 +3526,7 @@ class Item():
             else:
                 newtemp=(temp**2+self.mass*self.burn_temp**2)**0.5
                 newintensity=intensity+self.mass**0.5
-            return message,newtemp,newintensity
+            return message,newtemp,newintensity,ignition
         elif log==True and message!='':
             Shell.messages.append(message)
 
@@ -4101,6 +4180,7 @@ class Item():
 class Fluid():
     def __init__(self,owner,amount=1,**kwargs):
         self.owner=owner
+        self.mass=0.0001
         self.image=None
         self.identification_difficulty=5
         self.passable=True
@@ -4840,6 +4920,40 @@ class Floor(Screen):
                         break
             return cells_to_highlight
             '''
+
+    def get_cone(self,start,finish,angle=1,maxradius=50,require_los=False):
+        cells_to_highlight=[]
+        delta_x=finish[0]-start[0]
+        delta_y=finish[1]-start[1]
+        radius=(delta_x*delta_x+delta_y*delta_y)**0.5
+        if radius>=maxradius:
+            radius=maxradius
+        alpha=math.atan2(delta_y,delta_x)
+        point1=[radius*math.cos(alpha+angle/2),radius*math.sin(alpha+angle/2)]
+        point2=[radius*math.cos(alpha-angle/2),radius*math.sin(alpha-angle/2)]
+        xmin=min(0,delta_x,point1[0],point2[0])
+        xmax=max(0,delta_x,point1[0],point2[0])
+        ymin=min(0,delta_y,point1[1],point2[1])
+        ymax=max(0,delta_y,point1[1],point2[1])
+        limit=math.cos(angle/2)
+        for i in range(int(xmin),int(xmax+2)):
+            for j in range(int(ymin),int(ymax+2)):
+                point=[start[0]+i,start[1]+j]
+                d=(i*i+j*j)**0.5
+                if radius==0 or d==0:
+                    continue
+                if (delta_x*i+delta_y*j)>=limit*(radius*d) and d<=radius:
+                    if point[0] in range(0,self.dimensions[0]) and point[1] in range(0,self.dimensions[1]):
+                        cells_to_highlight.append(self.cells[point[0]][point[1]])
+        if require_los==False:
+            return cells_to_highlight
+        cells=[]
+        for i in cells_to_highlight:
+            if self.passability_check(self.cells[start[0]][start[1]],i):
+                cells.append(i)
+        return cells
+
+
 
     def on_turn(self,*args,**kwargs):
         pass

@@ -952,19 +952,30 @@ Builder.load_string('''
         pos:root.x+0.025*root.width,root.y+0.95*root.height-self.height
         text:"Abilities"
         outline:1,0,0,1
+    GridLayout:
+        size_hint:0.95,0.05
+        pos:root.x+root.width*0.025,root.y+root.height*0.825
+        rows:1
+        OutlinedTextBox:
+            text:'Index'
+            size_hint:0.1,1
+            outline:1,0,0,0.9
+        OutlinedTextBox:
+            outline:1,0,0,0.9
+            text:'Name'
+            size_hint:0.2,1
+        OutlinedTextBox:
+            outline:1,0,0,0.9
+            text:'Description'
+            size_hint:0.7,1
     ScrollView:
         id:abilityscroll
-        size_hint:0.95,0.85
+        size_hint:0.95,0.8
         pos:root.x+root.width*0.025,root.y+root.height*0.025
-        canvas.before:
-            Color:
-                rgba:0,0,0,0.95
-            Rectangle:
-                size:self.width,self.height
-                pos:self.pos
         GridLayout:
             cols:1
             id:abilities
+            size_hint_y:len(self.children)/10
 
     ''')
 '''
@@ -987,23 +998,41 @@ Builder.load_string('''
 '''
 
 #Below are UI elements which are fixed on the screen (bars, combat log, buttons, etc)
+class AbilityButton(Button):
+    def __init__(self,ability=None,*args,**kwargs):
+        super().__init__(**kwargs)
+        self.ability=ability
+        self.default_text=self.text
+
+    def set_ability(self,ability):
+        if ability==None:
+            self.ability=None
+            self.text=self.default_text
+            return
+        self.ability=ability
+        self.text=ability.name
+
+    def on_release(self):
+        if self.ability!=None:
+            self.ability.select_target()
+
 class Buttonbar(BoxLayout):
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
         self.orientation='horizontal'
         self.size_hint=(1,0.1)
-        self.button1=Button(text='1')
-        self.button2=Button(text='2')
-        self.button3=Button(text='3')
-        self.button4=Button(text='4')
-        self.button5=Button(text='5')
-        self.button6=Button(text='6')
-        self.button7=Button(text='7')
-        self.button8=Button(text='8')
-        self.button9=Button(text='9')
-        self.button10=Button(text='10')
-        self.button11=Button(text='11')
-        self.button12=Button(text='12')
+        self.button1=AbilityButton(text='1')
+        self.button2=AbilityButton(text='2')
+        self.button3=AbilityButton(text='3')
+        self.button4=AbilityButton(text='4')
+        self.button5=AbilityButton(text='5')
+        self.button6=AbilityButton(text='6')
+        self.button7=AbilityButton(text='7')
+        self.button8=AbilityButton(text='8')
+        self.button9=AbilityButton(text='9')
+        self.button10=AbilityButton(text='10')
+        self.button11=AbilityButton(text='11')
+        self.button12=AbilityButton(text='12')
         self.add_widget(self.button1)
         self.add_widget(self.button2)
         self.add_widget(self.button3)
@@ -1130,8 +1159,10 @@ class Portrait(Widget):
 
 #The classes below deal with inventory screens
 class OutlinedTextBox(Label):
-    def __init__(self,color=(0,0,0,1),background=(0,0,0,1),**kwargs):
+    def __init__(self,color=(0,0,0,1),background=(0,0,0,1),outline=None,**kwargs):
         self.outline=color
+        if outline!=None:
+            self.outline=outline
         self.background=background
         super().__init__(**kwargs)
 
@@ -1435,7 +1466,7 @@ class InventoryItem(ButtonBehavior,GridLayout):
         if hasattr(item,'equipped') and item.equipped!=[]:
             #print(item.equipped)
             text=' '.join((text,' [color=ff33ff](equipped on {})[/color]'.format(' '.join((i.name for i in item.equipped)))))
-        elif item.in_inventory!=None and item in item.in_inventory.quiver:
+        elif hasattr(item,'in_inventory') and item.in_inventory!=None and item in item.in_inventory.quiver:
             text=' '.join((text,' [color=ff33ff](in quiver)[/color]'))
         self.text=Label(markup=True,text=text,halign='left',text_size=(500,None),shorten=False)
         if letter=='playerinventory':
@@ -1632,6 +1663,103 @@ class InventorySidebar(ScrollView):
                 letterpos+=1
                 misc+=1
         if misc==0:
+            self.list.remove_widget(misclabel)
+
+
+        self.shell.add_widget(self)
+
+        for i in self.list.children:
+            try: i.bind(on_press=self.mouse_select)
+            except: pass
+
+    def show_items_in_list(self,list):
+        self.show_only=list
+        self.showing='ground'
+        self.selected_items=[]
+        self.selectionindex={}
+        letters='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-='
+        letterpos=0
+        self.list=BoxLayout(orientation='vertical',size_hint=(1,None))
+        self.list.size[1]=len(list)*30+60
+        self.add_widget(self.list)
+        with self.canvas.before:
+            Color(0.7,0.7,0.7)
+            self.graphics=Rectangle(size=(10000,10000),pos_hint=self.pos_hint)
+
+        weaponlabel=Label(markup=True,text="[color=333300]  Weapons:[/color]",halign='left',text_size=(500,None),shorten=False)
+        weaponlabel.bind(size=weaponlabel.setter('text_size'))
+        self.list.add_widget(weaponlabel)
+        weapons=0
+        for i in list:
+            if hasattr(i,'sortingtype') and i.sortingtype=='weapon':
+                try: letter=letters[letterpos]
+                except KeyError: letter=''
+                i.touched_by_player=True
+                if self.shell.player.can_see==True:
+                    i.seen_by_player=True
+                i.generate_descriptions(self.shell.player.stats['per'])
+                new=InventoryItem(i,size_hint=(1,None),letter=letter,height=30)
+                self.selectionindex[letter]=new
+                self.list.add_widget(new)
+                letterpos+=1
+                weapons+=1
+        if weapons==0:
+            self.list.remove_widget(weaponlabel)
+
+        armorlabel=Label(markup=True,text="[color=333300]  Armor:[/color]",halign='left',text_size=(500,None),shorten=False)
+        armorlabel.bind(size=armorlabel.setter('text_size'))
+        self.list.add_widget(armorlabel)
+        armor=0
+        for i in list:
+            if hasattr(i,'sortingtype') and i.sortingtype=='armor':
+                try: letter=letters[letterpos]
+                except KeyError: letter=''
+                i.touched_by_player=True
+                if self.shell.player.can_see==True:
+                    i.seen_by_player=True
+                i.generate_descriptions(self.shell.player.stats['per'])
+                new=InventoryItem(i,size_hint=(1,None),letter=letter,height=30)
+                self.selectionindex[letter]=new
+                self.list.add_widget(new)
+                letterpos+=1
+                armor+=1
+        if armor==0:
+            self.list.remove_widget(armorlabel)
+
+        misclabel=Label(markup=True,text="[color=333300]  Miscellaneous:[/color]",halign='left',text_size=(500,None),shorten=False)
+        misclabel.bind(size=misclabel.setter('text_size'))
+        self.list.add_widget(misclabel)
+        misc=0
+        for i in list:
+            if hasattr(i,'sortingtype') and i.sortingtype=='misc':
+                try: letter=letters[letterpos]
+                except KeyError: letter=''
+                i.touched_by_player=True
+                if self.shell.player.can_see==True:
+                    i.seen_by_player=True
+                i.generate_descriptions(self.shell.player.stats['per'])
+                new=InventoryItem(i,size_hint=(1,None),letter=letter,height=30)
+                self.selectionindex[letter]=new
+                self.list.add_widget(new)
+                letterpos+=1
+                misc+=1
+        if misc==0:
+            self.list.remove_widget(misclabel)
+
+        otherlabel=Label(markup=True,text="[color=333300]  Other:[/color]",halign='left',text_size=(500,None),shorten=False)
+        otherlabel.bind(size=otherlabel.setter('text_size'))
+        self.list.add_widget(otherlabel)
+        other=0
+        for i in list:
+            if not hasattr(i,'sortingtype'):
+                try: letter=letters[letterpos]
+                except KeyError: letter=''
+                new=InventoryItem(i,size_hint=(1,None),letter=letter,height=30)
+                self.selectionindex[letter]=new
+                self.list.add_widget(new)
+                letterpos+=1
+                other+=1
+        if other==0:
             self.list.remove_widget(misclabel)
 
 
@@ -2737,17 +2865,163 @@ class AbilityScreen(FloatLayout):
     def __init__(self,character,**kwargs):
         super().__init__(**kwargs)
         self.pos_hint={'x':0.065,'y':0.13}
-        for i in character.abilities:
-            self.ids['abilities'].add_widget(OutlinedTextBox(text=i.name))
+        physical=[]
+        technique=[]
+        psychic=[]
+        magic=[]
+        divine=[]
+        abilities=[]
+        abilities.extend(character.abilities)
+        abilities.extend(character.item_abilities)
+        if abilities==[]:
+            return
+        for i in abilities:
+            if i.category=='magic':
+                magic.append(i)
+            elif i.category=='psychic':
+                psychic.append(i)
+            elif i.category=='physical':
+                physical.append(i)
+            elif i.category=='divine':
+                divine.append(i)
+            elif i.category=='technique':
+                technique.append(i)
+
+        indices='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+        current_index=0
+        self.ability_dict={}
+        self.selected_ability=None
+        if physical!=[]:
+            self.ids['abilities'].add_widget(OutlinedTextBox(text="[b]Physical Abilities[/b]",halign='left',size_hint=(1,0.2),background=(0.1,0.1,0.1,1)))
+            for i in physical:
+                if current_index<=53:
+                    self.ability_dict[indices[current_index]]=i
+                    self.ids['abilities'].add_widget(AbilityDescriptor(i,indices[current_index],send_to=self))
+                    current_index+=1
+                else:
+                    self.ids['abilities'].add_widget(AbilityDescriptor(i,send_to=self))
+        if technique!=[]:
+            self.ids['abilities'].add_widget(OutlinedTextBox(text="[b]Techniques[/b]",halign='left',size_hint=(1,0.2),background=(0.1,0.1,0.1,1)))
+            for i in technique:
+                if current_index<=53:
+                    self.ability_dict[indices[current_index]]=i
+                    self.ids['abilities'].add_widget(AbilityDescriptor(i,indices[current_index],send_to=self))
+                    current_index+=1
+                else:
+                    self.ids['abilities'].add_widget(AbilityDescriptor(i),send_to=self)
+        if psychic!=[]:
+            self.ids['abilities'].add_widget(OutlinedTextBox(text="[b]Psychic Abilities[/b]",halign='left',size_hint=(1,0.2),background=(0.1,0.1,0.1,1)))
+            for i in psychic:
+                if current_index<=53:
+                    self.ability_dict[indices[current_index]]=i
+                    self.ids['abilities'].add_widget(AbilityDescriptor(i,indices[current_index],send_to=self))
+                    current_index+=1
+                else:
+                    self.ids['abilities'].add_widget(AbilityDescriptor(i,send_to=self))
+        if magic!=[]:
+            self.ids['abilities'].add_widget(OutlinedTextBox(text="[b]Spells[/b]",halign='left',size_hint=(1,0.2),background=(0.1,0.1,0.1,1)))
+            for i in magic:
+                if current_index<=53:
+                    self.ability_dict[indices[current_index]]=i
+                    self.ids['abilities'].add_widget(AbilityDescriptor(i,indices[current_index],send_to=self))
+                    current_index+=1
+                else:
+                    self.ids['abilities'].add_widget(AbilityDescriptor(i,send_to=self))
+        if divine!=[]:
+            self.ids['abilities'].add_widget(OutlinedTextBox(text="[b]Divine Powers[/b]",halign='left',size_hint=(1,0.2),background=(0.1,0.1,0.1,1)))
+            for i in divine:
+                if current_index<=53:
+                    self.ability_dict[indices[current_index]]=i
+                    self.ids['abilities'].add_widget(AbilityDescriptor(i,indices[current_index],send_to=self))
+                    current_index+=1
+                else:
+                    self.ids['abilities'].add_widget(AbilityDescriptor(i,send_to=self))
 
     def keyboard_input(self,input,shift):
         if input=='escape':
             self.screen=None
             Shell.shell.keyboard_mode='play'
             Shell.shell.remove_widget(self)
+        if shift==False:
+            for i in self.ids['abilities'].children:
+                try:
+                    if i.index==input:
+                        i.on_press()
+                except:
+                    pass
+        if shift==True:
+            for i in self.ids['abilities'].children:
+                try:
+                    if i.index==input.upper():
+                        i.on_press()
+                except:
+                    pass
+        if input=='enter':
+            self.screen=None
+            Shell.shell.keyboard_mode='play'
+            Shell.shell.remove_widget(self)
+            Clock.schedule_once(self.use_selected_ability,1/60)
+        if input=='1':
+            Shell.shell.actionbar.button1.set_ability(self.selected_ability)
+        if input=='2':
+            Shell.shell.actionbar.button2.set_ability(self.selected_ability)
+        if input=='3':
+            Shell.shell.actionbar.button3.set_ability(self.selected_ability)
+        if input=='4':
+            Shell.shell.actionbar.button4.set_ability(self.selected_ability)
+        if input=='5':
+            Shell.shell.actionbar.button5.set_ability(self.selected_ability)
+        if input=='6':
+            Shell.shell.actionbar.button6.set_ability(self.selected_ability)
+        if input=='7':
+            Shell.shell.actionbar.button7.set_ability(self.selected_ability)
+        if input=='8':
+            Shell.shell.actionbar.button8.set_ability(self.selected_ability)
+        if input=='9':
+            Shell.shell.actionbar.button9.set_ability(self.selected_ability)
+        if input=='0':
+            Shell.shell.actionbar.button10.set_ability(self.selected_ability)
+        if input=='-':
+            Shell.shell.actionbar.button11.set_ability(self.selected_ability)
+        if input=='=':
+            Shell.shell.actionbar.button12.set_ability(self.selected_ability)
+
+    def focus_ability(self,ability):
+        for i in self.ids['abilities'].children:
+            try:
+                i.unhighlight()
+            except:
+                pass
+        self.selected_ability=ability
+
+    def use_selected_ability(self,*args,**kwargs):
+        self.selected_ability.select_target()
+
+
+class AbilityDescriptor(ButtonBehavior,GridLayout):
+    def __init__(self,ability,index=None,send_to=None,**kwargs):
+        super().__init__(rows=1,**kwargs)
+        self.ability=ability
+        self.send_to=send_to
+        self.index=index
+        self.add_widget(OutlinedTextBox(text=str(index),size_hint=(0.1,1),color=(0.6,0.6,0.6,0.5)))
+        self.add_widget(OutlinedTextBox(text=ability.name,size_hint=(0.2,1),color=(0.6,0.6,0.6,0.5)))
+        self.add_widget(OutlinedTextBox(size_hint=(0.7,1),color=(0.6,0.6,0.6,0.5)))
+
+    def highlight(self):
+        with self.canvas.after:
+            Color(0.5,0.5,0.5,0.3)
+            Rectangle(size=self.size,pos=self.pos)
+
+    def unhighlight(self):
+        self.canvas.after.clear()
+
+    def on_press(self):
+        self.send_to.focus_ability(self.ability)
+        self.highlight()
 
 class Reticule():
-    def __init__(self,purpose=None,location=None,highlight_type='cell'):
+    def __init__(self,purpose=None,location=None,highlight_type='cell',highlight_start_location=None,radius=5):
         self.purpose=purpose
         if location==None:
             self.location=Shell.shell.player.location
@@ -2757,7 +3031,13 @@ class Reticule():
         self.image='./images/Reticule.png'
         self.name='targeting reticule'
         self.highlight_type=highlight_type
+        if highlight_start_location==None:
+            self.hsl=Shell.shell.player.location
+        else:
+            self.hsl=highlight_start_location
         self.player=False
+        Shell.shell.mouse_cone_radius=radius
+        Shell.shell.mouse_circle_radius=radius
 
     def hostilitycheck(self,*args,**kwargs):
         return False

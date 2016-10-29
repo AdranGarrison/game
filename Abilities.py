@@ -49,6 +49,9 @@ class Look():
             Shell.shell.reticule=None
         except: pass
 
+    def cleanup(self):
+        pass
+
 #Magic abilities
 def Summon_Demonic_Weapon(summoner):
     #determine power
@@ -135,6 +138,7 @@ def Summon_Demonic_Weapon(summoner):
 class Conjur_Weapon():
     def __init__(self,caster,**kwargs):
         self.caster=caster
+        self.category="magic"
         self.classification=['magic','summoning']
         self.contamination_cost={'summoning':2}
         self.name="Conjur Weapon"
@@ -264,9 +268,13 @@ class Conjur_Weapon():
     def enemy_activation(self):
         self.do()
 
+    def cleanup(self):
+        pass
+
 class Controlled_Teleport():
     def __init__(self,caster,**kwargs):
         self.caster=caster
+        self.category="magic"
         self.classification=['magic','arcane','ranged']
         self.target_type='select'
         self.targets=[]
@@ -374,9 +382,13 @@ class Controlled_Teleport():
         self.targets.extend(location.items)
         self.do()
 
+    def cleanup(self):
+        pass
+
 class Pain():
     def __init__(self,caster,**kwargs):
         self.caster=caster
+        self.category="magic"
         self.classification=['magic','dark','ranged']
         self.contamination_cost={'dark':1}
         self.name="Pain"
@@ -466,9 +478,13 @@ class Pain():
     def enemy_activation(self):
         self.do(location=self.caster.target.floor.cells[self.caster.target.location[0]][self.caster.target.location[1]])
 
+    def cleanup(self):
+        pass
+
 class Fireball():
     def __init__(self,caster,**kwargs):
         self.caster=caster
+        self.category="magic"
         self.classification=['magic','ranged','elemental']
         self.contamination_cost={'elemental':3}
         self.name="Fireball"
@@ -654,9 +670,13 @@ class Fireball():
     def enemy_activation(self):
         self.do(location=self.caster.target.floor.cells[self.caster.target.location[0]][self.caster.target.location[1]])
 
+    def cleanup(self):
+        pass
+
 class Frostbolt():
     def __init__(self,caster,**kwargs):
         self.caster=caster
+        self.category="magic"
         self.classification=['magic','ranged','elemental','debuff']
         self.contamination_cost={'elemental':2}
         self.name="Frost Bolt"
@@ -866,9 +886,13 @@ class Frostbolt():
         icewall.melt_resistance=melt
         location.contents.append(icewall)
 
+    def cleanup(self):
+        pass
+
 class Summon_Familiar():
     def __init__(self,caster,**kwargs):
         self.caster=caster
+        self.category="magic"
         self.classification=['magic','summoning']
         self.contamination_cost={'summoning':5}
         self.name="Summon Familiar"
@@ -931,10 +955,14 @@ class Summon_Familiar():
         except: pass
         if self.caster==Shell.shell.player: Shell.shell.turn+=1
 
+    def cleanup(self):
+        pass
+
 class Starstorm():
     def __init__(self,caster,**kwargs):
         self.caster=caster
         self.weapon=None
+        self.category="magic"
         self.classification=['magic','arcane','ranged']
         self.attacker=caster
         self.name="Starstorm"
@@ -1223,6 +1251,109 @@ class Starstorm():
                 density=5000
         return (thickness,density)
 
+    def cleanup(self):
+        pass
+
+class Invisibility():
+    def __init__(self,caster,**kwargs):
+        self.caster=caster
+        self.category="magic"
+        self.classification=['magic','dark']
+        self.contamination_cost={'dark':2}
+        self.name="Invisibility"
+
+    def select_target(self):
+        if self.caster==Shell.shell.player:
+            shell=Shell.shell
+            player=Shell.shell.player
+            shell.reticule=Shell.Reticule(purpose=self)
+            shell.reticule.floor=player.floor
+            shell.reticule.location=player.location
+            player.floor.cells[player.location[0]][player.location[1]].contents.append(shell.reticule)
+            shell.keyboard_mode='targeting'
+
+    def do(self,location=None,**kwargs):
+        self.abort=False
+        if self.test_usability()==False:
+            return
+        summoner=self.caster
+        #determine power
+        will=self.caster.stats['wil']
+        magic=self.caster.magic_contamination['total']
+        luck=summoner.stats['luc']
+        self.power=(will**0.5+1.05**magic)**2+self.caster.magic_contamination['dark']
+        for i in self.caster.enchantments:
+            if not self.abort:
+                i.attempt_ability_use(self)
+            if not self.abort:
+                i.magic_modification(self)
+        if self.abort:
+            try:
+                Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
+                Shell.shell.reticule=None
+                Shell.shell.keyboard_mode='play'
+            except: pass
+            return
+
+        invisible_things=[]
+        if location.creatures!=[]:
+            invisible_things=location.creatures
+        elif location.contents!=[]:
+            invisible_things=location.contents
+
+        if invisible_things==[]:
+            Shell.shell.log.addtext("There is nothing there to make invisible.")
+            try:
+                Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
+                Shell.shell.reticule=None
+                Shell.shell.keyboard_mode='play'
+            except: pass
+            return
+
+        for i in invisible_things:
+            if isinstance(i,BaseClasses.Creature):
+                Enchantments.Invisible(i,turns=int(self.power),strength=int(self.power**0.5+1))
+                i.magic_contamination['dark']+=1
+
+        summoner.magic_contamination['dark']+=2
+
+
+
+        self.caster.on_ability_use(self)
+        if self.caster==Shell.shell.player:
+            Shell.shell.turn+=1
+        try:
+            Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
+            Shell.shell.reticule=None
+            Shell.shell.keyboard_mode='play'
+        except: pass
+
+    def decide(self):
+        value=0
+        weapons=0
+        limbs=0
+        if self.caster.target==None or self.caster.iprefs['desired weapons']==0:
+            return (0,self)
+        for i in self.caster.equipped_items:
+            if hasattr(i,'sortingtype') and i.sortingtype=='weapon':
+                weapons+=1
+        for i in self.caster.limbs:
+            if 'grasp' in i.primaryequip and i.grasp==True and i.equipment['grasp']==None and i.ability>0:
+                limbs+=1
+        if weapons<self.caster.iprefs['desired weapons'] and limbs>0:
+            value+=1
+        value=(value)/(0.3*self.caster.magic_contamination['total']+1)
+        return (value,self)
+
+    def test_usability(self):
+        return True
+
+    def enemy_activation(self):
+        self.do()
+
+    def cleanup(self):
+        pass
+
 class Lightning_Strike():
     def __init__(self,caster,**kwargs):
         self.caster=caster
@@ -1367,12 +1498,16 @@ class Lightning_Strike():
     def enemy_activation(self):
         self.do(location=self.caster.target.floor.cells[self.caster.target.location[0]][self.caster.target.location[1]])
 
+    def cleanup(self):
+        pass
+
 #Psychic Abilities
 class Psychokinesis():
     def __init__(self,caster,**kwargs):
         self.caster=caster
         self.weapon=None
         self.focuscost=20
+        self.category="psychic"
         self.classification=['weaponless','physical','ranged']
         self.attacker=caster
         self.name="Psychokinesis"
@@ -1539,9 +1674,13 @@ class Psychokinesis():
     def enemy_activation(self):
         self.do(location=self.caster.target.floor.cells[self.caster.target.location[0]][self.caster.target.location[1]])
 
+    def cleanup(self):
+        pass
+
 class Psychic_Grab():
     def __init__(self,caster,**kwargs):
         self.caster=caster
+        self.category="psychic"
         self.classification=['physical']
         self.name="Psychic Grab"
 
@@ -1644,11 +1783,875 @@ class Psychic_Grab():
     def enemy_activation(self):
         self.do(location=self.caster.target.floor.cells[self.caster.target.location[0]][self.caster.target.location[1]])
 
+    def cleanup(self):
+        pass
+
+class Psychic_Throw():
+    def __init__(self,caster,**kwargs):
+        self.caster=caster
+        self.weapon=None
+        self.can_tear=False
+        self.category="psychic"
+        self.classification=['psychic','physical','ranged']
+        self.attacker=caster
+        self.name="Psychic Throw"
+        self.target_type='select'
+
+    def select_target(self):
+        if self.caster==Shell.shell.player:
+            shell=Shell.shell
+            player=Shell.shell.player
+            if self.target_type=='select':
+                Shell.shell.log.addtext("What do you want to throw?")
+                shell.reticule=Shell.Reticule(purpose=self)
+                shell.reticule.floor=player.floor
+                shell.reticule.location=player.location
+                player.floor.cells[player.location[0]][player.location[1]].contents.append(shell.reticule)
+            elif self.target_type=='location':
+                Shell.shell.log.addtext("Where do you want to throw the target?")
+                shell.reticule=Shell.Reticule(purpose=self,highlight_type='los from',highlight_start_location=self.startcell.location)
+                shell.reticule.floor=player.floor
+                shell.reticule.location=self.startcell.location
+                player.floor.cells[self.startcell.location[0]][self.startcell.location[1]].contents.append(shell.reticule)
+            shell.keyboard_mode='targeting'
+
+    def do(self,location=None,remove_item=True,**kwargs):
+        self.abort=False
+
+        if self.target_type=='select' and self.caster==Shell.shell.player:
+            self.startpos=location
+            self.targets=location.creatures
+            self.targets.extend(location.items)
+            self.startcell=Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]]
+            if self.targets==[]:
+                Shell.shell.log.addtext("There is nothing there to throw")
+                Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
+                Shell.shell.reticule=None
+                return
+            self.target_type='location'
+            Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
+            Shell.shell.reticule=None
+            self.select_target()
+            return
+
+        self.thrown=None
+        for i in self.targets:
+            if isinstance(i,BaseClasses.Creature):
+                self.thrown=i
+
+        self.damagefactor=1
+        self.power=self.caster.stats['per']*(self.caster.focus[0]+1)/self.caster.focus[1]
+        originalpower=self.power
+        for i in self.caster.enchantments:
+            if not self.abort:
+                i.attempt_ability_use(self)
+            if not self.abort:
+                i.psychic_modification(self)
+        self.bonus=self.power/originalpower
+        if self.abort:
+            self.target_type='select'
+            try:
+                Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
+                Shell.shell.reticule=None
+                Shell.shell.keyboard_mode='play'
+            except: pass
+            return
+
+        if self.thrown!=None:
+            #proceed to throw the creature
+            self.throw_creature(location=location)
+        else:
+            throwcost=0
+            for i in self.targets:
+                throwcost+=i.mass*i.mass
+            throwcost=int(40+(2*throwcost**0.5)/self.power)
+            if self.caster.focus[0]<throwcost:
+                Shell.shell.log.addtext("You don't have the focus to throw that right now")
+            else:
+                #throw the items at the location, shotgun style
+                for i in self.targets:
+                    self.thrown=i
+                    self.throw_item(location=location)
+                    Shell.messages.append(0)
+                self.caster.focus[0]-=throwcost
+        try:
+            Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
+            Shell.shell.reticule=None
+            Shell.shell.keyboard_mode='play'
+        except: pass
+        if self.caster==Shell.shell.player: Shell.shell.turn+=1
+        return
+
+    def throw_creature(self,location=None):
+        self.target_type='select'
+        self.startcell.contents.remove(self.thrown)
+        self.damage_severity=0
+        self.surprise=False
+        indent=0
+        self.killingblow=False
+        resolved=False
+        throw_accuracy=1+(self.caster.focus[0]*1.12**self.caster.stats['per'])/self.caster.focus[1]
+        while resolved==False:
+            if throw_accuracy<self.startcell.distance_to(location)*random.random():
+                location=random.choice(location.immediate_neighbors)
+            else:
+                resolved=True
+
+        collide=False
+
+        line=BaseClasses.get_line(self.startcell.location,location.location)
+        lineindex=len(line)-1
+        #if len(line)>1: line.pop(0)
+        for position in line:
+            if position==line[0]: pass
+            elif self.caster.floor.cells[position[0]][position[1]].passable:
+                continue
+            else:
+                collide=True
+                location=self.caster.floor.cells[position[0]][position[1]]
+                lineindex=line.index(position)
+                for i in range(lineindex+1,len(line)):
+                    line.pop(len(line)-1)
+                break
+        if len(line)<=2 and collide:
+            if self.caster==Shell.shell.player: Shell.shell.log.addtext("You must throw the enemy somewhere!")
+            self.startcell.contents.append(self.thrown)
+            self.target_type='select'
+            try:
+                Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
+                Shell.shell.reticule=None
+                Shell.shell.keyboard_mode='play'
+            except: pass
+            return
+        if not self.thrown.player:
+            Enchantments.GeneralIncapacitation(self.thrown,turns=1)
+
+        strikeables=[]
+        target=None
+        alive=False
+        for i in location.contents:
+            if isinstance(i,BaseClasses.Creature) and i.alive==True:
+                target=BaseClasses.targetchoice(i)
+                alive=True
+                break
+            elif isinstance(i,BaseClasses.Item) or isinstance(i,BaseClasses.Limb):
+                strikeables.append(i)
+            elif isinstance(i,BaseClasses.Creature):
+                strikeables.append(BaseClasses.targetchoice(i))
+        if target==None and strikeables!=[]:
+            target=random.choice(strikeables)
+
+        self.energy=self.power*100*self.thrown.mass**0.3333333-self.thrown.mass
+        self.speed=(2*self.energy/self.thrown.mass)**0.5
+        throwcost=40+int(2*self.thrown.mass/self.power)
+        if type(self.energy)==complex or type(self.speed)==complex:
+            throwcost=self.caster.focus[1]+1
+        self.limb=None
+
+        if self.caster.focus[0]<throwcost:
+            Shell.shell.log.addtext("You don't have the focus to throw that right now")
+            self.startcell.contents.append(self.thrown)
+            self.target_type='select'
+            try:
+                Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
+                Shell.shell.reticule=None
+                Shell.shell.keyboard_mode='play'
+            except:
+                pass
+            return
+
+        self.caster.on_ability_use(self)
+
+        self.caster.focus[0]-=throwcost
+        self.caster.combataction=True
+        self.caster.attacked=True
+
+        #Make sure we can actually throw far enough to reach our target
+        maxdistance=max(self.speed*self.speed/20-3,2)
+        distance=Shell.shell.dungeonmanager.current_screen.cells[self.startcell.location[0]][self.startcell.location[1]].distance_to(location)
+        self.time=distance/self.speed
+
+        if maxdistance<distance:
+            xy=line[min(int(maxdistance*(len(line)-1)/distance),len(line)-1)]
+            self.landingcell=self.caster.floor.cells[xy[0]][xy[1]]
+            line=BaseClasses.get_line(self.startcell.location,self.landingcell.location)
+            if any(self.caster.floor.cells[i[0]][i[1]] in Shell.shell.player.visible_cells for i in line):
+                self.caster.floor.animate_travel(self.thrown,self.caster.floor.cells[self.startcell.location[0]][self.startcell.location[1]],self.landingcell,slowness=15)
+            #self.animate(self.caster.floor.cells[self.caster.location[0]][self.caster.location[1]],location)
+            Clock.schedule_once(lambda dx: self.landingcell.contents.append(self.thrown),1/6)
+
+            if self.caster==Shell.shell.player:
+                Shell.messages.append("[b][size=13][color=1FAD39]You throw {}![/b][/size][/color]".format(self.thrown.name))
+                Shell.messages.append(1)
+                indent+=1
+            elif self.thrown==Shell.shell.player:
+                Shell.messages.append("[b][size=13][color=C21D25]{} throws you![/b][/size][/color]".format(self.caster.name))
+                Shell.messages.append(1)
+                indent+=1
+            elif self.caster in Shell.shell.player.visible_creatures:
+                Shell.messages.append("[b][color=AD801F]{} throws {}![/b][/color]".format(self.caster.name,self.thrown.name))
+                Shell.messages.append(1)
+                indent+=1
+
+            self.thrown.location=self.landingcell.location
+            self.resolve_thrown_damage()#Need to resolve damage for the thrown creature here
+            self.target_type='select'
+            try:
+                Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
+                Shell.shell.reticule=None
+                Shell.shell.keyboard_mode='play'
+            except: pass
+            if self.caster==Shell.shell.player: Shell.shell.turn+=1
+            return
+        #If we hit a wall or similar feature, land in front of it
+        if not location.passable:
+            thing=None
+            for i in location.contents:
+                if not hasattr(i,'passable'):
+                    continue
+                if not i.passable:
+                    thing=i
+            if isinstance(thing,BaseClasses.Creature):
+                thingname=thing.name
+            elif isinstance(thing,MapTiles.DungeonFeature):
+                thingname=' '.join(['the',thing.name])
+            else:
+                thingname='something'
+            if self.caster==Shell.shell.player:
+                Shell.messages.append("[b][size=13][color=1FAD39]You throw {} into {}![/b][/size][/color]".format(self.thrown.name,thingname))
+                Shell.messages.append(1)
+                indent+=1
+            elif thing==Shell.shell.player:
+                Shell.messages.append("[b][size=13][color=C21D25]{} throws {} into you![/b][/size][/color]".format(self.caster.name,thingname))
+                Shell.messages.append(1)
+                indent+=1
+            elif self.thrown==Shell.shell.player:
+                Shell.messages.append("[b][size=13][color=C21D25]{} throws you into {}![/b][/size][/color]".format(self.caster.name,thingname))
+                Shell.messages.append(1)
+                indent+=1
+            elif self.caster in Shell.shell.player.visible_creatures:
+                Shell.messages.append("[b][color=AD801F]{} throws {} into {}![/b][/color]".format(self.caster.name,self.thrown.name,thingname))
+                Shell.messages.append(1)
+                indent+=1
+            collide=True
+            self.damagefactor*=1.5
+            xy=line[lineindex-1]
+            self.landingcell=self.caster.floor.cells[xy[0]][xy[1]]
+            line=BaseClasses.get_line(self.startcell.location,self.landingcell.location)
+            if target==None:
+                self.target_type='select'
+                self.thrown.location=self.landingcell.location
+                self.resolve_thrown_damage()
+                line=BaseClasses.get_line(self.startcell.location,self.landingcell.location)
+                if any(self.caster.floor.cells[i[0]][i[1]] in Shell.shell.player.visible_cells for i in line):
+                    self.caster.floor.animate_travel(self.thrown,self.caster.floor.cells[self.startcell.location[0]][self.startcell.location[1]],self.landingcell,slowness=15)
+                Clock.schedule_once(lambda dx: self.landingcell.contents.append(self.thrown),1/6)
+                if self.caster==Shell.shell.player: Shell.shell.turn+=1
+                try:
+                    Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
+                    Shell.shell.reticule=None
+                    Shell.shell.keyboard_mode='play'
+                except: pass
+                return
+        elif target==None:
+            self.landingcell=location
+            line=BaseClasses.get_line(self.caster.location,self.landingcell.location)
+            if any(self.caster.floor.cells[i[0]][i[1]] in Shell.shell.player.visible_cells for i in line):
+                self.caster.floor.animate_travel(self.thrown,self.caster.floor.cells[self.startcell.location[0]][self.startcell.location[1]],self.landingcell,slowness=15)
+            #self.animate(self.caster.floor.cells[self.caster.location[0]][self.caster.location[1]],location)
+
+            if self.caster==Shell.shell.player:
+                Shell.messages.append("[b][size=13][color=1FAD39]You throw {}![/b][/size][/color]".format(self.thrown.name))
+                Shell.messages.append(1)
+                indent+=1
+            elif self.thrown==Shell.shell.player:
+                Shell.messages.append("[b][size=13][color=C21D25]{} throws you![/b][/size][/color]".format(self.caster.name))
+                Shell.messages.append(1)
+                indent+=1
+            elif self.caster in Shell.shell.player.visible_creatures:
+                Shell.messages.append("[b][color=AD801F]{} throws {}![/b][/color]".format(self.caster.name,self.thrown.name))
+                Shell.messages.append(1)
+                indent+=1
+
+            Clock.schedule_once(lambda dx: self.landingcell.contents.append(self.thrown),1/6)
+
+            self.thrown.location=self.landingcell.location
+            self.resolve_thrown_damage()
+            self.target_type='select'
+
+            if self.caster==Shell.shell.player: Shell.shell.turn+=1
+            try:
+                Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
+                Shell.shell.reticule=None
+                Shell.shell.keyboard_mode='play'
+            except: pass
+            return
+        #We can hit the target! Now let's process the damage
+        if isinstance(target,BaseClasses.Limb) and target.owner!=None and target in target.owner.limbs:
+            if self.thrown==Shell.shell.player:
+                Shell.messages.append("[color=C21D25]You collide with {}![/color]".format(target.owner.name))
+                Shell.messages.append(1)
+            elif target.owner in Shell.shell.player.visible_creatures:
+                Shell.messages.append("[color=AD801F]{} is injured as it collides with {}![/color]".format(self.thrown.name,target.owner.name))
+                Shell.messages.append(1)
+            self.resolve_thrown_damage()
+            Shell.messages.append(-1)
+            self.struck=target.owner
+            if self.struck==Shell.shell.player:
+                Shell.messages.append("[color=C21D25]{} slams into you![/color]".format(self.thrown.name))
+                Shell.messages.append(1)
+            elif self.struck in Shell.shell.player.visible_creatures:
+                Shell.messages.append("[color=AD801F]{} slams into {}![/color]".format(self.thrown.name,self.struck.name))
+                Shell.messages.append(1)
+            self.resolve_struck_damage()
+        else:
+            self.target=target
+            self.basetarget=target
+            self.touchedobjects=[]
+            self.penetrate=False
+            self.contact=True
+            self.blocked=False
+            self.dodged=False
+            self.parried=False
+            self.damage_dealt=0
+            self.type='crush'
+            self.oldtype=self.type
+            self.results=[]
+            self.damagedobjects=[]
+            self.absolute_depth_limit=1
+            self.attacker=self.caster
+            self.accuracy=(self.caster.focus[0]*self.caster.stats['per']**0.6)/self.caster.focus[1]
+            self.arpen=0
+            self.area=random.random()**3
+
+            try:
+                self.blockable=0
+                self.parryable=0
+                self.dodgeable=1
+                self.target.owner.evasion(self)
+            except: pass
+
+            if self.dodged==True:
+                Shell.messages.append("[color=7B888C]{} dodges![/color]".format(self.target.owner.name))
+
+            self.reducedmass = self.thrown.mass * self.target.mass / (self.thrown.mass + self.target.mass)
+            thickness,density=self.armor_penetration()
+            self.weapon=random.choice(self.thrown.limbs)
+            self.force = self.damagefactor* (self.speed * (10**3) * (self.shear**0.25) * (self.reducedmass**0.75) / ((density**0.25)*(
+                self.weapon.thickness / self.weapon.youngs + thickness / self.youngs)**0.25))
+            self.pressure = self.force / self.area
+            if not self.abort: self.target.damageresolve(self,self.caster)
+
+        self.landingcell=location
+        line=BaseClasses.get_line(self.caster.location,self.landingcell.location)
+        if any(self.caster.floor.cells[i[0]][i[1]] in Shell.shell.player.visible_cells for i in line):
+            self.caster.floor.animate_travel(self.thrown,self.caster.floor.cells[self.startcell.location[0]][self.startcell.location[1]],self.landingcell,slowness=15)
+        #self.animate(self.caster.floor.cells[self.caster.location[0]][self.caster.location[1]],location)
+
+        Clock.schedule_once(lambda dx: self.landingcell.contents.append(self.thrown),1/6)
+
+        limb_processed=False
+        if not self.abort:
+            for i in self.touchedobjects:
+                i.on_struck(self)
+                try:
+                    if i in self.basetarget.layers and limb_processed==False:
+                        self.basetarget.on_struck(self)
+                        limb_processed=True
+                except:
+                    self.target.on_struck(self)
+
+
+        if alive:
+            self.basetarget.owner.survivalcheck()
+            if self.basetarget.owner.alive==False:
+                self.caster.on_kill(self.basetarget.owner)
+        self.target_type='select'
+        try:
+            Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
+            Shell.shell.reticule=None
+            Shell.shell.keyboard_mode='play'
+        except: pass
+        if self.caster==Shell.shell.player: Shell.shell.turn+=1
+        if indent>0:
+            Shell.messages.append(-1)
+        if self.surprise:
+            Shell.messages.append(-1)
+        pass
+
+    def throw_item(self,location=None):
+        item=self.thrown
+        self.target_type='select'
+        self.startcell.contents.remove(self.thrown)
+        self.damage_severity=0
+        self.surprise=False
+        indent=0
+        self.killingblow=False
+        resolved=False
+        throw_accuracy=(1+(self.caster.focus[0]*1.12**self.caster.stats['per'])/self.caster.focus[1])/len(self.targets)
+        while resolved==False:
+            if throw_accuracy<self.startcell.distance_to(location)*random.random():
+                location=random.choice(location.immediate_neighbors)
+            else:
+                resolved=True
+
+        collide=False
+
+        line=BaseClasses.get_line(self.startcell.location,location.location)
+        lineindex=len(line)-1
+        #if len(line)>1: line.pop(0)
+        for position in line:
+            if position==line[0]: pass
+            elif self.caster.floor.cells[position[0]][position[1]].passable:
+                continue
+            else:
+                collide=True
+                location=self.caster.floor.cells[position[0]][position[1]]
+                lineindex=line.index(position)
+                for i in range(lineindex+1,len(line)):
+                    line.pop(len(line)-1)
+                break
+        if len(line)<=1 and collide:
+            if self.caster==Shell.shell.player: Shell.shell.log.addtext("You must throw that somewhere!")
+            self.startcell.contents.append(self.thrown)
+            self.target_type='select'
+            try:
+                Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
+                Shell.shell.reticule=None
+                Shell.shell.keyboard_mode='play'
+            except: pass
+            return
+
+        strikeables=[]
+        target=None
+        alive=False
+        for i in location.contents:
+            if isinstance(i,BaseClasses.Creature) and i.alive==True:
+                target=BaseClasses.targetchoice(i)
+                alive=True
+                break
+            elif isinstance(i,BaseClasses.Item) or isinstance(i,BaseClasses.Limb):
+                strikeables.append(i)
+            elif isinstance(i,BaseClasses.Creature):
+                strikeables.append(BaseClasses.targetchoice(i))
+        if target==None and strikeables!=[]:
+            target=random.choice(strikeables)
+
+        self.energy=self.power*50*self.thrown.mass**0.3333333-self.thrown.mass
+        self.energy=self.energy/len(self.targets)**0.5
+        self.speed=(2*self.energy/self.thrown.mass)**0.5
+        self.limb=None
+
+        self.caster.on_ability_use(self)
+
+        self.caster.combataction=True
+        self.caster.attacked=True
+
+        #Make sure we can actually throw far enough to reach our target
+        maxdistance=max(self.speed*self.speed/20-3,2)
+        distance=Shell.shell.dungeonmanager.current_screen.cells[self.startcell.location[0]][self.startcell.location[1]].distance_to(location)
+        self.time=distance/self.speed
+
+        if maxdistance<distance:
+            xy=line[min(int(maxdistance*(len(line)-1)/distance),len(line)-1)]
+            self.landingcell=self.caster.floor.cells[xy[0]][xy[1]]
+            line=BaseClasses.get_line(self.startcell.location,self.landingcell.location)
+            if any(self.caster.floor.cells[i[0]][i[1]] in Shell.shell.player.visible_cells for i in line):
+                self.caster.floor.animate_travel(self.thrown,self.caster.floor.cells[self.startcell.location[0]][self.startcell.location[1]],self.landingcell,slowness=15)
+            #self.animate(self.caster.floor.cells[self.caster.location[0]][self.caster.location[1]],location)
+            cell=self.landingcell
+            Clock.schedule_once(lambda dx: cell.contents.append(item),1/6)
+            self.resolve_thrown_damage()
+
+            self.thrown.location=self.landingcell.location
+
+            self.target_type='select'
+
+        #If we hit a wall or similar feature, land in front of it
+        if not location.passable:
+            thing=None
+            for i in location.contents:
+                if not hasattr(i,'passable'):
+                    continue
+                if isinstance(thing,BaseClasses.Creature):
+                    thing=i
+                    thingname=thing.name
+                    continue
+                if not i.passable:
+                    thing=i
+            if isinstance(thing,MapTiles.DungeonFeature):
+                thingname=' '.join(['the',thing.name])
+            elif isinstance(thing,BaseClasses.Creature):
+                thingname=thing.name
+            else:
+                thingname='something'
+            if thing==Shell.shell.player:
+                Shell.messages.append("[b][size=13][color=C21D25]The {} flies at you![/b][/size][/color]".format(self.thrown.name))
+                Shell.messages.append(1)
+                indent+=1
+            elif self.caster in Shell.shell.player.visible_creatures:
+                Shell.messages.append("[b][color=AD801F]The {} flies at {}![/b][/color]".format(self.thrown.name,thingname))
+                Shell.messages.append(1)
+                indent+=1
+            collide=True
+            xy=line[lineindex-1]
+            self.landingcell=self.caster.floor.cells[xy[0]][xy[1]]
+            line=BaseClasses.get_line(self.startcell.location,self.landingcell.location)
+            if target==None:
+                self.target_type='select'
+                self.thrown.location=self.landingcell.location
+                line=BaseClasses.get_line(self.startcell.location,self.landingcell.location)
+                if any(self.caster.floor.cells[i[0]][i[1]] in Shell.shell.player.visible_cells for i in line):
+                    self.caster.floor.animate_travel(self.thrown,self.caster.floor.cells[self.startcell.location[0]][self.startcell.location[1]],self.landingcell,slowness=15)
+                cell=self.landingcell
+                Clock.schedule_once(lambda dx: cell.contents.append(item),1/6)
+                self.resolve_thrown_damage()
+                return
+
+        elif target==None:
+            self.landingcell=location
+            line=BaseClasses.get_line(self.caster.location,self.landingcell.location)
+            if any(self.caster.floor.cells[i[0]][i[1]] in Shell.shell.player.visible_cells for i in line):
+                self.caster.floor.animate_travel(self.thrown,self.caster.floor.cells[self.startcell.location[0]][self.startcell.location[1]],self.landingcell,slowness=15)
+            #self.animate(self.caster.floor.cells[self.caster.location[0]][self.caster.location[1]],location)
+            cell=self.landingcell
+            Clock.schedule_once(lambda dx: cell.contents.append(item),1/6)
+
+            self.thrown.location=self.landingcell.location
+            self.target_type='select'
+            self.resolve_thrown_damage()
+            return
+
+        #We can hit the target! Now let's process the damage
+        if isinstance(target,BaseClasses.Limb) and target.owner!=None and target in target.owner.limbs:
+            self.struck=target.owner
+            self.resolve_struck_damage()
+        else:
+            self.target=target
+            self.basetarget=target
+            self.touchedobjects=[]
+            self.penetrate=False
+            self.contact=True
+            self.blocked=False
+            self.dodged=False
+            self.parried=False
+            self.damage_dealt=0
+            self.type='crush'
+            self.oldtype=self.type
+            self.results=[]
+            self.damagedobjects=[]
+            self.absolute_depth_limit=1
+            self.attacker=self.caster
+            self.accuracy=(self.caster.focus[0]*self.caster.stats['per']**0.6)/self.caster.focus[1]
+            self.arpen=0
+            self.area=random.random()**3
+
+            try:
+                self.blockable=0
+                self.parryable=0
+                self.dodgeable=1
+                self.target.owner.evasion(self)
+            except: pass
+
+            if self.dodged==True:
+                Shell.messages.append("[color=7B888C]{} dodges![/color]".format(self.target.owner.name))
+
+            self.reducedmass = self.thrown.mass * self.target.mass / (self.thrown.mass + self.target.mass)
+            thickness,density=self.armor_penetration()
+            try:
+                self.weapon=random.choice(self.thrown.limbs)
+            except:
+                self.weapon=self.thrown
+            self.force = self.damagefactor* (self.speed * (10**3) * (self.shear**0.25) * (self.reducedmass**0.75) / ((density**0.25)*(
+                self.weapon.thickness / self.weapon.youngs + thickness / self.youngs)**0.25))
+            self.pressure = self.force / self.area
+            if not self.abort: self.target.damageresolve(self,self.caster)
+
+        self.landingcell=location
+        line=BaseClasses.get_line(self.caster.location,self.landingcell.location)
+        if any(self.caster.floor.cells[i[0]][i[1]] in Shell.shell.player.visible_cells for i in line):
+            self.caster.floor.animate_travel(self.thrown,self.caster.floor.cells[self.startcell.location[0]][self.startcell.location[1]],self.landingcell,slowness=15)
+        #self.animate(self.caster.floor.cells[self.caster.location[0]][self.caster.location[1]],location)
+
+        cell=self.landingcell
+        Clock.schedule_once(lambda dx: cell.contents.append(item),1/6)
+
+        limb_processed=False
+        if not self.abort:
+            for i in self.touchedobjects:
+                i.on_struck(self)
+                try:
+                    if i in self.basetarget.layers and limb_processed==False:
+                        self.basetarget.on_struck(self)
+                        limb_processed=True
+                except:
+                    self.target.on_struck(self)
+
+
+        if alive:
+            self.basetarget.owner.survivalcheck()
+            if self.basetarget.owner.alive==False:
+                self.caster.on_kill(self.basetarget.owner)
+        self.target_type='select'
+
+        if indent>0:
+            Shell.messages.append(-1)
+        if self.surprise:
+            Shell.messages.append(-1)
+        pass
+
+    def test_usability(self):
+        return True
+
+    def resolve_thrown_damage(self):
+        try:
+            if self.caster in self.thrown.detected_creatures:
+                self.thrown.hostilitycheck(self.caster)
+                self.thrown.affinity[self.caster]-=3
+        except:
+            pass
+        strucklimbs=[]
+        if isinstance(self.thrown,BaseClasses.Creature):
+            maxlimbs=int((random.random()**2)*self.power/self.thrown.stats['luc']**0.5)+1
+        else:
+            maxlimbs=1
+        for i in range(0,maxlimbs):
+            self.blockable=0
+            self.dodgeable=0
+            self.parryable=0
+            self.touchedobjects=[]
+            self.penetrate=False
+            self.contact=True
+            self.blocked=False
+            self.dodged=False
+            self.parried=False
+            self.damage_dealt=0
+            self.type='crush'
+            self.oldtype=self.type
+            self.results=[]
+            self.damagedobjects=[]
+            self.absolute_depth_limit=1
+            self.attacker=self.caster
+            self.accuracy=1
+            self.arpen=0
+            if isinstance(self.thrown,BaseClasses.Creature):
+                self.target=BaseClasses.targetchoice(self.thrown)
+            else:
+                self.target=self.thrown
+            if self.target in strucklimbs or self.target==None:
+                continue
+            else:
+                strucklimbs.append(self.target)
+            self.basetarget=self.target
+            self.reducedmass = self.target.mass+random.random()*self.thrown.mass
+            self.area=random.random()*self.target.radius*self.target.length
+            if self.thrown==Shell.shell.player:
+                Shell.messages.append("[color=C21D25]Your {} is struck![/color]".format(self.target.name))
+                Shell.messages.append(1)
+            elif self.caster==Shell.shell.player and isinstance(self.target,BaseClasses.Limb):
+                Shell.messages.append("[color=1FAD39]{}'s {} is struck![/color]".format(self.thrown.name,self.target.name))
+                Shell.messages.append(1)
+            elif self.thrown in Shell.shell.player.visible_creatures:
+                Shell.messages.append("[color=AD801F]{}'s {} is struck![/color]".format(self.thrown.name,self.target.name))
+                Shell.messages.append(1)
+            thickness,density=self.armor_penetration()
+            self.force = self.damagefactor* (self.speed * (10**3) * (self.shear**0.25) * (self.reducedmass**0.75) / ((density**0.25)*(
+                thickness / self.youngs)**0.25))
+            self.pressure = self.force / self.area
+            self.target.damageresolve(self,self.thrown)
+            Shell.messages.append(-1)
+        Shell.messages.append(-1)
+
+        pass
+
+    def resolve_struck_damage(self):
+        strucklimbs=[]
+        if self.caster in self.struck.detected_creatures:
+            self.struck.hostilitycheck(self.caster)
+            self.struck.affinity[self.caster]-=3
+        if isinstance(self.thrown,BaseClasses.Creature):
+            maxlimbs=int((random.random()**2)*self.power/self.struck.stats['luc']**0.5)+1
+        else:
+            maxlimbs=1
+        for i in range(0,maxlimbs):
+            self.blockable=0
+            self.surprise=False
+            self.dodgeable=1
+            self.parryable=0
+            self.touchedobjects=[]
+            self.penetrate=False
+            self.contact=True
+            self.blocked=False
+            self.dodged=False
+            self.parried=False
+            self.damage_dealt=0
+            self.type='crush'
+            self.oldtype=self.type
+            self.results=[]
+            self.damagedobjects=[]
+            self.absolute_depth_limit=1
+            self.attacker=self.caster
+            self.accuracy=self.caster.stats['tec']**0.5
+            self.arpen=0
+            self.target=BaseClasses.targetchoice(self.struck)
+            self.area=random.random()*self.target.radius*self.target.length
+            if isinstance(self.thrown,BaseClasses.Item):
+                if hasattr(self.thrown,'edge'):
+                    if random.random()>0.7:
+                        self.type='cut'
+                        self.area=random.random()*self.thrown.edge*self.thrown.length
+                if hasattr(self.thrown,'tip'):
+                    if random.random()>0.8:
+                        self.type='pierce'
+                        self.area=self.thrown.tip
+                self.oldtype=self.type
+                self.absolute_depth_limit=self.thrown.length
+                self.weapon=self.thrown
+            if strucklimbs==[]:
+                try:
+                    self.blockable=0
+                    self.parryable=0
+                    self.dodgeable=1
+                    self.target.owner.evasion(self)
+                except: pass
+
+                if self.dodged==True:
+                    Shell.messages.append("[color=7B888C]{} dodges![/color]".format(self.target.owner.name))
+                    return
+            if self.target in strucklimbs:
+                continue
+            else:
+                strucklimbs.append(self.target)
+            self.basetarget=self.target
+            self.reducedmass = self.target.mass*self.thrown.mass/(self.target.mass+self.thrown.mass)
+
+            if self.struck==Shell.shell.player:
+                Shell.messages.append("[color=C21D25]Your {} is struck![/color]".format(self.target.name))
+                Shell.messages.append(1)
+            elif self.caster==Shell.shell.player:
+                Shell.messages.append("[color=1FAD39]{}'s {} is struck![/color]".format(self.struck.name,self.target.name))
+                Shell.messages.append(1)
+            elif self.struck in Shell.shell.visible_creatures:
+                Shell.messages.append("[color=AD801F]{}'s {} is struck![/color]".format(self.struck.name,self.target.name))
+                Shell.messages.append(1)
+            thickness,density=self.armor_penetration()
+            if isinstance(self.thrown,BaseClasses.Item):
+                hardness=self.thrown.thickness/self.thrown.youngs
+            else:
+                hardness=0
+            self.force = self.damagefactor* (self.speed * (10**3) * (self.shear**0.25) * (self.reducedmass**0.75) / ((density**0.25)*(
+                thickness / self.youngs)**0.25))
+            self.pressure = self.force / self.area
+            self.target.damageresolve(self,self.caster)
+            self.thrown.on_strike(self)
+            Shell.messages.append(-1)
+            if self.surprise:
+                Shell.messages.append(-1)
+        Shell.messages.append(-1)
+
+        pass
+
+    def energy_recalc(self):
+        if self.energy < 0:
+            self.force = 0
+            self.pressure = 0
+            self.energy=0
+            return
+        self.speed = (2 * self.energy / self.thrown.mass) ** 0.5
+        if hasattr(self.basetarget,'layers'):
+            density=self.basetarget.layers[len(self.basetarget.layers)-1].density
+        elif hasattr(self.basetarget,'density'):
+            density=self.basetarget.density
+        else:
+            density=5000
+        new = self.damagefactor*(self.speed * (10**3) * (self.shear**0.25) * (self.reducedmass**0.75) / ((density**0.25)*(
+            self.basetarget.thickness / self.youngs)**0.25))
+        self.force = min(new, 0.9 * self.force)
+
+    def decide(self):
+        value=0
+        possible_throws=[]
+        for i in self.caster.limbs:
+            for j in i.enchantments:
+                if j.classname=='holding on':
+                    try:
+                        possible_throws.append(j.held.owner)
+                    except AttributeError: pass
+        if possible_throws==[]:
+            return (0,self)
+        value+=len(possible_throws)
+        self.enemy_throwcell=None
+        for i in self.caster.detected_creatures:
+            distance=self.caster.floor.cells[self.caster.location[0]][self.caster.location[1]].distance_to(self.caster.floor.cells[i.location[0]][i.location[1]])
+            if self.caster.hostilitycheck(i) and distance>2:
+                value+=4/(distance)
+                self.enemy_throwcell=self.caster.floor.cells[i.location[0]][i.location[1]]
+        pref=self.caster.ai_preferences['throw']*self.caster.ai_preferences['grapple']
+        value=value*pref/(value+pref)
+        if 'thrower' in self.caster.classification: value*=2
+        self.thrown=random.choice(possible_throws)
+        self.startcell=self.thrown.floor.cells[self.thrown.location[0]][self.thrown.location[1]]
+        return (value,self)
+
+    def enemy_activation(self):
+        attempts=0
+        startloc=self.caster.location
+        while self.enemy_throwcell==None and attempts<10:
+            attempts+=1
+            loc=[startloc[0]+random.randint(-5,6),startloc[1]+random.randint(-5,6)]
+            distance=self.caster.floor.cells[startloc[0]][startloc[1]].distance_to(self.caster.floor.cells[loc[0]][loc[1]])
+            path=self.caster.floor.passability_check(self.caster.floor.cells[startloc[0]][startloc[1]],self.caster.floor.cells[loc[0]][loc[1]])
+            if distance>2 and path:
+                self.enemy_throwcell=self.caster.floor.cells[loc[0]][loc[1]]
+        self.do(location=self.enemy_throwcell)
+
+    def armor_penetration(self):
+        tec=self.caster.stats['tec']
+        luc=self.caster.stats['luc']
+        if hasattr(self.target,'stats'):
+            dluc=self.target.stats['luc']
+            dper=self.target.stats['per']
+        else:
+            dluc=10
+            dper=10
+        if hasattr(self.target,"armor") and self.target.armor is not None:
+            thickness=self.target.thickness+self.target.armor.thickness
+            density=self.target.armor.density
+            coverage=self.target.armor.coverage-self.arpen
+                #mode shifts down for higher defender luck or per. Shifts up for higher attacker tec or luck.
+            mode=(tec+0.5*luc)/(2*dluc+dper)
+            mode=min(mode,1)
+            if random.triangular(0,1,mode)>coverage:
+                #if self.target.armor.coverage*abs(random.gauss(self.target.stats['luc'],1))<random.random()*(self.limb.stats['luc']+2*self.limb.stats['tec'])/3+self.arpen:
+                self.youngs=self.target.arpen_youngs
+                self.shear=self.target.arpen_shear
+                thickness=self.target.thickness
+                density=self.target.layers[len(self.target.layers)-1].density
+                self.penetrate=True
+            else:
+                self.youngs=self.target.youngs
+                self.shear=self.target.shear
+        else:
+            thickness=self.target.thickness
+            self.youngs=self.target.youngs
+            self.shear=self.target.shear
+            if hasattr(self.target,'density'):
+                density=self.target.density
+            elif hasattr(self.target,'layers'):
+                density=self.target.layers[len(self.target.layers)-1].density
+            else:
+                density=5000
+        return (thickness,density)
+
+    def cleanup(self):
+        self.target_type='select'
+
 class Addle():
     def __init__(self,caster,**kwargs):
         self.caster=caster
         self.weapon=None
         self.focuscost=30
+        self.category="psychic"
         self.classification=['weaponless','psychic','ranged']
         self.attacker=caster
         self.name="Addle"
@@ -1796,11 +2799,15 @@ class Addle():
     def enemy_activation(self):
         self.do(location=self.caster.target.floor.cells[self.caster.target.location[0]][self.caster.target.location[1]])
 
+    def cleanup(self):
+        pass
+
 class Telekinetic_Barrier():
     def __init__(self,caster,**kwargs):
         self.caster=caster
         self.weapon=None
         self.focuscost=50
+        self.category="psychic"
         self.classification=['defensive','psychic']
         self.attacker=caster
         self.name="Telekinetic Barrier"
@@ -1848,7 +2855,6 @@ class Telekinetic_Barrier():
 
         if self.caster==Shell.shell.player: Shell.shell.turn+=1
 
-
     def decide(self):
         if self.caster.focus[0]<=50:
             return (0,self)
@@ -1864,12 +2870,16 @@ class Telekinetic_Barrier():
     def enemy_activation(self):
         self.do()
 
+    def cleanup(self):
+        pass
+
 #Physical skills are handled just like attacks. They must have basetarget and target attributes, force, pressure, etc
 class Throw():
     def __init__(self,caster,**kwargs):
         self.caster=caster
         self.weapon=None
         self.can_tear=False
+        self.category="physical"
         self.classification=['physical','ranged']
         self.attacker=caster
         self.name="Throw"
@@ -2304,12 +3314,16 @@ class Throw():
                 density=5000
         return (thickness,density)
 
+    def cleanup(self):
+        pass
+
 class Fire_Bow():
     def __init__(self,caster,bow,**kwargs):
         self.caster=caster
         self.bow=bow
         self.weapon=None
         self.can_tear=False
+        self.category="physical"
         self.classification=['physical','ranged']
         self.attacker=caster
         self.name="Fire Bow"
@@ -2727,12 +3741,16 @@ class Fire_Bow():
                 density=5000
         return (thickness,density)
 
+    def cleanup(self):
+        pass
+
 class Fire_Crossbow():
     def __init__(self,caster,bow,**kwargs):
         self.caster=caster
         self.bow=bow
         self.weapon=None
         self.can_tear=False
+        self.category="physical"
         self.classification=['physical','ranged']
         self.attacker=caster
         self.name="Load/Fire Crossbow"
@@ -3119,12 +4137,16 @@ class Fire_Crossbow():
                 density=5000
         return (thickness,density)
 
+    def cleanup(self):
+        pass
+
 class Load_Crossbow():
     def __init__(self,caster,bow,**kwargs):
         self.caster=caster
         self.bow=bow
         self.weapon=None
         self.can_tear=False
+        self.category="physical"
         self.classification=['physical','ranged']
         self.attacker=caster
         self.name="Load/Fire Crossbow"
@@ -3210,11 +4232,14 @@ class Load_Crossbow():
             Shell.shell.reticule=Shell.Reticule(purpose=self,highlight_type='los')
             Shell.shell.player.floor.cells[Shell.shell.player.location[0]][Shell.shell.player.location[1]].contents.append(Shell.shell.reticule)
 
+    def cleanup(self):
+        pass
 
 class Charge():
     def __init__(self,caster,**kwargs):
         self.caster=caster
         self.weapon=None
+        self.category="physical"
         self.classification=['physical','melee','movement']
         self.name="Charge"
 
@@ -3391,7 +4416,7 @@ class Charge():
         try:
             Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
             Shell.shell.reticule=None
-            Shell.shell.keyboard_mode=None
+            Shell.shell.keyboard_mode='play'
         except: pass
 
     def test_usability(self):
@@ -3471,9 +4496,13 @@ class Charge():
         attack.energy+=0.5*self.caster.movemass*self.chargespeed*self.chargespeed*self.bonus
         attack.time*=0.5/self.bonus
 
+    def cleanup(self):
+        pass
+
 class Grab():
     def __init__(self,caster,**kwargs):
         self.caster=caster
+        self.category="physical"
         self.classification=['physical']
         self.name="Grab"
 
@@ -3547,7 +4576,7 @@ class Grab():
                 elif self.caster in Shell.shell.player.visible_creatures and self.target in Shell.shell.player.visible_creatures:
                     Shell.messages.apend("[b][color=AD801F]{} attempts to grab {} with its {},[color=7B888C] but the grab is avoided![/b][/color][/color]".format(
                         self.caster.name,self.target.name,self.holding_limb.name))
-            elif chance<random.random():
+            elif chance<random.random() or any('incapacitate' in i.classification for i in self.target.enchantments):
                 grasp=Enchantments.Held_In_Grasp(self.target,holding_limb=self.holding_limb,held_limb=self.held_limb)
                 grasp.on_turn()
                 if self.caster==Shell.shell.player:
@@ -3614,11 +4643,746 @@ class Grab():
     def enemy_activation(self):
         self.do(location=self.caster.target.floor.cells[self.caster.target.location[0]][self.caster.target.location[1]])
 
+    def cleanup(self):
+        pass
+
+class Throw_Creature():
+    def __init__(self,caster,**kwargs):
+        self.caster=caster
+        self.weapon=None
+        self.can_tear=False
+        self.category="physical"
+        self.classification=['physical','ranged']
+        self.attacker=caster
+        self.name="Throw creature"
+
+    def select_target(self):
+        list=[]
+        for i in self.caster.limbs:
+            for j in i.enchantments:
+                if j.classname=='holding on':
+                    list.append(j.held.owner)
+        if list==[]:
+            Shell.shell.log.addtext("You are holding no creatures.")
+            return
+        Shell.shell.inventory.show_items_in_list(list)
+        Shell.shell.keyboard_mode='item select'
+        Shell.shell.keyboard_send_to=self
+
+    def do(self,location=None,remove_item=True,**kwargs):
+        self.abort=True
+        self.damagefactor=1
+        self.power=1
+        grasps=[]
+        for i in list(self.thrown.enchantments):
+            if i.classname=='held in grasp' and i.holding_limb.owner==self.caster:
+                self.throwinglimb=i.holding_limb
+                grasps.append(i)
+                self.throwinglimb.updateability(include_enchantments=False)
+                self.power+=i.holding_limb.stats['str']*i.holding_limb.ability
+                self.armlength=self.throwinglimb.length
+                self.moment=self.throwinglimb.I
+                if self.throwinglimb.attachpoint!=None:
+                    self.power+=self.throwinglimb.attachpoint.stats['str']*self.throwinglimb.attachpoint.ability
+                    self.armlength+=self.throwinglimb.attachpoint.length
+                    self.moment+=self.throwinglimb.attachpoint.I
+                    if self.throwinglimb.attachpoint.attachpoint!=None:
+                        self.power+=self.throwinglimb.attachpoint.attachpoint.stats['str']*0.5*self.throwinglimb.attachpoint.attachpoint.ability
+                        self.armlength+=self.throwinglimb.attachpoint.attachpoint.length*0.5
+                        self.moment+=self.throwinglimb.attachpoint.attachpoint.I*0.5
+                self.moment+=self.thrown.mass*self.armlength*self.armlength
+                self.abort=False
+                self.power*=0.5*self.caster.stamina[0]/self.caster.stamina[1]
+        if self.abort:
+            print("Somehow, we were able to throw without holding. Hmmm.")
+        originalpower=self.power
+        for i in self.caster.enchantments:
+            if not self.abort:
+                i.attempt_ability_use(self)
+            if not self.abort:
+                i.physical_ability_modification(self)
+        if self.abort:
+            try:
+                Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
+                Shell.shell.reticule=None
+                Shell.shell.keyboard_mode='play'
+            except: pass
+            return
+        self.startcell.contents.remove(self.thrown)
+
+        bonus=self.power/originalpower
+        self.damage_severity=0
+        self.surprise=False
+        indent=0
+        self.killingblow=False
+        resolved=False
+        throw_accuracy=1+(self.caster.focus[0]*1.12**self.caster.stats['tec'])/self.caster.focus[1]
+        while resolved==False:
+            if throw_accuracy<self.caster.floor.cells[self.caster.location[0]][self.caster.location[1]].distance_to(location)*random.random():
+                location=random.choice(location.immediate_neighbors)
+            else:
+                resolved=True
+
+        collide=False
+
+        line=BaseClasses.get_line(self.caster.location,location.location)
+        lineindex=len(line)-1
+        #if len(line)>1: line.pop(0)
+        for position in line:
+            if position==line[0]: pass
+            elif self.caster.floor.cells[position[0]][position[1]].passable:
+                continue
+            else:
+                collide=True
+                location=self.caster.floor.cells[position[0]][position[1]]
+                lineindex=line.index(position)
+                for i in range(lineindex+1,len(line)):
+                    line.pop(len(line)-1)
+                break
+        if len(line)<=2 and collide:
+            Shell.shell.log.addtext("You cannot throw an enemy onto yourself!")
+            self.startcell.contents.append(self.thrown)
+            try:
+                Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
+                Shell.shell.reticule=None
+                Shell.shell.keyboard_mode='play'
+            except: pass
+            return
+        if not self.thrown.player:
+            Enchantments.GeneralIncapacitation(self.thrown,turns=1)
+        for i in grasps:
+            i.on_removal()
+            if i in self.thrown.enchantments:
+                self.thrown.enchantments.remove(i)
+
+        strikeables=[]
+        target=None
+        alive=False
+        for i in location.contents:
+            if isinstance(i,BaseClasses.Creature) and i.alive==True:
+                target=BaseClasses.targetchoice(i)
+                alive=True
+                break
+            elif isinstance(i,BaseClasses.Item) or isinstance(i,BaseClasses.Limb):
+                strikeables.append(i)
+            elif isinstance(i,BaseClasses.Creature):
+                strikeables.append(BaseClasses.targetchoice(i))
+        if target==None and strikeables!=[]:
+            target=random.choice(strikeables)
+
+
+        if hasattr(target,'stats'): luc=target.stats['luc']
+        else: luc=10
+
+        torque=7*self.power*self.moment**0.5
+        swingangle = random.triangular(low=2, high=4.5, mode=min(max(2 * self.caster.stats['tec'] / luc,2),4.5))
+        throwspeed=self.armlength*((2 * torque * swingangle / self.moment) ** 0.5)
+        throwcost=1+int(7*self.moment/self.power)
+        self.limb=None
+
+        if self.caster.stamina[0]<throwcost:
+            Shell.shell.log.addtext("You don't have the stamina to throw that right now")
+            self.startcell.contents.append(self.thrown)
+            try:
+                Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
+                Shell.shell.reticule=None
+                Shell.shell.keyboard_mode='play'
+            except:
+                pass
+            return
+
+        self.caster.on_ability_use(self)
+
+        self.speed=throwspeed
+        self.caster.stamina[0]-=throwcost
+        self.caster.focus[0]-=3
+        self.caster.combataction=True
+        self.caster.attacked=True
+        self.energy=0.5*self.thrown.mass*self.speed**2
+
+        print("Speed: {}, I: {}, torque: {},energy: {}".format(self.speed,self.moment,torque,self.energy))
+
+        #Make sure we can actually throw far enough to reach our target
+        maxdistance=max(self.speed*self.speed/20-3,2)
+        distance=Shell.shell.dungeonmanager.current_screen.cells[self.caster.location[0]][self.caster.location[1]].distance_to(location)
+        self.time=distance/self.speed
+
+        if maxdistance<distance:
+            xy=line[min(int(maxdistance*(len(line)-1)/distance),len(line)-1)]
+            self.landingcell=self.caster.floor.cells[xy[0]][xy[1]]
+            line=BaseClasses.get_line(self.caster.location,self.landingcell.location)
+            if any(self.caster.floor.cells[i[0]][i[1]] in Shell.shell.player.visible_cells for i in line):
+                self.caster.floor.animate_travel(self.thrown,self.caster.floor.cells[self.caster.location[0]][self.caster.location[1]],self.landingcell,slowness=15)
+            #self.animate(self.caster.floor.cells[self.caster.location[0]][self.caster.location[1]],location)
+            Clock.schedule_once(lambda dx: self.landingcell.contents.append(self.thrown),1/6)
+
+            if self.caster==Shell.shell.player:
+                Shell.messages.append("[b][size=13][color=1FAD39]You throw {}![/b][/size][/color]".format(self.thrown.name))
+                Shell.messages.append(1)
+                indent+=1
+            elif self.thrown==Shell.shell.player:
+                Shell.messages.append("[b][size=13][color=C21D25]{} throws you![/b][/size][/color]".format(self.caster.name))
+                Shell.messages.append(1)
+                indent+=1
+            elif self.caster in Shell.shell.player.visible_creatures:
+                Shell.messages.append("[b][color=AD801F]{} throws {}![/b][/color]".format(self.caster.name,self.thrown.name))
+                Shell.messages.append(1)
+                indent+=1
+
+            self.thrown.location=self.landingcell.location
+            self.resolve_thrown_damage()#Need to resolve damage for the thrown creature here
+
+            try:
+                Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
+                Shell.shell.reticule=None
+                Shell.shell.keyboard_mode='play'
+            except: pass
+            if self.caster==Shell.shell.player: Shell.shell.turn+=1
+            return
+        #If we hit a wall or similar feature, land in front of it
+        if not location.passable:
+            thing=None
+            for i in location.contents:
+                if not hasattr(i,'passable'):
+                    continue
+                if not i.passable:
+                    thing=i
+            if isinstance(thing,BaseClasses.Creature):
+                thingname=thing.name
+            elif isinstance(thing,MapTiles.DungeonFeature):
+                thingname=' '.join(['the',thing.name])
+            else:
+                thingname='something'
+            if self.caster==Shell.shell.player:
+                Shell.messages.append("[b][size=13][color=1FAD39]You throw {} into {}![/b][/size][/color]".format(self.thrown.name,thingname))
+                Shell.messages.append(1)
+                indent+=1
+            elif thing==Shell.shell.player:
+                Shell.messages.append("[b][size=13][color=C21D25]{} throws {} into you![/b][/size][/color]".format(self.caster.name,thingname))
+                Shell.messages.append(1)
+                indent+=1
+            elif self.thrown==Shell.shell.player:
+                Shell.messages.append("[b][size=13][color=C21D25]{} throws you into {}![/b][/size][/color]".format(self.caster.name,thingname))
+                Shell.messages.append(1)
+                indent+=1
+            elif self.caster in Shell.shell.player.visible_creatures:
+                Shell.messages.append("[b][color=AD801F]{} throws {} into {}![/b][/color]".format(self.caster.name,self.thrown.name,thingname))
+                Shell.messages.append(1)
+                indent+=1
+            collide=True
+            self.damagefactor*=1.5
+            xy=line[lineindex-1]
+            self.landingcell=self.caster.floor.cells[xy[0]][xy[1]]
+            line=BaseClasses.get_line(self.caster.location,self.landingcell.location)
+            if target==None:
+                self.thrown.location=self.landingcell.location
+                self.resolve_thrown_damage()
+                line=BaseClasses.get_line(self.caster.location,self.landingcell.location)
+                if any(self.caster.floor.cells[i[0]][i[1]] in Shell.shell.player.visible_cells for i in line):
+                    self.caster.floor.animate_travel(self.thrown,self.caster.floor.cells[self.caster.location[0]][self.caster.location[1]],self.landingcell,slowness=15)
+                Clock.schedule_once(lambda dx: self.landingcell.contents.append(self.thrown),1/6)
+                if self.caster==Shell.shell.player: Shell.shell.turn+=1
+                try:
+                    Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
+                    Shell.shell.reticule=None
+                    Shell.shell.keyboard_mode='play'
+                except: pass
+                return
+        elif target==None:
+            self.landingcell=location
+            line=BaseClasses.get_line(self.caster.location,self.landingcell.location)
+            if any(self.caster.floor.cells[i[0]][i[1]] in Shell.shell.player.visible_cells for i in line):
+                self.caster.floor.animate_travel(self.thrown,self.caster.floor.cells[self.caster.location[0]][self.caster.location[1]],self.landingcell,slowness=15)
+            #self.animate(self.caster.floor.cells[self.caster.location[0]][self.caster.location[1]],location)
+
+            if self.caster==Shell.shell.player:
+                Shell.messages.append("[b][size=13][color=1FAD39]You throw {}![/b][/size][/color]".format(self.thrown.name))
+                Shell.messages.append(1)
+                indent+=1
+            elif self.thrown==Shell.shell.player:
+                Shell.messages.append("[b][size=13][color=C21D25]{} throws you![/b][/size][/color]".format(self.caster.name))
+                Shell.messages.append(1)
+                indent+=1
+            elif self.caster in Shell.shell.player.visible_creatures:
+                Shell.messages.append("[b][color=AD801F]{} throws {}![/b][/color]".format(self.caster.name,self.thrown.name))
+                Shell.messages.append(1)
+                indent+=1
+
+            Clock.schedule_once(lambda dx: self.landingcell.contents.append(self.thrown),1/6)
+
+            self.thrown.location=self.landingcell.location
+            self.resolve_thrown_damage()
+
+            if self.caster==Shell.shell.player: Shell.shell.turn+=1
+            try:
+                Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
+                Shell.shell.reticule=None
+                Shell.shell.keyboard_mode='play'
+            except: pass
+            return
+        #We can hit the target! Now let's process the damage
+        if isinstance(target,BaseClasses.Limb) and target.owner!=None and target in target.owner.limbs:
+            if self.thrown==Shell.shell.player:
+                Shell.messages.append("[color=C21D25]You collide with {}![/color]".format(target.owner.name))
+                Shell.messages.append(1)
+            elif target.owner in Shell.shell.player.visible_creatures:
+                Shell.messages.append("[color=AD801F]{} is injured as it collides with {}![/color]".format(self.thrown.name,target.owner.name))
+                Shell.messages.append(1)
+            self.resolve_thrown_damage()
+            Shell.messages.append(-1)
+            self.struck=target.owner
+            if self.struck==Shell.shell.player:
+                Shell.messages.append("[color=C21D25]{} slams into you![/color]".format(self.thrown.name))
+                Shell.messages.append(1)
+            elif self.struck in Shell.shell.player.visible_creatures:
+                Shell.messages.append("[color=AD801F]{} slams into {}![/color]".format(self.thrown.name,self.struck.name))
+                Shell.messages.append(1)
+            self.resolve_struck_damage()
+        else:
+            self.target=target
+            self.basetarget=target
+            self.touchedobjects=[]
+            self.penetrate=False
+            self.contact=True
+            self.blocked=False
+            self.dodged=False
+            self.parried=False
+            self.damage_dealt=0
+            self.type='crush'
+            self.oldtype=self.type
+            self.results=[]
+            self.damagedobjects=[]
+            self.absolute_depth_limit=1
+            self.attacker=self.caster
+            self.accuracy=(self.caster.focus[0]*self.caster.stats['tec']**0.6)/self.caster.focus[1]
+            self.arpen=0
+            self.area=random.random()**3
+
+            try:
+                self.blockable=0
+                self.parryable=0
+                self.dodgeable=1
+                self.target.owner.evasion(self)
+            except: pass
+
+            if self.dodged==True:
+                Shell.messages.append("[color=7B888C]{} dodges![/color]".format(self.target.owner.name))
+
+            self.reducedmass = self.thrown.mass * self.target.mass / (self.thrown.mass + self.target.mass)
+            thickness,density=self.armor_penetration()
+            self.weapon=random.choice(self.thrown.limbs)
+            self.force = self.damagefactor* (self.speed * (10**3) * (self.shear**0.25) * (self.reducedmass**0.75) / ((density**0.25)*(
+                self.weapon.thickness / self.weapon.youngs + thickness / self.youngs)**0.25))
+            self.pressure = self.force / self.area
+            if not self.abort: self.target.damageresolve(self,self.caster)
+
+        self.landingcell=location
+        line=BaseClasses.get_line(self.caster.location,self.landingcell.location)
+        if any(self.caster.floor.cells[i[0]][i[1]] in Shell.shell.player.visible_cells for i in line):
+            self.caster.floor.animate_travel(self.thrown,self.caster.floor.cells[self.caster.location[0]][self.caster.location[1]],self.landingcell,slowness=15)
+        #self.animate(self.caster.floor.cells[self.caster.location[0]][self.caster.location[1]],location)
+
+        Clock.schedule_once(lambda dx: self.landingcell.contents.append(self.thrown),1/6)
+
+        limb_processed=False
+        if not self.abort:
+            for i in self.touchedobjects:
+                i.on_struck(self)
+                try:
+                    if i in self.basetarget.layers and limb_processed==False:
+                        self.basetarget.on_struck(self)
+                        limb_processed=True
+                except:
+                    self.target.on_struck(self)
+
+
+        if alive:
+            self.basetarget.owner.survivalcheck()
+            if self.basetarget.owner.alive==False:
+                self.caster.on_kill(self.basetarget.owner)
+
+        try:
+            Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
+            Shell.shell.reticule=None
+            Shell.shell.keyboard_mode='play'
+        except: pass
+        if self.caster==Shell.shell.player: Shell.shell.turn+=1
+        if indent>0:
+            Shell.messages.append(-1)
+        if self.surprise:
+            Shell.messages.append(-1)
+
+    def test_usability(self):
+        return True
+
+    def resolve_thrown_damage(self):
+        if self.caster in self.thrown.detected_creatures:
+            self.thrown.hostilitycheck(self.caster)
+            self.thrown.affinity[self.caster]-=3
+        strucklimbs=[]
+        for i in range(0,int((random.random()**2)*self.power/self.thrown.stats['luc']**0.5)+1):
+            self.blockable=0
+            self.dodgeable=0
+            self.parryable=0
+            self.touchedobjects=[]
+            self.penetrate=False
+            self.contact=True
+            self.blocked=False
+            self.dodged=False
+            self.parried=False
+            self.damage_dealt=0
+            self.type='crush'
+            self.oldtype=self.type
+            self.results=[]
+            self.damagedobjects=[]
+            self.absolute_depth_limit=1
+            self.attacker=self.caster
+            self.accuracy=1
+            self.arpen=0
+            self.target=BaseClasses.targetchoice(self.thrown)
+            if self.target in strucklimbs:
+                continue
+            else:
+                strucklimbs.append(self.target)
+            self.basetarget=self.target
+            self.reducedmass = self.target.mass+random.random()*self.thrown.mass
+            self.area=random.random()*self.target.radius*self.target.length
+            if self.thrown==Shell.shell.player:
+                Shell.messages.append("[color=C21D25]Your {} is struck![/color]".format(self.target.name))
+                Shell.messages.append(1)
+            elif self.caster==Shell.shell.player:
+                Shell.messages.append("[color=1FAD39]{}'s {} is struck![/color]".format(self.thrown.name,self.target.name))
+                Shell.messages.append(1)
+            elif self.thrown in Shell.shell.visible_creatures:
+                Shell.messages.append("[color=AD801F]{}'s {} is struck![/color]".format(self.thrown.name,self.target.name))
+                Shell.messages.append(1)
+            thickness,density=self.armor_penetration()
+            self.force = self.damagefactor* (self.speed * (10**3) * (self.shear**0.25) * (self.reducedmass**0.75) / ((density**0.25)*(
+                thickness / self.youngs)**0.25))
+            self.pressure = self.force / self.area
+            self.target.damageresolve(self,self.thrown)
+            Shell.messages.append(-1)
+        Shell.messages.append(-1)
+
+        pass
+
+    def resolve_struck_damage(self):
+        strucklimbs=[]
+        if self.caster in self.struck.detected_creatures:
+            self.struck.hostilitycheck(self.caster)
+            self.struck.affinity[self.caster]-=3
+        for i in range(0,int((random.random()**2)*self.power/self.struck.stats['luc']**0.5)+1):
+            self.blockable=0
+            self.dodgeable=1
+            self.parryable=0
+            self.touchedobjects=[]
+            self.penetrate=False
+            self.contact=True
+            self.blocked=False
+            self.dodged=False
+            self.parried=False
+            self.damage_dealt=0
+            self.type='crush'
+            self.oldtype=self.type
+            self.results=[]
+            self.damagedobjects=[]
+            self.absolute_depth_limit=1
+            self.attacker=self.caster
+            self.accuracy=self.caster.stats['tec']**0.5
+            self.arpen=0
+            self.target=BaseClasses.targetchoice(self.struck)
+            if strucklimbs==[]:
+                try:
+                    self.blockable=0
+                    self.parryable=0
+                    self.dodgeable=1
+                    self.target.owner.evasion(self)
+                except: pass
+
+                if self.dodged==True:
+                    Shell.messages.append("[color=7B888C]{} dodges![/color]".format(self.target.owner.name))
+                    return
+            if self.target in strucklimbs:
+                continue
+            else:
+                strucklimbs.append(self.target)
+            self.basetarget=self.target
+            self.reducedmass = self.target.mass*self.thrown.mass/(self.target.mass+self.thrown.mass)
+            self.area=random.random()*self.target.radius*self.target.length
+            if self.struck==Shell.shell.player:
+                Shell.messages.append("[color=C21D25]Your {} is struck![/color]".format(self.target.name))
+                Shell.messages.append(1)
+            elif self.caster==Shell.shell.player:
+                Shell.messages.append("[color=1FAD39]{}'s {} is struck![/color]".format(self.struck.name,self.target.name))
+                Shell.messages.append(1)
+            elif self.struck in Shell.shell.visible_creatures:
+                Shell.messages.append("[color=AD801F]{}'s {} is struck![/color]".format(self.struck.name,self.target.name))
+                Shell.messages.append(1)
+            thickness,density=self.armor_penetration()
+            self.force = self.damagefactor* (self.speed * (10**3) * (self.shear**0.25) * (self.reducedmass**0.75) / ((density**0.25)*(
+                thickness / self.youngs)**0.25))
+            self.pressure = self.force / self.area
+            self.target.damageresolve(self,self.thrown)
+            Shell.messages.append(-1)
+        Shell.messages.append(-1)
+
+        pass
+
+    def energy_recalc(self):
+        if self.energy < 0:
+            self.force = 0
+            self.pressure = 0
+            self.energy=0
+            return
+        self.speed = (2 * self.energy / self.thrown.mass) ** 0.5
+        if hasattr(self.basetarget,'layers'):
+            density=self.basetarget.layers[len(self.basetarget.layers)-1].density
+        elif hasattr(self.basetarget,'density'):
+            density=self.basetarget.density
+        else:
+            density=5000
+        new = self.damagefactor*(self.speed * (10**3) * (self.shear**0.25) * (self.reducedmass**0.75) / ((density**0.25)*(
+            self.basetarget.thickness / self.youngs)**0.25))
+        self.force = min(new, 0.9 * self.force)
+
+    def decide(self):
+        value=0
+        possible_throws=[]
+        for i in self.caster.limbs:
+            for j in i.enchantments:
+                if j.classname=='holding on':
+                    try:
+                        possible_throws.append(j.held.owner)
+                    except AttributeError: pass
+        if possible_throws==[]:
+            return (0,self)
+        value+=len(possible_throws)
+        self.enemy_throwcell=None
+        for i in self.caster.detected_creatures:
+            distance=self.caster.floor.cells[self.caster.location[0]][self.caster.location[1]].distance_to(self.caster.floor.cells[i.location[0]][i.location[1]])
+            if self.caster.hostilitycheck(i) and distance>2:
+                value+=4/(distance)
+                self.enemy_throwcell=self.caster.floor.cells[i.location[0]][i.location[1]]
+        pref=self.caster.ai_preferences['throw']*self.caster.ai_preferences['grapple']
+        value=value*pref/(value+pref)
+        if 'thrower' in self.caster.classification: value*=2
+        self.thrown=random.choice(possible_throws)
+        self.startcell=self.thrown.floor.cells[self.thrown.location[0]][self.thrown.location[1]]
+        return (value,self)
+
+    def enemy_activation(self):
+        attempts=0
+        startloc=self.caster.location
+        while self.enemy_throwcell==None and attempts<10:
+            attempts+=1
+            loc=[startloc[0]+random.randint(-5,6),startloc[1]+random.randint(-5,6)]
+            distance=self.caster.floor.cells[startloc[0]][startloc[1]].distance_to(self.caster.floor.cells[loc[0]][loc[1]])
+            path=self.caster.floor.passability_check(self.caster.floor.cells[startloc[0]][startloc[1]],self.caster.floor.cells[loc[0]][loc[1]])
+            if distance>2 and path:
+                self.enemy_throwcell=self.caster.floor.cells[loc[0]][loc[1]]
+        self.do(location=self.enemy_throwcell)
+
+    def recieve_input(self,item):
+        if item=='abort':
+            Shell.shell.inventory.close()
+            Shell.shell.keyboard_mode='play'
+            Shell.shell.mouselistener(None,[0,0])
+        if hasattr(item,'mass'):
+            Shell.shell.inventory.close()
+            Shell.shell.keyboard_mode='targeting'
+            self.thrown=item
+            self.startcell=item.floor.cells[item.location[0]][item.location[1]]
+            item.floor.cells[item.location[0]][item.location[1]].passable=True
+            Shell.shell.reticule=Shell.Reticule(purpose=self,highlight_type='los')
+            Shell.shell.player.floor.cells[Shell.shell.player.location[0]][Shell.shell.player.location[1]].contents.append(Shell.shell.reticule)
+
+    def armor_penetration(self):
+        tec=self.caster.stats['tec']
+        luc=self.caster.stats['luc']
+        if hasattr(self.target,'stats'):
+            dluc=self.target.stats['luc']
+            dper=self.target.stats['per']
+        else:
+            dluc=10
+            dper=10
+        if hasattr(self.target,"armor") and self.target.armor is not None:
+            thickness=self.target.thickness+self.target.armor.thickness
+            density=self.target.armor.density
+            coverage=self.target.armor.coverage-self.arpen
+                #mode shifts down for higher defender luck or per. Shifts up for higher attacker tec or luck.
+            mode=(tec+0.5*luc)/(2*dluc+dper)
+            mode=min(mode,1)
+            if random.triangular(0,1,mode)>coverage:
+                #if self.target.armor.coverage*abs(random.gauss(self.target.stats['luc'],1))<random.random()*(self.limb.stats['luc']+2*self.limb.stats['tec'])/3+self.arpen:
+                self.youngs=self.target.arpen_youngs
+                self.shear=self.target.arpen_shear
+                thickness=self.target.thickness
+                density=self.target.layers[len(self.target.layers)-1].density
+                self.penetrate=True
+            else:
+                self.youngs=self.target.youngs
+                self.shear=self.target.shear
+        else:
+            thickness=self.target.thickness
+            self.youngs=self.target.youngs
+            self.shear=self.target.shear
+            if hasattr(self.target,'density'):
+                density=self.target.density
+            elif hasattr(self.target,'layers'):
+                density=self.target.layers[len(self.target.layers)-1].density
+            else:
+                density=5000
+        return (thickness,density)
+
+    def cleanups(self):
+        pass
+
+class Firebreath():
+    def __init__(self,caster,power=15,angle=1,**kwargs):
+        self.caster=caster
+        self.category="physical"
+        self.classification=['fire','elemental']
+        self.name="Fire Breath"
+        self.power=power
+        self.angle=angle
+
+    def select_target(self):
+        if self.caster==Shell.shell.player:
+            shell=Shell.shell
+            player=Shell.shell.player
+            shell.reticule=Shell.Reticule(purpose=self,highlight_type='los cone',radius=3*self.power**(1/3))
+            shell.reticule.floor=player.floor
+            shell.reticule.location=player.location
+            player.floor.cells[player.location[0]][player.location[1]].contents.append(shell.reticule)
+            shell.keyboard_mode='targeting'
+
+    def do(self,location=None,**kwargs):
+        self.abort=False
+        self.killingblow=False
+        blast_radius=3*(0.5+random.random())*self.power**(1/3)
+        cone=self.caster.floor.get_cone(self.caster.location,location.location,angle=self.angle,maxradius=blast_radius,require_los=True)
+        temperature=(400*(self.power)**0.5)
+        heat=(self.power**0.5)
+
+        indent=0
+        if self.caster==Shell.shell.player:
+            Shell.messages.append("[b][size=13][color=1FAD39]You breathe flames![/b][/size][/color]")
+            Shell.messages.append(1)
+            indent=1
+        elif self.caster in Shell.shell.player.visible_creatures:
+            if any(Shell.shell.player.location==i.location for i in cone):
+                Shell.messages.append("[b][size=13][color=C21D25]{} breathes flames![/b][/color][/size]".format(self.caster.name))
+            else:
+                Shell.messages.append("[b][color=AD801F]{} breathes flames!![/b][/color]".format(self.caster.name))
+            Shell.messages.append(1)
+            indent=1
+
+        self.blockable=True
+        self.dodgeable=False
+        self.parryable=False
+        self.surprisable=False
+        self.exploitable=False
+        self.blocked=False
+        self.target=None
+        self.attacker=self.caster
+        self.accuracy=self.caster.stats['tec']**0.5
+        self.time=random.random()
+        self.damagefactor=1
+
+        ordered_cells=[]
+        for i in cone:
+            d=i.distance_to(self.caster.floor.cells[self.caster.location[0]][self.caster.location[1]])
+            if d==0:
+                continue
+            added=False
+            for j in ordered_cells:
+                if d==j[0]:
+                    j.append(i)
+                    added=True
+                    break
+            if added==False:
+                ordered_cells.append([d,i])
+        ordered_cells=sorted(ordered_cells,key=lambda x: x[0])
+        iteration=0
+        for k in ordered_cells:
+            iteration+=1
+            d=k[0]
+            for i in k:
+                if i==d:
+                    continue
+                intensity=heat/d
+                temp=temperature/d**0.5
+                red=0.8
+                green=max((temp-800*d**0.5)/temp,0)
+                blue=max((temp-1100*d)/temp,0)
+                if temp>2000:
+                    green=green*1500/temp
+                    red=red*2000/temp
+                Clock.schedule_once(functools.partial(i.animate_flash,(red,green,blue,(intensity-0.5)/intensity),(0.1,0.1,0.1,0.1),15),iteration/60)
+                for j in i.creatures:
+                    res=j.resistance['fire']*j.resistance['elemental']
+                    indents=0
+                    if j==Shell.shell.player:
+                        Shell.messages.append("[b][size=13][color=C21D25]You are caught in the blast![/color][/b][/size]")
+                        Shell.messages.append(1)
+                        indents=1
+                    elif j in Shell.shell.player.visible_creatures:
+                        Shell.messages.append("[b][size=13][color=AD801F]{} is caught in the blast![/color][/b][/size]".format(j.name))
+                        Shell.messages.append(1)
+                        indents=1
+                    limbs_to_burn=[]
+                    j.evasion(self,blockable=1,parryable=0,dodgeable=0,exploitable=0,surprisable=0)
+                    if not self.blocked:
+                        number_of_burns=random.randrange(1,len(j.limbs)+1)
+                        number_of_burns=max(int(number_of_burns/random.triangular(1,d,1)),1)
+                        for k in range(0,number_of_burns):
+                            newlimb=BaseClasses.targetchoice(j)
+                            if newlimb not in limbs_to_burn:
+                                limbs_to_burn.append(newlimb)
+                    else:
+                        limbs_to_burn=[self.target]
+                        if j==Shell.shell.player:
+                            Shell.messages.append("[color=7B888C]You block the flames with your {}[/color]".format(self.target.name))
+                        elif j in Shell.shell.player.visible_creatures:
+                            Shell.messages.append("[color=7B888C]{} blocks with its {}[/color]".format(j.name,self.target.name))
+                    for k in limbs_to_burn:
+                        k.burn(temp/res,intensity/res,source=self)
+                    if indents==1:
+                        Shell.messages.append(-1)
+                for j in i.items:
+                    j.burn(temp,intensity,source=self)
+                for j in i.dungeon:
+                    j.burn(temp,intensity,source=self)
+
+        if indent==1:
+            Shell.messages.append(-1)
+
+        if self.caster==Shell.shell.player:
+            Shell.shell.turn+=1
+        try:
+            Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
+            Shell.shell.reticule=None
+            Shell.shell.keyboard_mode='play'
+        except: pass
+
+    def decide(self):
+        return (0,self)
+
+    def test_usability(self):
+        return True
+
+    def enemy_activation(self):
+        self.do(location=self.caster.target.floor.cells[self.caster.target.location[0]][self.caster.target.location[1]])
+
+    def cleanup(self):
+        pass
+
 #Techniques
 
 class Sprint():
     def __init__(self,caster,**kwargs):
         self.caster=caster
+        self.category="technique"
         self.classification=['physical','technique','movement']
         self.name="Sprint"
 
@@ -3627,13 +5391,13 @@ class Sprint():
 
     def do(self,*args,**kwargs):
         self.abort=False
-        self.power=self.caster.stats['tec']
+        self.power=self.caster.stats['tec']*(self.caster.tension+1)/100
         for i in self.caster.enchantments:
             if not self.abort:
                 i.attempt_ability_use(self)
             if not self.abort:
-                i.technique_ability_modification(self)
-        Enchantments.Sprinting(self.caster,turns=1,strength=int(self.power**0.8))
+                i.technique_modification(self)
+        Enchantments.Sprinting(self.caster,turns=1,strength=int(self.power**0.8)+1)
 
     def decide(self):
         return (0,self)
@@ -3644,12 +5408,16 @@ class Sprint():
     def enemy_activation(self):
         self.do()
 
+    def cleanup(self):
+        pass
+
 #Divine skills must have a targetcreature attribute and have a type attribute which is 'offensive' 'defensive' or 'mixed
 #Must also have a 'difficulty' attribute, with higher difficulties corresponding to greater failure rates and/or costs
 
 class Divine_Healing():
     def __init__(self,caster):
         self.caster=caster
+        self.category="divine"
         self.classification=['divine','defensive','healing']
         self.type='defensive'
         self.difficulty=2
@@ -3793,9 +5561,13 @@ class Divine_Healing():
     def enemy_activation(self):
         self.do(location=self.caster.floor.cells[self.enemytarget.location[0]][self.enemytarget.location[1]])
 
+    def cleanup(self):
+        pass
+
 class Smite():
     def __init__(self,caster):
         self.caster=caster
+        self.category="divine"
         self.classification=['divine','defensive','healing']
         self.type='defensive'
         self.difficulty=2
@@ -3975,15 +5747,182 @@ class Smite():
         for i in self.caster.gods:
             backupfavor[i]=i.favor[self.caster]
         test=False
-        value=self.caster.damage_level
+        value=0
+        if not isinstance(self.caster.target,BaseClasses.Creature) or self.caster.hostilitycheck(self.caster.target)==False:
+            return (value,self)
+        if self.caster.location[0]-self.caster.target.location[0] not in [-1,0,1]:
+            return (value,self)
+        if self.caster.location[1]-self.caster.target.location[1] not in [-1,0,1]:
+            return (value,self)
+        value=1
+        #Test invocation. If successful, there is a good chance that this can be cast
+        for i in self.caster.gods:
+            test=i.invoke(self)
+            if test==True: break
+        for i in self.caster.gods:
+            i.favor[self.caster]=backupfavor[i]
+        if test==False:
+            return (0,self)
+        pref=self.caster.ai_preferences['melee']*self.caster.ai_preferences['divine']
+        value=value*pref/(value+pref)
+        return (value,self)
+
+    def test_usability(self):
+        return True
+
+    def enemy_activation(self):
+        self.do(location=self.caster.floor.cells[self.caster.target.location[0]][self.caster.target.location[1]])
+
+    def call_before_evasion(self,attack):
+        self.god.smite_effects(self.caster,attack,self)
+
+    def cleanup(self):
+        pass
+
+class Regrowth():
+    def __init__(self,caster):
+        self.caster=caster
+        self.category="divine"
+        self.classification=['divine','defensive','healing']
+        self.type='defensive'
+        self.difficulty=7
+        self.alignment='L'
+        self.name="Regrowth"
+
+    def select_target(self):
+        if self.caster==Shell.shell.player:
+            shell=Shell.shell
+            player=Shell.shell.player
+            shell.reticule=Shell.Reticule(purpose=self,highlight_type='cell')
+            shell.reticule.floor=player.floor
+            shell.reticule.location=player.location
+            player.floor.cells[player.location[0]][player.location[1]].contents.append(shell.reticule)
+            shell.keyboard_mode='targeting'
+
+    def do(self,location=None,**kwargs):
+        self.abort=False
+        self.damagefactor=1
+        self.power=self.caster.stats['luc']
+        self.killingblow=False
+        targetcell=location
+        creatures=[]
+        for i in location.contents:
+            if isinstance(i,BaseClasses.Creature):
+                creatures.append(i)
+        if creatures==[]:
+            Shell.shell.log.addtext("There are no creatures there to heal")
+            return
+        elif not any(i.alive for i in creatures):
+            Shell.shell.log.addtext("It's too late for that one")
+            return
+        else:
+            new=[]
+            for i in creatures:
+                if i.alive: new.append(i)
+            creatures=new
+        self.targetcreature=creatures[0]
+
+        for i in self.caster.enchantments:
+            if not self.abort:
+                i.attempt_ability_use(self)
+            if not self.abort:
+                i.divine_modification(self)
+
+
+        if self.test_usability()==False or self.abort:
+            try:
+                Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
+                Shell.shell.reticule=None
+                Shell.shell.keyboard_mode='play'
+            except: pass
+            return
+        if self.caster==Shell.shell.player:
+            if self.targetcreature==Shell.shell.player: message="[b][size=13][color=1FAD39]You beseech the gods for restoration"
+            else: message="[b][size=13][color=1FAD39]You ask the gods that {} be healed".format(self.targetcreature.name)
+        else:
+            message="[b][color=AD801F]{} mutters a prayer".format(self.caster.name)
+
+        gods=self.caster.gods
+        random.shuffle(gods)
+        self.god=None
+        for i in gods:
+            if i.invoke(self):
+                self.god=i
+                break
+        if self.god==None:
+            if self.caster==Shell.shell.player:
+                message=''.join([message,',[color=7B888C] but your prayers go unanswered.[/b][/size][/color][/color]'])
+                Shell.messages.append(message)
+                Shell.messages.append(1)
+            elif self.caster in Shell.shell.player.visible_creatures:
+                message=''.join([message,',[color=7B888C] but nothing seems to happen.[/b][/size][/color][/color]'])
+                Shell.messages.append(message)
+                Shell.messages.append(1)
+        else:
+            if self.caster==Shell.shell.player:
+                message=''.join([message,'. {} answers your prayer![/b][/size][/color]'.format(self.god.name)])
+                Shell.messages.append(message)
+                Shell.messages.append(1)
+            elif self.caster in Shell.shell.player.visible_creatures:
+                message=''.join([message, ' to {}![/b][/size][/color]'.format(self.god.name)])
+                Shell.messages.append(message)
+                Shell.messages.append(1)
+
+        if self.targetcreature.missing_limbs!=[] and self.god!=None:
+            heals=0
+            possible_targets=[]
+            for i in self.targetcreature.missing_limbs:
+                if i.attachpoint in self.targetcreature.limbs:
+                    possible_targets.append(i)
+            if possible_targets==[]:
+                if self.targetcreature==Shell.shell.player:
+                    Shell.messages.append('[color=7B888C]You have no missing limbs to restore.[/color')
+                elif self.targetcreature in Shell.shell.player.visible_creatures:
+                    Shell.messages.append('[color=7B888C]{} has no limbs to restore.[/color'.format(self.targetcreature.name))
+            else:
+                while random.random()**heals>=1/max(self.power**0.7,1) and possible_targets!=[]:
+                    limb=random.choice(possible_targets)
+                    self.targetcreature.regrow_limb(limb)
+                    if self.targetcreature==Shell.shell.player:
+                        Shell.messages.append("[color=1ED6E3]Your {} regrows![/color]".format(limb.name))
+                    elif self.targetcreature in Shell.shell.player.visible_creatures:
+                        Shell.messages.append("[color=1ED6E3]{}'s {} regrows![/color]".format(self.targetcreature.name,limb.name))
+                    heals+=1
+                    possible_targets=[]
+                    for i in self.targetcreature.missing_limbs:
+                        if i.attachpoint in self.targetcreature.limbs:
+                            possible_targets.append(i)
+
+
+
+        Shell.messages.append(0)
+        self.caster.on_ability_use(self)
+
+
+        try:
+            Shell.dungeonmanager.current_screen.cells[Shell.shell.reticule.location[0]][Shell.shell.reticule.location[1]].contents.remove(Shell.shell.reticule)
+            Shell.shell.reticule=None
+            Shell.shell.keyboard_mode='play'
+        except: pass
+        if self.caster==Shell.shell.player: Shell.shell.turn+=1
+
+    def decide(self):
+        if self.test_usability()==False:
+            return (0,self)
+        value=0
+        backupfavor={}
+        for i in self.caster.gods:
+            backupfavor[i]=i.favor[self.caster]
+        test=False
+        value=len(self.caster.missing_limbs)
         self.enemytarget=self.caster
         for i in self.caster.visible_creatures:
             if self.caster.hostilitycheck(i)==True:
                 continue
             if self.caster.affinity[i]>0 and i.alive:
-                if i.damage_level>value:
+                if len(i.missing_limbs)*self.caster.affinity[i]/10>value:
                     self.enemytarget=i
-                    value=i.damage_level
+                    value=len(i.missing_limbs)
         self.targetcreature=self.enemytarget
         #Test invocation. If successful, there is a good chance that this can be cast
         for i in self.caster.gods:
@@ -3995,7 +5934,7 @@ class Smite():
             return (0,self)
         pref=self.caster.ai_preferences['heal']*self.caster.ai_preferences['divine']
         value=value*pref/(value+pref)
-        return (2*value,self)
+        return (value,self)
 
     def test_usability(self):
         return True
@@ -4003,14 +5942,121 @@ class Smite():
     def enemy_activation(self):
         self.do(location=self.caster.floor.cells[self.enemytarget.location[0]][self.enemytarget.location[1]])
 
-    def call_before_evasion(self,attack):
-        self.god.smite_effects(self.caster,attack,self)
+    def cleanup(self):
+        pass
+
+#Passively used abilities
+
+class Fireburst():
+    def __init__(self,caster,power=10,**kwargs):
+        self.caster=caster
+        self.category="passive"
+        self.classification=['fire','elemental']
+        self.name="Fireburst"
+        self.power=power
+
+    def select_target(self):
+        self.do(self.caster.location)
+
+    def do(self,location=None,**kwargs):
+        self.abort=False
+        self.killingblow=False
+        blast_radius=(0.5+random.random())*self.power**(1/3)
+        circle=self.caster.floor.get_circle(location,blast_radius,require_los=True)
+        temperature=(400*(self.power)**0.5)
+        heat=(self.power**0.5)
+
+        indent=0
+        if self.caster==Shell.shell.player:
+            Shell.messages.append("[b][size=13][color=1FAD39]The ground around you erupts in flame![/b][/size][/color]")
+            Shell.messages.append(1)
+            indent=1
+        elif self.caster in Shell.shell.player.visible_creatures:
+            if any(Shell.shell.player.location==i.location for i in circle):
+                Shell.messages.append("[b][size=13][color=C21D25]Flames burst forth from {}![/b][/color][/size]".format(self.caster.name))
+            else:
+                Shell.messages.append("[b][color=AD801F]Flames burst forth from {}![/b][/color]".format(self.caster.name))
+            Shell.messages.append(1)
+            indent=1
+
+        ordered_cells=[]
+        for i in circle:
+            d=i.distance_to(self.caster.floor.cells[location[0]][location[1]])
+            if d==0:
+                continue
+            added=False
+            for j in ordered_cells:
+                if d==j[0]:
+                    j.append(i)
+                    added=True
+                    break
+            if added==False:
+                ordered_cells.append([d,i])
+        ordered_cells=sorted(ordered_cells,key=lambda x: x[0])
+        iteration=0
+        for k in ordered_cells:
+            iteration+=1
+            d=k[0]
+            for i in k:
+                if i==d:
+                    continue
+                intensity=heat/d
+                temp=temperature/d**0.5
+                red=0.8
+                green=max((temp-800*d**0.5)/temp,0)
+                blue=max((temp-1100*d)/temp,0)
+                if temp>2000:
+                    green=green*1500/temp
+                    red=red*2000/temp
+                Clock.schedule_once(functools.partial(i.animate_flash,(red,green,blue,(intensity-0.5)/intensity),(0.1,0.1,0.1,0.1),15),iteration/60)
+                for j in i.creatures:
+                    res=j.resistance['fire']*j.resistance['elemental']
+                    indents=0
+                    if j==Shell.shell.player:
+                        Shell.messages.append("[b][size=13][color=C21D25]You are caught in the blast![/color][/b][/size]")
+                        Shell.messages.append(1)
+                        indents=1
+                    elif j in Shell.shell.player.visible_creatures:
+                        Shell.messages.append("[b][size=13][color=AD801F]{} is caught in the blast![/color][/b][/size]".format(j.name))
+                        Shell.messages.append(1)
+                        indents=1
+                    limbs_to_burn=[]
+                    number_of_burns=random.randrange(1,len(j.limbs)+1)
+                    number_of_burns=max(int(number_of_burns/random.triangular(1,d,1)),1)
+                    for k in range(0,number_of_burns):
+                        newlimb=BaseClasses.targetchoice(j)
+                        if newlimb not in limbs_to_burn:
+                            limbs_to_burn.append(newlimb)
+                    for k in limbs_to_burn:
+                        k.burn(temp/res,intensity/res,source=self)
+                    if indents==1:
+                        Shell.messages.append(-1)
+                for j in i.items:
+                    j.burn(temp,intensity,source=self)
+                for j in i.dungeon:
+                    j.burn(temp,intensity,source=self)
+
+        if indent==1:
+            Shell.messages.append(-1)
+
+    def decide(self):
+        return (0,self)
+
+    def test_usability(self):
+        return True
+
+    def enemy_activation(self):
+        self.do(location=self.caster.target.floor.cells[self.caster.target.location[0]][self.caster.target.location[1]])
+
+    def cleanup(self):
+        pass
 
 #Abilities not activated by creatures under normal circumstances
 
 class Frost_Explosion():
     def __init__(self,power,**kwargs):
         self.power=power
+        self.category="magic"
         self.classification=['magic','ranged','elemental','debuff']
         self.name="Frost Explosion"
 
@@ -4083,6 +6129,9 @@ class Frost_Explosion():
         icewall=MapTiles.IceWall()
         icewall.melt_resistance=melt
         location.contents.append(icewall)
+
+    def cleanup(self):
+        pass
 
 
 

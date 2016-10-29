@@ -1045,6 +1045,62 @@ class Numb(BaseClasses.Enchantment):
     def on_dispel(self,**kwargs):
         self.target.painfactor=self.oldpainfactor
 
+class Burning_Limb(BaseClasses.Enchantment):
+    def __init__(self,target,turns=10,strength=6,**kwargs):
+        if not isinstance(target,BaseClasses.Limb):
+            return
+        if not any(isinstance(i,Numb) for i in target.enchantments):
+            new=True
+        else: new=False
+        super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='on fire'
+        self.strength=strength
+        self.classification=['fire','negative']
+        self.category='physical'
+        self.oldpainfactor=self.target.painfactor
+        self.target.painfactor=0
+        if self.target.owner==Shell.shell.player:
+            self.identified=True
+            self.detected=True
+            if new==True: Shell.messages.append("[color=C21D25][b]Your {} catches fire![/color][/b]".format(self.target.name))
+        elif self.target.owner in Shell.shell.player.visible_creatures:
+            Shell.messages.append("[color=1F4CAD]{}'s {} catches fire[/color]".format(self.target.owner.name,self.target.name))
+        self.target.coatings=[]
+
+    def on_turn(self):
+        if self.target.owner==Shell.shell.player:
+            Shell.messages.append("[color=C21D25]Your {} burns![/color]".format(self.target.name))
+        elif self.target.owner in Shell.shell.player.visible_creatures:
+            Shell.messages.append("[color=1F4CAD]{}'s {} burns![/color]".format(self.target.owner.name,self.target.name))
+        Shell.messages.append(1)
+        burning_layer=None
+        burntemp=self.strength*100
+        layers=list(self.target.layers)
+        while layers!=[]:
+            layer=layers.pop()
+            for i in layer.coatings:
+                if i.flammable:
+                    self.turns+=random.randint(1,10)
+                    self.strength+=random.randint(1,4)
+                else:
+                    i.burn(burntemp,1)
+                    self.turns-=1
+                    self.strength-=1
+            if layer.damage['burn']>=1:
+                continue
+            if layer.heat_reaction not in ('burn','ignite'):
+                break
+            burning_layer=layer
+            burntemp=max(burntemp,burning_layer.burn_temp)
+            break
+        self.target.burn(burntemp,3*random.random())
+        if burning_layer==None:
+            self.turns=0
+        else:
+            self.strength+=1
+        Shell.messages.append(-1)
+        super().on_turn()
+
 class Magical_Grasp(BaseClasses.Enchantment):
     def __init__(self,target,turns='permanent',strength=6,**kwargs):
         if not isinstance(target,BaseClasses.Limb):
@@ -1162,7 +1218,7 @@ class Held(BaseClasses.Enchantment):
         self.strength=strength
         self.category='physical'
         self.classification=["physical","grasp","movement impairing"]
-        self.held=None
+        self.grasping=None
 
     def on_turn(self):
         self.target.ability=0
@@ -1421,7 +1477,6 @@ class Frozen_Creature(BaseClasses.Enchantment):
         else:
             self.removalmessage="[color=1F4CAD]{} is no longer frozen[/color]".format(self.target.name)
 
-
     def on_turn(self):
         res=self.target.resistance['ice']*self.target.resistance['magic']*self.target.resistance['elemental']
         super().on_turn()
@@ -1447,6 +1502,41 @@ class Frozen_Creature(BaseClasses.Enchantment):
             Shell.messages.append("You are frozen solid!")
         ability.abort=True
         Shell.shell.turn+=1
+        return False
+
+class Impaired_Mobility(BaseClasses.Enchantment):
+    def __init__(self,target,turns='permanent',strength=6,**kwargs):
+        if not isinstance(target,BaseClasses.Creature):
+            return
+        super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='impaired mobility'
+        self.classification=['incapacitate','physical','movement impairing']
+        self.strength=strength
+        self.identified=True
+        self.detected=True
+
+
+
+    def on_turn(self):
+        super().on_turn()
+
+    def attempt_movement(self):
+        abil=self.target.balance*(self.target.stats['luc']*self.target.stats['str']*self.target.stats['wil']*self.target.stats['tec'])**0.25
+        if abil/(abil+30)>random.random():
+            return True
+        if self.target==Shell.shell.player:
+            Shell.messages.append("You stumble!")
+        return False
+
+    def attempt_ability_use(self,ability,**kwargs):
+        if not 'movement' in ability.classification:
+            return True
+        abil=self.target.balance*(self.target.stats['luc']*self.target.stats['str']*self.target.stats['wil']*self.target.stats['tec'])**0.25
+        if abil/(abil+30)>random.random:
+            return True
+        if self.target==Shell.shell.player:
+            Shell.messages.append("You stumble!")
+            Shell.shell.turn+=1
         return False
 
 class Dazed(BaseClasses.Enchantment):
@@ -1775,6 +1865,132 @@ class Blind(BaseClasses.Enchantment):
         self.target.can_see=False
         super().sense_modification()
 
+class Berserk(BaseClasses.Enchantment):
+    def __init__(self,target,turns='permanent',strength=6,**kwargs):
+        if not isinstance(target,BaseClasses.Creature):
+            return
+        super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='berserk'
+        self.classification=['berserk','movement impairing','attack impairing']
+        self.category='physical'
+        self.strength=strength
+        self.staminacost=50+self.target.stamina[1]-self.target.stamina[0]
+        self.focuscost=10+self.target.focus[1]-self.target.focus[0]
+        Creature_Stat_Modification(self.target,turns=1,strength=int(self.strength/2))
+        for i in ('psychic','fear','pain','disable'):
+            self.target.resistance[i]*=10000
+        if self.target==Shell.shell.player:
+            self.removalmessage="[b][color=1FAD39]You calm down.[/b][/color]"
+        else:
+            self.removalmessage="[color=1F4CAD]{} calms down[/color]".format(self.target.name)
+        if self.target==Shell.shell.player:
+            self.identified=True
+            self.detected=True
+
+    def on_turn(self):
+        self.staminacost+=self.target.stamina[1]-self.target.stamina[0]
+        self.focuscost+=self.target.focus[1]-self.target.focus[0]
+        self.target.stamina[0]=self.target.stamina[1]
+        self.target.focus[0]=self.target.focus[1]
+        self.target.pain=0
+        Creature_Stat_Modification(self.target,turns=1,strength=int(self.strength/2))
+        self.strength-=1
+        if self.strength<=0:
+            self.turns=0
+        super().on_turn()
+
+    def on_removal(self,**kwargs):
+        self.target.stamina[0]=max(self.target.stamina[0]-self.staminacost,0)
+        self.target.focus[0]=max(self.target.focus[0]-self.focuscost,0)
+        for i in ('psychic','fear','pain','disable'):
+            self.target.resistance[i]=self.target.resistance[i]/10000
+        super().on_removal(**kwargs)
+
+    def attempt_attack(self):
+        super().attempt_attack()
+        return True
+
+    def evasion_modification(self,attack,**kwargs):
+        self.target.surprise=0
+        self.target.exploit=0
+        super().evasion_modification(attack,**kwargs)
+
+    def attack_modification(self,attack,**kwargs):
+        super().attack_modification(attack,**kwargs)
+        self.strength+=2
+        attack.damagefactor*=1+self.strength/10
+        attack.time*=15/(15+self.strength)
+        attack.energy*=1+self.strength/10
+
+    def physical_ability_modification(self,ability,**kwargs):
+        super().physical_ability_modification(ability,**kwargs)
+        self.strength+=1
+
+    def magic_modification(self,magic,**kwargs):
+        super().magic_modification(magic,**kwargs)
+        magic.abort=True
+        if self.target==Shell.shell.player:
+            Shell.shell.log.addtext("You cannot cast spells while berserk!")
+
+    def technique_modification(self,technique,**kwargs):
+        super().technique_modification(technique,**kwargs)
+        technique.abort=True
+        if self.target==Shell.shell.player:
+            Shell.shell.log.addtext("You cannot use that while berserk!")
+
+    def divine_modification(self,ability,**kwargs):
+        super().divine_modification(ability,**kwargs)
+        ability.abort=True
+        if self.target==Shell.shell.player:
+            Shell.shell.log.addtext("You cannot pray while berserk!")
+
+    def psychic_modification(self,ability,**kwargs):
+        super().psychic_modification(ability,**kwargs)
+        ability.abort=True
+        if self.target==Shell.shell.player:
+            Shell.shell.log.addtext("You cannot focus your psychic abilities while berserk!")
+
+class Invisible(BaseClasses.Enchantment):
+    def __init__(self,target,turns='permanent',strength=6,**kwargs):
+        if not isinstance(target,BaseClasses.Creature):
+            return
+        super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='invisible'
+        self.strength=strength
+        self.detection={}
+        self.location=[self.target.location[0],self.target.location[1]]
+        self.identified=True
+        self.detected=True
+
+    def on_turn(self):
+        if self.location!=self.target.location:
+            self.location=[self.target.location[0],self.target.location[1]]
+            for i in self.detection:
+                if self.detection[i]>0:
+                    self.detection[i]-=1
+        super().on_turn()
+
+    def detect(self,detector):
+        if detector in self.detection and self.detection[detector]>0:
+            return True
+        else:
+            return False
+
+    def on_strike(self,attack):
+        super().on_strike(attack)
+        if attack.basetarget.owner==None: return
+        if attack.basetarget.owner not in self.detection:
+            self.detection[attack.basetarget.owner]=0
+        if ((attack.basetarget.owner.stats['per']*attack.basetarget.owner.stats['luc'])**0.5)*random.random()>10:
+            self.detection[attack.basetarget.owner]+=random.randint(1,3)
+
+    def on_struck(self,attack):
+        super().on_struck(attack)
+        if attack.attacker not in self.detection:
+            self.detection[attack.attacker]=0
+        if ((attack.basetarget.owner.stats['per']*attack.basetarget.owner.stats['luc'])**0.5)*random.random()>10:
+            self.detection[attack.basetarget.owner]+=random.randint(1,3)
+
 
 
 class Vision_Modification(BaseClasses.Enchantment):
@@ -1895,7 +2111,9 @@ class Held_In_Grasp(BaseClasses.Enchantment):
                 self.target.enchantments.remove(self)
                 return
         self.grasping=Grasping(self.holding_limb)
+        self.grasping.held=self.held_limb
         self.held=Held(self.held_limb)
+        self.held.grasping=self.grasping
 
     def sense_modification(self):
         self.normal_balance=self.target.balance
@@ -2050,6 +2268,29 @@ class Familiar_Guidance(BaseClasses.Enchantment):
     def sense_modification(self):
         super().sense_modification()
         self.familiar.check_visible_cells(send_to=self.target)
+
+class GeneralIncapacitation(BaseClasses.Enchantment):
+    def __init__(self,target,turns='permanent',strength=6,**kwargs):
+        if not isinstance(target,BaseClasses.Creature):
+            return
+        super().__init__(target,turns=turns,strength=strength,**kwargs)
+        self.classname='incapacitated'
+        self.classification=['incapacitate','movement impairing','attack impairing']
+        self.strength=strength
+        self.identified=False
+        self.detected=False
+
+    def on_turn(self):
+        super().on_turn()
+
+    def attempt_attack(self):
+        return False
+
+    def attempt_movement(self):
+        return False
+
+    def attempt_ability_use(self,ability,**kwargs):
+        return False
 
 
 

@@ -1403,7 +1403,7 @@ class Argentavis(BaseClasses.Creature):
 
         self.classification.append('avian')
         self.classification.append('living')
-        self.classification.append('owl')
+        self.classification.append('argentavis')
         if self.player==True:
             self.classification.append('player')
         if hostile==True:
@@ -1415,6 +1415,101 @@ class Argentavis(BaseClasses.Creature):
         for i in limb.layers:
             if isinstance(i.material,M.Flesh_Material):
                 i.fluid=Fluids.Blood(self)
+
+class Phoenix(BaseClasses.Creature):
+    def __init__(self,color=(1,1,1,1),name='the phoenix',job='',named=False,hostile=True,player=False,stats='random',sizefactor=random.gauss(1,0.06)):
+        super().__init__()
+        self.basicname='phoenix'
+        self.race=('phoenix','phoenixes')
+        if stats=='random':
+            self.stats= {'s': int(random.triangular(low=20, high=40, mode=30)),
+                         't': int(random.triangular(low=20, high=50, mode=35)),
+                         'p': int(random.triangular(low=10, high=40, mode=20)),
+                         'w': int(random.triangular(low=10, high=40, mode=25)),
+                         'l': int(random.triangular(low=5, high=17, mode=10))}
+        else:
+            self.stats=stats
+        self.stats['str']=self.stats['s']
+        self.stats['tec']=self.stats['t']
+        self.stats['per']=self.stats['p']
+        self.stats['wil']=self.stats['w']
+        self.stats['luc']=self.stats['l']
+        self.level=1
+        self.exp=[0,100]
+        self.focus=[int(20*(self.stats['p']**0.7+self.level**0.3)),int(20*(self.stats['p']**0.7+self.level**0.3))]
+        self.stamina=[int(10*(2*self.stats['s']**2+self.level**2)**0.5),int(10*(2*self.stats['s']**2+self.level**2)**0.5)]
+        self.maxstamina=int(10*(2*self.stats['s']**2+self.level**2)**0.5)
+        self.image='./images/Untitled.jpg'
+        self.location=[None,None]
+        self.passable=False
+        self.color=color
+        self.name=name+job
+        self.indefinitename=name.replace('the ', 'a ',1)
+        self.targetable=True
+        self.player=player
+        self.limbs=[]
+        self.vitals=[]
+        self.attacks=[]
+        #self.body=Torso(self.stats,'torso',owner=self)
+        self.sizefactor=sizefactor
+
+        self.body=L.Upper_Torso(self.stats,name='torso',scale=sizefactor,length=1,radius=0.13,owner=self)
+        self.body.add_outer_layer(Items.Feathers,M.Feather,0.07,name='feathers',plural=True)
+        self.flank=L.Abdomen(self.stats,name='flank',scale=sizefactor,length=1,radius=0.11,owner=self)
+        self.flank.add_outer_layer(Items.Feathers,M.Feather,0.07,name='feathers',plural=True)
+        self.flank.join_to(self.body)
+        self.head=L.Avian_Head(self.stats,scale=self.sizefactor,length=0.3,radius=0.08,owner=self)
+        self.head.join_to(self.body)
+        self.beak=L.Beak(self.stats,scale=sizefactor,length=0.3,radius=0.06,owner=self,tip=0.000008)
+        self.beak.join_to(self.head)
+
+        for i in ('left','right'):
+            leg=L.Avian_Leg(self.stats,name="{} leg".format(i),scale=sizefactor,owner=self,boneradius=0.015,length=0.4)
+            leg.join_to(self.flank)
+            foot=L.Avian_Foot(self.stats,name="{} foot".format(i),scale=sizefactor,owner=self,radius=0.07,length=0.13)
+            foot.join_to(leg)
+            for j in ('first','second','third','fourth'):
+                talon=L.Claw(self.stats,name="{} talon, {} foot".format(j,i),scale=sizefactor,tip=0.000004,owner=self,length=0.4,
+                             radius=0.03)
+                talon.join_to(foot)
+            wing=L.Avian_Wing(self.stats,name="{} wing".format(i),scale=sizefactor,length=0.07,radius=3.5,owner=self)
+            wing.join_to(self.body)
+            eye=L.Eye(self.stats,name="{} ".format(i),scale=sizefactor,radius=0.009,owner=self)
+            eye.visual_acuity=1
+            eye.join_to(self.head)
+
+
+        self.mass_calc()
+        self.updateattacks()
+
+        for i in self.limbs:
+            self.process_new_limb(i)
+
+        self.classification.append('avian')
+        self.classification.append('living')
+        self.classification.append('phoenix')
+        if self.player==True:
+            self.classification.append('player')
+        if hostile==True:
+            self.disposition['player']=random.randint(-5,0)
+        self.disposition['rodent']=random.randint(-10,-7)
+        self.resistance['fire']=10000
+
+    def process_new_limb(self,limb):
+        super().process_new_limb(limb)
+        for i in limb.layers:
+            if isinstance(i.material,M.Flesh_Material):
+                i.fluid=Fluids.Blood(self)
+
+    def on_struck(self,attack):
+        super().on_struck(attack)
+        fireburst=S.Abilities.Fireburst(self,power=20)
+        fireburst.do(self.location)
+
+    def die(self,scatter=1,corpse=True,**kwargs):
+        fireburst=S.Abilities.Fireburst(self,power=40)
+        fireburst.do(self.location)
+        super().die(scatter=scatter,corpse=corpse,**kwargs)
 
 class Owl(BaseClasses.Creature):
     def __init__(self,color=(1,1,1,1),name='the owl',job='',named=False,hostile=True,player=False,stats='random',sizefactor=random.gauss(1,0.06)):
@@ -2940,6 +3035,15 @@ class Target_Dummy(BaseClasses.Creature):
             print('average pressure:',self.averagehits[keys][2])
             print('average energy:',self.averagehits[keys][3])
 
+'''
+class ThrowBeast(Giant):
+    def __init__(self,color=(1,1,1,1),name='the giant',job='',named=False,hostile=True,player=False,stats='random',sizefactor=random.gauss(3,0.2)):
+        super().__init__(color=color,name='throwbeast',job=job,named=named,hostile=hostile,player=player,stats=stats,sizefactor=sizefactor)
+        self.ai_preferences['grapple']=10
+        self.ai_preferences['throw']=10
+        import Abilities
+        self.abilities=[Abilities.Grab(self),Abilities.Throw_Creature(self)]
+'''
 
 ##################################################
 
